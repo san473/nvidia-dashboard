@@ -17,6 +17,8 @@ def get_data(ticker):
     stock = yf.Ticker(ticker)
     info = stock.info
     hist = stock.history(period="1y")
+    
+
     return info, hist
 
 def get_financial_ratios(ticker):
@@ -56,6 +58,8 @@ def format_large_number(n):
 # Fetch data
 try:
     info, hist = get_data(ticker)
+    ratios = get_financial_ratios(ticker)
+
     st.subheader(f"{info.get('longName', ticker)} ({ticker})")
     st.markdown(f"**Sector:** {info.get('sector', 'N/A')}  ")
     st.markdown(f"**Industry:** {info.get('industry', 'N/A')}  ")
