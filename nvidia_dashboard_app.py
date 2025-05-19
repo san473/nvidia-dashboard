@@ -1,10 +1,23 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import numpy as np
-import datetime
 import plotly.graph_objects as go
+import numpy as np
 import requests
+from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
+
+NEWSAPI_KEY = st.secrets["newsapi"]
+def fetch_news(ticker):
+    try:
+        url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWSAPI_KEY}&sortBy=publishedAt&language=en"
+        response = requests.get(url)
+        articles = response.json().get("articles", [])[:5]
+        return articles
+    except Exception as e:
+        st.error(f"Failed to fetch news: {e}")
+        return []
+
 
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
@@ -73,6 +86,23 @@ try:
 
 except Exception as e:
     st.error(f"Failed to fetch data for ticker {ticker}. Error: {e}")
+
+    # ------------------------ GEOGRAPHIC REVENUE / HQ INFO ------------------------
+with st.expander("🌍 Geographic & Business Overview"):
+    try:
+        country = info.get("country", "N/A")
+        city = info.get("city", "")
+        state = info.get("state", "")
+        address = f"{city}, {state}, {country}" if city else country
+        st.markdown(f"**Headquarters:** {address}")
+
+        st.markdown(f"**Sector:** {info.get('sector', 'N/A')}")
+        st.markdown(f"**Industry:** {info.get('industry', 'N/A')}")
+
+        summary = info.get("longBusinessSummary", "Business description not available.")
+        st.markdown(f"**Business Description:**  \n{summary}")
+    except Exception as e:
+        st.warning("Geographic and company summary data not available.")
 
 # ------------------------ DCF VALUATION ------------------------
 with st.expander("💰 Discounted Cash Flow (DCF) Valuation"):
@@ -151,41 +181,21 @@ else:
     st.warning("No peer data available for this ticker.")
 
 # ------------------------ REAL-TIME NEWS ------------------------
-with st.expander("📰 Real-Time News Feed"):
-    try:
-        stock = yf.Ticker(ticker)
-        news_items = stock.news
-        if not news_items:
-            raise ValueError("No news returned")
+st.subheader("📰 Real-Time News Feed")
+news_articles = fetch_news(ticker)
 
-        for item in news_items[:5]:
-            title = item.get("title") or "No Title"
-            link = item.get("link") or "#"
-            publisher = item.get("publisher") or "Unknown Publisher"
-            st.markdown(f"**[{title}]({link})**  \n_{publisher}_")
-
-    except Exception as e:
-        st.info("📭 No recent news available.")
-        st.write(f"Debug info: {e}")
+if news_articles:
+    for article in news_articles:
+        st.markdown(f"**[{article['title']}]({article['url']})**")
+        st.caption(f"{article['source']['name']} - {article['publishedAt']}")
+        st.write(article['description'] or "No summary available.")
+        st.markdown("---")
+else:
+    st.info("No recent news available.")
 
 
 # ---------------------------------------------
-# ------------------------ GEOGRAPHIC REVENUE / HQ INFO ------------------------
-with st.expander("🌍 Geographic & Business Overview"):
-    try:
-        country = info.get("country", "N/A")
-        city = info.get("city", "")
-        state = info.get("state", "")
-        address = f"{city}, {state}, {country}" if city else country
-        st.markdown(f"**Headquarters:** {address}")
-
-        st.markdown(f"**Sector:** {info.get('sector', 'N/A')}")
-        st.markdown(f"**Industry:** {info.get('industry', 'N/A')}")
-
-        summary = info.get("longBusinessSummary", "Business description not available.")
-        st.markdown(f"**Business Description:**  \n{summary}")
-    except Exception as e:
-        st.warning("Geographic and company summary data not available.")
+# 
 
 # ------------------------ INTERACTIVE VISUALIZATIONS ------------------------
 st.header("📊 Interactive Visualizations")
