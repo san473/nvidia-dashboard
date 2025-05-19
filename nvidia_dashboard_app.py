@@ -105,41 +105,91 @@ with st.expander("🌍 Geographic & Business Overview"):
         st.warning("Geographic and company summary data not available.")
 
 # ------------------------ DCF VALUATION ------------------------
-with st.expander("💰 Discounted Cash Flow (DCF) Valuation"):
+st.header("💰 Discounted Cash Flow (DCF) Valuation")
+
+# --- User-Defined Assumptions ---
+st.subheader("📈 DCF Assumptions")
+col1, col2, col3 = st.columns(3)
+with col1:
+    forecast_years = st.slider("Forecast Years", min_value=3, max_value=10, value=5)
+with col2:
+    growth_rate = st.slider("FCF Growth Rate (%)", min_value=0.0, max_value=20.0, value=10.0, step=0.5) / 100
+with col3:
+    discount_rate = st.slider("Discount Rate / WACC (%)", min_value=5.0, max_value=15.0, value=9.0, step=0.5) / 100
+
+# --- DCF Function ---
+def calculate_dcf(ticker, forecast_years, growth_rate, discount_rate):
+    stock = yf.Ticker(ticker)
     try:
-        stock = yf.Ticker(ticker)
         cashflow = stock.cashflow
-        st.write("📊 Available Cashflow Index:", list(cashflow.index))
-
-        if 'Total Cash From Operating Activities' in cashflow.index:
-            op_cash = cashflow.loc['Total Cash From Operating Activities']
+        if 'Total Cash From Operating Activities' in cashflow.index and 'Capital Expenditures' in cashflow.index:
+            fcf = cashflow.loc['Total Cash From Operating Activities'] - cashflow.loc['Capital Expenditures']
+        elif 'Operating Cash Flow' in cashflow.index and 'Capital Expenditures' in cashflow.index:
+            fcf = cashflow.loc['Operating Cash Flow'] - cashflow.loc['Capital Expenditures']
+            st.info("Using fallback row: **Operating Cash Flow**")
         else:
-            op_match = [i for i in cashflow.index if "operating" in i.lower()]
-            if not op_match:
-                raise ValueError("Operating cash flow not found.")
-            op_cash = cashflow.loc[op_match[0]]
-            st.info(f"Using fallback row: **{op_match[0]}**")
+            return None
 
-        avg_cashflow = op_cash.mean()
-        discount_rate = 0.10
-        growth_rate = 0.05
-        intrinsic_value = avg_cashflow * (1 + growth_rate) / (discount_rate - growth_rate)
+        fcf = fcf.dropna()
+        latest_fcf = fcf.iloc[0]
+        terminal_growth_rate = 0.03
 
-        # Get current market price
-        market_price = stock.history(period="1d")["Close"][-1]
-        diff = intrinsic_value - market_price
+        projected_fcfs = [latest_fcf * (1 + growth_rate) ** i for i in range(1, forecast_years + 1)]
+        discounted_fcfs = [fcf / (1 + discount_rate) ** i for i, fcf in enumerate(projected_fcfs, start=1)]
+        terminal_value = projected_fcfs[-1] * (1 + terminal_growth_rate) / (discount_rate - terminal_growth_rate)
+        discounted_terminal = terminal_value / (1 + discount_rate) ** forecast_years
 
-        st.success(f"Intrinsic Value Estimate: **${intrinsic_value:,.2f}**")
-        st.info(f"Current Market Price: **${market_price:.2f}**")
+        enterprise_value = sum(discounted_fcfs) + discounted_terminal
+        try:
+            debt = stock.balance_sheet.loc['Total Debt'].iloc[0]
+        except:
+            debt = 0
+        try:
+            cash = stock.balance_sheet.loc['Cash'].iloc[0]
+        except:
+            cash = 0
 
-        if intrinsic_value > market_price:
-            st.success("✅ The stock appears **undervalued** based on DCF.")
-        else:
-            st.warning("⚠️ The stock appears **overvalued** based on DCF.")
+        shares_outstanding = stock.info.get('sharesOutstanding', 0)
+        equity_value = enterprise_value - debt + cash
+        fair_value_per_share = equity_value / shares_outstanding if shares_outstanding > 0 else None
+
+        return {
+            'enterprise_value': enterprise_value,
+            'equity_value': equity_value,
+            'fair_value_per_share': fair_value_per_share
+        }
 
     except Exception as e:
         st.error(f"DCF valuation failed: {e}")
-        st.warning("DCF valuation data not available.")
+        return None
+
+# --- Run DCF ---
+dcf_result = calculate_dcf(ticker, forecast_years, growth_rate, discount_rate)
+
+# --- Display DCF Results ---
+if dcf_result and dcf_result['fair_value_per_share']:
+    current_price = info.get('currentPrice', 0)
+    fair_value = dcf_result['fair_value_per_share']
+
+    st.markdown(f"""
+    **DCF Assumptions:**
+    - Forecast Period: `{forecast_years}` years  
+    - FCF Growth Rate: `{growth_rate * 100:.1f}%`  
+    - Discount Rate (WACC): `{discount_rate * 100:.1f}%`  
+    - Terminal Growth Rate: `3.0%`  
+    """)
+
+    st.success(f"**Intrinsic Value Estimate (DCF): ${dcf_result['equity_value']:,.2f}**")
+    st.info(f"**Current Market Price:** ${current_price:,.2f}")
+    st.success(f"**Intrinsic Value per Share:** ${fair_value:,.2f}")
+
+    if fair_value > current_price:
+        st.markdown("✅ The stock appears **undervalued** based on DCF.")
+    else:
+        st.markdown("⚠️ The stock appears **overvalued** based on DCF.")
+else:
+    st.warning("DCF valuation data not available.")
+
 
 
 # ------------------------ PEER COMPARISON ------------------------
