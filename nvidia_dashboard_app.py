@@ -104,58 +104,55 @@ with st.expander("🌍 Geographic & Business Overview"):
     except Exception as e:
         st.warning("Geographic and company summary data not available.")
 
-# -----------------------
-# ----------------------------- 💰 DCF VALUATION -----------------------------
+
+# ------------------- DCF VALUATION -------------------
+st.header("💰 Discounted Cash Flow (DCF) Valuation")
+
+# --- User-Defined Assumptions ---
+st.subheader("📈 DCF Assumptions")
+col1, col2, col3 = st.columns(3)
+with col1:
+    forecast_years = st.slider("Forecast Years", min_value=3, max_value=10, value=5)
+with col2:
+    growth_rate = st.slider("FCF Growth Rate (%)", min_value=0.0, max_value=20.0, value=10.0, step=0.5) / 100
+with col3:
+    discount_rate = st.slider("Discount Rate / WACC (%)", min_value=5.0, max_value=15.0, value=9.0, step=0.5) / 100
+
+# --- DCF Calculation ---
 def calculate_dcf(ticker, forecast_years, growth_rate, discount_rate):
-    stock = yf.Ticker(ticker)
-
     try:
+        stock = yf.Ticker(ticker)
         cashflow = stock.cashflow
-
-        if cashflow is None or cashflow.empty:
-            st.warning("⚠️ No cash flow data available from yfinance for this stock.")
-            return None
 
         st.write("📌 Available Cashflow Rows:", list(cashflow.index))
 
-        # Try multiple fallback rows for FCF calculation
-        fcf = None
         if 'Total Cash From Operating Activities' in cashflow.index and 'Capital Expenditures' in cashflow.index:
             fcf = cashflow.loc['Total Cash From Operating Activities'] - cashflow.loc['Capital Expenditures']
         elif 'Operating Cash Flow' in cashflow.index and 'Capital Expenditures' in cashflow.index:
             fcf = cashflow.loc['Operating Cash Flow'] - cashflow.loc['Capital Expenditures']
-            st.info("🔁 Using fallback: Operating Cash Flow")
+            st.info("Using fallback row: **Operating Cash Flow**")
         else:
-            st.warning("⚠️ Could not find usable FCF rows in cashflow.")
+            st.warning("DCF valuation failed: Required cash flow rows not found.")
             return None
 
         fcf = fcf.dropna()
         if fcf.empty:
-            st.warning("⚠️ No non-null FCF values found.")
+            st.warning("DCF valuation failed: FCF data is empty after dropna.")
             return None
 
         latest_fcf = fcf.iloc[0]
         terminal_growth_rate = 0.03
 
         projected_fcfs = [latest_fcf * (1 + growth_rate) ** i for i in range(1, forecast_years + 1)]
-        discounted_fcfs = [fcf / (1 + discount_rate) ** i for i, fcf in enumerate(projected_fcfs, start=1)]
-
+        discounted_fcfs = [val / (1 + discount_rate) ** i for i, val in enumerate(projected_fcfs, start=1)]
         terminal_value = projected_fcfs[-1] * (1 + terminal_growth_rate) / (discount_rate - terminal_growth_rate)
         discounted_terminal = terminal_value / (1 + discount_rate) ** forecast_years
 
         enterprise_value = sum(discounted_fcfs) + discounted_terminal
-
-        # Debt and cash fallback
-        try:
-            debt = stock.balance_sheet.loc['Total Debt'].iloc[0]
-        except:
-            debt = 0
-        try:
-            cash = stock.balance_sheet.loc['Cash'].iloc[0]
-        except:
-            cash = 0
-
+        debt = stock.balance_sheet.loc['Total Debt'].iloc[0] if 'Total Debt' in stock.balance_sheet.index else 0
+        cash = stock.balance_sheet.loc['Cash'].iloc[0] if 'Cash' in stock.balance_sheet.index else 0
         shares_outstanding = stock.info.get('sharesOutstanding', 0)
+
         equity_value = enterprise_value - debt + cash
         fair_value_per_share = equity_value / shares_outstanding if shares_outstanding > 0 else None
 
@@ -166,10 +163,15 @@ def calculate_dcf(ticker, forecast_years, growth_rate, discount_rate):
         }
 
     except Exception as e:
-        st.error(f"❌ DCF valuation failed: {e}")
+        st.error(f"DCF valuation failed due to error: {e}")
         return None
 
+# --- Run and Display DCF ---
+dcf_result = calculate_dcf(ticker, forecast_years, growth_rate, discount_rate)
 
+if dcf_result and dcf_result['fair_value_per_share']:
+    current_price = info.get('currentPrice', 0)
+   
 
 
 # ------------------------ PEER COMPARISON ------------------------
