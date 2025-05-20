@@ -507,24 +507,20 @@ else:
 
 
 # --- Risks & Concerns ---
-st.header("⚠️ Risks & Concerns")
+# --- Risks & Concerns ---
+st.markdown("## ⚠️ Risks & Concerns")
 
-risk_points = []
+try:
+    debt_equity = key_metrics.get("Debt to Equity", None)  # or ratios.get(...) depending on your setup
 
-debt_equity = get_ratio("Debt to Equity")
-if debt_equity and debt_equity > 1:
-    risk_points.append(f"⚠️ High leverage with a debt-to-equity ratio of **{debt_equity:.2f}**, which could pressure finances during downturns.")
+    if debt_equity and debt_equity > 1:
+        st.error(f"""
+        **High Leverage Risk**: The company has a Debt-to-Equity ratio of **{debt_equity:.2f}**, indicating it is significantly leveraged.
 
-peg = get_ratio("PEG Ratio")
-if peg and peg > 2:
-    risk_points.append(f"📌 High PEG ratio of **{peg:.2f}**, suggesting the stock may be expensive relative to growth.")
+        High debt levels could expose it to refinancing risks, especially in a rising interest rate environment.
+        """)
+    else:
+        st.info("No significant debt-related risks detected based on current ratios.")
 
-profit_margin = get_ratio("Profit Margin")
-if profit_margin and profit_margin < 10:
-    risk_points.append(f"📉 Low profit margins (**{profit_margin:.1f}%**), limiting bottom-line growth.")
-
-if not risk_points:
-    st.success("No major concerns based on current financial data.")
-else:
-    for point in risk_points:
-        st.markdown(f"- {point}")
+except Exception as e:
+    st.warning(f"Could not assess risk metrics: {e}")
