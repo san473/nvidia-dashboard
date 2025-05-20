@@ -533,62 +533,49 @@ except Exception as e:
 st.markdown("## ⚠️ Risks & Concerns")
 
 try:
-    # Get financial metrics
-    debt_equity = key_metrics.get("Debt to Equity")
-    gross_margin = key_metrics.get("Gross Margin")
-    net_margin = key_metrics.get("Net Margin")
-    operating_margin = key_metrics.get("Operating Margin")
-    
-    # Try extracting Free Cash Flow directly from Yahoo
-    cashflow_stmt = stock.get_cashflow()
-    fcf = None
-    for label in ['Total Cash From Operating Activities', 'Free Cash Flow']:
-        if label in cashflow_stmt.index:
-            fcf = cashflow_stmt.loc[label].iloc[0]
-            break
+    # Check if key_metrics exists
+    if 'key_metrics' not in locals():
+        raise ValueError("key_metrics is not defined")
 
-    # Fetch peer symbols
-    peer_symbols = stock.get_peers()
-    peer_symbols = [p for p in peer_symbols if p != ticker][:5]
+    debt_equity = key_metrics.get("Debt to Equity", None)
+    net_margin = key_metrics.get("Net Margin", None)
+    operating_margin = key_metrics.get("Operating Margin", None)
+    fcf = cashflow_data.get("Total Cash From Operating Activities", [None])[0] if 'cashflow_data' in locals() else None
 
-    # Fetch peer financials
-    peer_data = []
-    for p in peer_symbols:
-        try:
-            peer = yf.Ticker(p)
-            peer_info = peer.info
-            peer_data.append({
-                'symbol': p,
-                'debt_to_equity': peer_info.get('debtToEquity'),
-                'gross_margin': peer_info.get('grossMargins'),
-                'net_margin': peer_info.get('netMargins'),
-                'operating_margin': peer_info.get('operatingMargins')
-            })
-        except:
-            continue
+    # Optional: Peer comparison fallback
+    peer_tickers = {
+        "AAPL": ["MSFT", "GOOGL", "AMZN"],
+        "MSFT": ["AAPL", "GOOGL", "ORCL"],
+        "GOOGL": ["AAPL", "MSFT", "META"],
+        "TSLA": ["GM", "F", "NIO"],
+        "NVDA": ["AMD", "INTC", "AVGO"]
+    }
 
-    peers_df = pd.DataFrame(peer_data)
+    # Use fallback peers if ticker matches
+    peers_list = peer_tickers.get(ticker.upper(), [])
 
-    risk_flags = []
+    peer_df = yf.download(peers_list, period="1y", group_by='ticker', progress=False)
 
-    if debt_equity is not None and debt_equity > 1:
-        risk_flags.append(f"- **High Leverage**: Debt/Equity ratio is **{debt_equity:.2f}**, which may indicate over-leverage.")
+    if peer_df.empty:
+        st.info("⚠️ Could not fetch peer data for risk benchmarking.")
+    else:
+        st.caption(f"Peer group used: {', '.join(peers_list)}")
 
-    if fcf is not None and fcf < 0:
-        risk_flags.append(f"- **Negative Free Cash Flow**: Latest FCF is **${fcf:,.0f}**, suggesting the firm might be struggling to generate internal capital.")
+    # --- Risk logic ---
+    if debt_equity and debt_equity > 1.0:
+        st.error(f"**Leverage Risk**: Debt-to-Equity ratio is **{debt_equity:.2f}**, indicating potential over-leverage.")
 
     if net_margin is not None and net_margin < 0:
-        risk_flags.append(f"- **Negative Profitability**: Net margin is **{net_margin:.2%}**, pointing to ongoing losses.")
+        st.error(f"**Profitability Risk**: Net Margin is **{net_margin:.2%}**, suggesting the company is unprofitable.")
 
-    if not peers_df.empty:
-        avg_op_margin = peers_df['operating_margin'].mean()
-        if operating_margin is not None and operating_margin < avg_op_margin * 0.8:
-            risk_flags.append(f"- **Weak Competitive Profitability**: Operating margin is **{operating_margin:.2%}**, significantly below peer average (**{avg_op_margin:.2%}**).")
+    if operating_margin is not None and operating_margin < 0:
+        st.error(f"**Operational Risk**: Operating margin is negative (**{operating_margin:.2%}**), implying inefficiency.")
 
-    if risk_flags:
-        st.error("### ⚠️ Potential Risks Detected:\n" + "\n".join(risk_flags))
-    else:
-        st.info("✅ No major red flags found based on financial metrics and peer comparison.")
+    if fcf is not None and fcf < 0:
+        st.error("**Cash Flow Risk**: Negative free cash flow may hinder the company’s ability to reinvest or pay down debt.")
+
+    if not any([debt_equity and debt_equity > 1.0, net_margin and net_margin < 0, operating_margin and operating_margin < 0, fcf and fcf < 0]):
+        st.info("✅ No major financial red flags identified based on leverage, profitability, or cash flow.")
 
 except Exception as e:
     st.warning(f"⚠️ Could not generate risk section: {e}")
