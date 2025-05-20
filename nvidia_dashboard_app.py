@@ -283,74 +283,93 @@ except Exception as e:
 # -------------------- FINANCIAL METRICS & KEY RATIOS --------------------
 st.header("📉 Financial Metrics & Key Ratios")
 
-# --- Market Valuation Multiples ---
+# 📊 Market Valuation Multiples
 st.subheader("📊 Market Valuation Multiples")
 
-market_multiples = {
-    "P/E Ratio": ratios.get("Trailing P/E"),
-    "EV/EBITDA": ratios.get("Enterprise Value/EBITDA"),
-    "Price to Book": ratios.get("Price to Book")
+# Select only relevant valuation multiples
+valuation_keys = {
+    "P/E Ratio": "Trailing P/E",
+    "Price to Book": "Price to Book",
+    "EV/EBITDA": "Enterprise to EBITDA"
 }
 
-market_cleaned = {k: v for k, v in market_multiples.items() if v is not None}
+valuation_data = {}
+for label, key in valuation_keys.items():
+    val = ratios.get(key)
+    if val is not None:
+        valuation_data[label] = val
 
-if market_cleaned:
-    fig1 = go.Figure([go.Bar(x=list(market_cleaned.keys()), y=list(market_cleaned.values()), marker_color='indianred')])
+if valuation_data:
+    fig1 = px.bar(
+        x=list(valuation_data.keys()),
+        y=list(valuation_data.values()),
+        labels={"x": "", "y": "Value"},
+        text_auto=True
+    )
     fig1.update_layout(title="Market Valuation Metrics (Multiples)", xaxis_title="", yaxis_title="Value")
     st.plotly_chart(fig1, use_container_width=True)
 else:
-    st.warning("No market valuation data available.")
+    st.warning("⚠️ No market valuation data available.")
 
-   # --- Profitability & Leverage Ratios ---
+
+
+# 📈 Profitability & Leverage Ratios
 st.subheader("📈 Profitability & Leverage Ratios")
 
-# Helper to extract ratios with fallback
-def get_ratio(*possible_keys):
-    for key in possible_keys:
-        val = ratios.get(key)
-        if val is not None:
-            return val
-    return None
-
-# Retrieve valid ratios using actual keys
-roic = get_ratio("Return on Equity (ROE)")
-operating_margin = get_ratio("Operating Margins")
-net_debt_to_equity = get_ratio("Debt to Equity")
-
-# Store ratios and labels
-profitability_ratios = {
-    "Return on Equity (ROE)": roic,
-    "Operating Margin (%)": operating_margin
+# Define the ratios you want to show
+profitability_keys = {
+    "Return on Equity (ROE)": "Return on Equity (ROE)",
+    "Operating Margin (%)": "Operating Margins"
+}
+leverage_keys = {
+    "Net Debt to Equity": "Debt to Equity"
 }
 
-leverage_ratios = {
-    "Net Debt to Equity": net_debt_to_equity
-}
+# Extract values
+profitability_data = {}
+leverage_data = {}
 
-# Show only if data is available
-if any(val is not None for val in list(profitability_ratios.values()) + list(leverage_ratios.values())):
+for label, key in profitability_keys.items():
+    val = ratios.get(key)
+    if val is not None:
+        profitability_data[label] = val
+
+for label, key in leverage_keys.items():
+    val = ratios.get(key)
+    if val is not None:
+        leverage_data[label] = val
+
+# Plot side-by-side charts only if data exists
+if profitability_data or leverage_data:
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("### 📊 Profitability")
-        fig_profit = go.Figure()
-        for label, value in profitability_ratios.items():
-            if value is not None:
-                fig_profit.add_bar(x=[label], y=[value])
-        fig_profit.update_layout(title="Profitability Ratios", yaxis_title="%", xaxis_title="")
-        st.plotly_chart(fig_profit, use_container_width=True)
+        if profitability_data:
+            fig_profit = px.bar(
+                x=list(profitability_data.keys()),
+                y=list(profitability_data.values()),
+                labels={"x": "", "y": "%"},
+                text_auto=True
+            )
+            fig_profit.update_layout(title="Profitability Ratios")
+            st.plotly_chart(fig_profit, use_container_width=True)
+        else:
+            st.warning("⚠️ No profitability data available.")
 
     with col2:
-        st.markdown("### 🧮 Leverage")
-        fig_leverage = go.Figure()
-        for label, value in leverage_ratios.items():
-            if value is not None:
-                fig_leverage.add_bar(x=[label], y=[value])
-        fig_leverage.update_layout(title="Leverage Ratios", yaxis_title="x", xaxis_title="")
-        st.plotly_chart(fig_leverage, use_container_width=True)
-
+        if leverage_data:
+            fig_leverage = px.bar(
+                x=list(leverage_data.keys()),
+                y=list(leverage_data.values()),
+                labels={"x": "", "y": "×"},
+                text_auto=True
+            )
+            fig_leverage.update_layout(title="Leverage Ratios")
+            st.plotly_chart(fig_leverage, use_container_width=True)
+        else:
+            st.warning("⚠️ No leverage data available.")
 else:
-    st.warning("No profitability or leverage data available.")
+    st.warning("⚠️ No profitability or leverage data available.")
 
 
 
