@@ -156,16 +156,34 @@ else:
     st.warning("Please select one or more companies to compare.")
 
 
-# ------------------------ REAL-TIME NEWS ------------------------
-st.subheader("📰 Real-Time News Feed")
-news_articles = fetch_news(ticker)
 
-if news_articles:
-    for article in news_articles:
-        st.markdown(f"**[{article['title']}]({article['url']})**")
-        st.caption(f"{article['source']['name']} - {article['publishedAt']}")
-        st.write(article['description'] or "No summary available.")
-        st.markdown("---")
+# -------------------- Real-Time News Feed --------------------
+import requests
+import yfinance as yf
+from datetime import datetime
+
+st.header("📰 Real-Time News Feed")
+
+def fetch_news(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        query = stock.info.get("longName", ticker)  # Use full company name if available
+        url = f"https://newsapi.org/v2/everything?q={query}&sortBy=publishedAt&language=en&apiKey={st.secrets['NEWSAPI_KEY']}"
+        response = requests.get(url)
+        response.raise_for_status()
+        articles = response.json().get("articles", [])[:5]
+        return articles
+    except Exception as e:
+        st.error(f"Failed to fetch news: {e}")
+        return []
+
+articles = fetch_news(ticker)
+
+if articles:
+    for article in articles:
+        published_at = datetime.strptime(article['publishedAt'], "%Y-%m-%dT%H:%M:%SZ")
+        st.markdown(f"**[{article['title']}]({article['url']})**  \n*{article['source']['name']} - {published_at.strftime('%b %d, %Y %H:%M')}*  \n{article['description']}\n")
+        st.divider()
 else:
     st.info("No recent news available.")
 
