@@ -479,24 +479,50 @@ for i, kpi in enumerate(selected_kpis):
             st.metric(kpi, "N/A")
 
 # --- Investment Thesis & Upside Potential ---
+# --- Investment Thesis (No DCF) ---
 st.markdown("## 💡 Investment Thesis & Upside Potential")
 
 try:
-    st.info("""
-    **Investment Thesis**: Based on available financial metrics, the company exhibits strong fundamentals and operational performance.
-    
-    - High revenue growth trajectory
-    - Healthy profitability margins
-    - Market leadership or innovation edge
+    if stock:
+        revenue_growth = stock.info.get("revenueGrowth")
+        profit_margin = stock.info.get("profitMargins")
+        forward_pe = stock.info.get("forwardPE")
 
-    These factors may support continued shareholder value creation and potential price appreciation.
-    """)
+        thesis = []
+
+        if revenue_growth and revenue_growth > 0.15:
+            thesis.append("The company demonstrates strong revenue growth, indicating expanding demand and operational scale.")
+
+        if profit_margin and profit_margin > 0.2:
+            thesis.append("High profit margins suggest pricing power and operational efficiency.")
+
+        if forward_pe and forward_pe < 25:
+            thesis.append("The stock appears reasonably valued based on forward P/E, offering potential upside.")
+
+        if thesis:
+            st.success("**Investment Thesis**:\n\n" + "\n\n".join(thesis))
+        else:
+            st.warning("⚠️ Not enough valuation or growth metrics available to formulate a dynamic thesis.")
+    else:
+        st.warning("⚠️ No data available to generate investment thesis.")
 except Exception as e:
-    st.warning(f"⚠️ Could not generate thesis: {e}")
+    st.warning(f"⚠️ Could not generate investment thesis: {e}")
 
 
 # --- Risks & Concerns ---
 st.markdown("## ⚠️ Risks & Concerns")
+
+# Extract key ratios
+key_metrics = {}
+try:
+    key_metrics = {
+        "Debt to Equity": stock.info.get("debtToEquity"),
+        "Current Ratio": stock.info.get("currentRatio"),
+        "Profit Margin": stock.info.get("profitMargins"),
+    }
+except Exception as e:
+    st.warning(f"⚠️ Could not extract key financial metrics: {e}")
+
 
 try:
     # Make sure `key_metrics` exists before accessing
