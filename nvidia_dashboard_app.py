@@ -529,53 +529,98 @@ except Exception as e:
     key_metrics = {}
     st.warning(f"Could not extract key metrics: {e}")
 
-# --- Risks & Concerns ---
+# --- ⚠️ Risks & Concerns ---
 st.markdown("## ⚠️ Risks & Concerns")
 
 try:
-    # Check if key_metrics exists
-    if 'key_metrics' not in locals():
-        raise ValueError("key_metrics is not defined")
+    # Define fallback peer tickers if not already defined
+    if 'peer_tickers' not in locals():
+        peer_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN']  # fallback group
+    st.caption(f"Peer group used: {', '.join(peer_tickers)}")
 
-    debt_equity = key_metrics.get("Debt to Equity", None)
-    net_margin = key_metrics.get("Net Margin", None)
-    operating_margin = key_metrics.get("Operating Margin", None)
-    fcf = cashflow_data.get("Total Cash From Operating Activities", [None])[0] if 'cashflow_data' in locals() else None
+    # Load peer data (ensure yf.download or cache is already available)
+    peer_data = yf.download(peer_tickers, period="1y", group_by='ticker', progress=False)
+    
+    # Calculate average revenue growth and margin for peers
+    peer_revenue_growth = []
+    peer_net_margins = []
 
-    # Optional: Peer comparison fallback
-    peer_tickers = {
-        "AAPL": ["MSFT", "GOOGL", "AMZN"],
-        "MSFT": ["AAPL", "GOOGL", "ORCL"],
-        "GOOGL": ["AAPL", "MSFT", "META"],
-        "TSLA": ["GM", "F", "NIO"],
-        "NVDA": ["AMD", "INTC", "AVGO"]
-    }
+    for pt in peer_tickers:
+        pt_ticker = yf.Ticker(pt)
+        pt_financials = pt_ticker.financials
+        pt_income = pt_financials if isinstance(pt_financials, pd.DataFrame) else pt_financials.get('incomeStatementHistory', {})
+        if pt_income is not None and "Total Revenue" in pt_income:
+            rev = pt_income.loc["Total Revenue"].values
+            if len(rev) >= 2 and rev[0] and rev[1]:
+                growth = (rev[0] - rev[1]) / rev[1]
+                peer_revenue_growth.append(growth)
 
-    # Use fallback peers if ticker matches
-    peers_list = peer_tickers.get(ticker.upper(), [])
+        if pt_income is not None and "Net Income" in pt_income and "Total Revenue" in pt_income:
+            net_income = pt_income.loc["Net Income"].values[0]
+            total_rev = pt_income.loc["Total Revenue"].values[0]
+            if net_income and total_rev:
+                margin = net_income / total_rev
+                peer_net_margins.append(margin)
 
-    peer_df = yf.download(peers_list, period="1y", group_by='ticker', progress=False)
+    avg_peer_growth = np.mean(peer_revenue_growth) if peer_revenue_growth else None
+    avg_peer_margin = np.mean(peer_net_margins) if peer_net_margins else None
 
-    if peer_df.empty:
-        st.info("⚠️ Could not fetch peer data for risk benchmarking.")
-    else:
-        st.caption(f"Peer group used: {', '.join(peers_list)}")
+    # Load target company data
+    target = yf.Ticker(ticker)
+    income_stmt = target.financials
+    balance_sheet = target.balance_sheet
+    cashflow = target.cashflow
 
-    # --- Risk logic ---
-    if debt_equity and debt_equity > 1.0:
-        st.error(f"**Leverage Risk**: Debt-to-Equity ratio is **{debt_equity:.2f}**, indicating potential over-leverage.")
+    # 1. Leverage Risk
+    if key_metrics.get("Debt to Equity", 0) > 2:
+        st.error(f"**Leverage Risk:** Debt-to-Equity ratio is **{key_metrics['Debt to Equity']:.2f}**, indicating potential over-leverage.")
 
-    if net_margin is not None and net_margin < 0:
-        st.error(f"**Profitability Risk**: Net Margin is **{net_margin:.2%}**, suggesting the company is unprofitable.")
+    # 2. Earnings Volatility (based on quarterly EPS)
+    try:
+        eps = target.earnings
+        if not eps.empty and len(eps) > 4:
+            earnings_std = eps['Earnings'].pct_change().std()
+            if earnings_std > 0.5:
+                st.error(f"**Earnings Volatility Risk:** High variability in quarterly earnings. Std Dev: **{earnings_std:.2f}**")
+    except:
+        pass
 
-    if operating_margin is not None and operating_margin < 0:
-        st.error(f"**Operational Risk**: Operating margin is negative (**{operating_margin:.2%}**), implying inefficiency.")
+    # 3. Revenue Decline
+    try:
+        revenue = income_stmt.loc["Total Revenue"]
+        if revenue.iloc[0] < revenue.iloc[1]:
+            st.error(f"**Revenue Risk:** Revenue declined from **${revenue.iloc[1]:,.0f}** to **${revenue.iloc[0]:,.0f}** YoY.")
+    except:
+        pass
 
-    if fcf is not None and fcf < 0:
-        st.error("**Cash Flow Risk**: Negative free cash flow may hinder the company’s ability to reinvest or pay down debt.")
+    # 4. Margin Compression vs peers
+    try:
+        net_income = income_stmt.loc["Net Income"].iloc[0]
+        total_revenue = income_stmt.loc["Total Revenue"].iloc[0]
+        net_margin = net_income / total_revenue
+        if avg_peer_margin and net_margin < avg_peer_margin * 0.8:
+            st.error(f"**Margin Risk:** Net margin is **{net_margin:.2%}**, significantly below peer average **{avg_peer_margin:.2%}**.")
+    except:
+        pass
 
-    if not any([debt_equity and debt_equity > 1.0, net_margin and net_margin < 0, operating_margin and operating_margin < 0, fcf and fcf < 0]):
-        st.info("✅ No major financial red flags identified based on leverage, profitability, or cash flow.")
+    # 5. Shareholder Dilution (check share count increase)
+    try:
+        shares = balance_sheet.loc["Ordinary Shares Number"]
+        if shares.iloc[0] > shares.iloc[1]:
+            dilution_pct = (shares.iloc[0] - shares.iloc[1]) / shares.iloc[1]
+            st.error(f"**Dilution Risk:** Share count increased by **{dilution_pct:.1%}**, indicating potential dilution.")
+    except:
+        pass
+
+    # 6. Liquidity Risk (current ratio)
+    try:
+        current_assets = balance_sheet.loc["Total Current Assets"].iloc[0]
+        current_liab = balance_sheet.loc["Total Current Liabilities"].iloc[0]
+        current_ratio = current_assets / current_liab
+        if current_ratio < 1:
+            st.error(f"**Liquidity Risk:** Current Ratio is **{current_ratio:.2f}**, indicating short-term liquidity pressure.")
+    except:
+        pass
 
 except Exception as e:
     st.warning(f"⚠️ Could not generate risk section: {e}")
