@@ -354,8 +354,10 @@ if multiple_ratios:
 
 
 # -------------------- KPI DASHBOARD --------------------
+# ------- KPI Toggles -------
 st.subheader("📌 Key Performance Indicators (KPIs)")
 
+# User KPI selections
 kpi_options = [
     "Revenue",
     "Net Profit Margin (%)",
@@ -400,28 +402,21 @@ kpis["Return on Equity (%)"] = roe * 100 if roe is not None else None
 rev_growth = info.get("revenueGrowth")
 kpis["Revenue Growth (%)"] = rev_growth * 100 if rev_growth is not None else None
 
-# --- Display KPIs with Arrows ---
+# --- Display KPIs ---
 cols = st.columns(len(selected_kpis))
-
 for i, kpi in enumerate(selected_kpis):
     value = kpis.get(kpi)
-
-    # Default display and delta
+    
+    # Format based on type
     if value is None:
         display = "N/A"
-        delta = ""
     elif "Margin" in kpi or "Growth" in kpi or "Return" in kpi:
         display = f"{value:.2f}%"
-        delta = "🔺" if value >= 0 else "🔻"
     elif "EPS" in kpi:
         display = f"${value:.2f}"
-        delta = "🔺" if value >= 0 else "🔻"
     elif "Revenue" in kpi or "Cash Flow" in kpi:
         display = f"${value / 1e9:.2f}B"
-        delta = "🔺" if value >= 0 else "🔻"
     else:
         display = value
-        delta = ""
 
-    # Show metric with trend arrow
-    cols[i].metric(label=kpi, value=display, delta=delta)
+    cols[i].metric(kpi, display)
