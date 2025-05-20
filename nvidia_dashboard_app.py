@@ -478,70 +478,79 @@ for i, kpi in enumerate(selected_kpis):
         else:
             st.metric(kpi, "N/A")
 
-# --- Investment Thesis & Upside Potential ---
-# --- Investment Thesis (No DCF) ---
+# --- Investment Thesis ---
 st.markdown("## 💡 Investment Thesis & Upside Potential")
 
 try:
-    if stock:
-        revenue_growth = stock.info.get("revenueGrowth")
-        profit_margin = stock.info.get("profitMargins")
-        forward_pe = stock.info.get("forwardPE")
+    if stock and stock.info:
+        name = stock.info.get("longName", ticker)
+        sector = stock.info.get("sector", "N/A")
+        rev_growth = stock.info.get("revenueGrowth", 0)
+        net_margin = stock.info.get("profitMargins", 0)
+        roe = stock.info.get("returnOnEquity", 0)
+        roic = stock.info.get("returnOnAssets", 0)
+        fwd_pe = stock.info.get("forwardPE", None)
+        peg = stock.info.get("pegRatio", None)
 
         thesis = []
 
-        if revenue_growth and revenue_growth > 0.15:
-            thesis.append("The company demonstrates strong revenue growth, indicating expanding demand and operational scale.")
-
-        if profit_margin and profit_margin > 0.2:
-            thesis.append("High profit margins suggest pricing power and operational efficiency.")
-
-        if forward_pe and forward_pe < 25:
-            thesis.append("The stock appears reasonably valued based on forward P/E, offering potential upside.")
+        if rev_growth and rev_growth > 0.1:
+            thesis.append(f"- **Strong Revenue Growth**: Revenue is growing at **{rev_growth*100:.1f}% YoY**, indicating business expansion.")
+        if net_margin and net_margin > 0.15:
+            thesis.append(f"- **Healthy Profitability**: Net profit margins are **{net_margin*100:.1f}%**, signaling operational strength.")
+        if roe and roe > 0.15:
+            thesis.append(f"- **High Return on Equity**: ROE of **{roe*100:.1f}%** implies effective use of shareholder capital.")
+        if roic and roic > 0.1:
+            thesis.append(f"- **Efficient Capital Use**: ROIC at **{roic*100:.1f}%** reflects good return on invested assets.")
+        if peg and peg < 1:
+            thesis.append(f"- **Undervalued on PEG**: PEG ratio of **{peg:.2f}** may indicate undervaluation relative to growth.")
+        if sector == "Technology":
+            thesis.append(f"- **Strategic Moat**: As a tech sector leader, {name} is positioned to benefit from long-term digital trends like AI, cloud, and automation.")
 
         if thesis:
-            st.success("**Investment Thesis**:\n\n" + "\n\n".join(thesis))
+            st.success("**Investment Thesis:**\n" + "\n".join(thesis))
         else:
-            st.warning("⚠️ Not enough valuation or growth metrics available to formulate a dynamic thesis.")
+            st.info("No compelling thesis could be generated from available data.")
     else:
-        st.warning("⚠️ No data available to generate investment thesis.")
+        st.warning("⚠️ Company info not available.")
 except Exception as e:
-    st.warning(f"⚠️ Could not generate investment thesis: {e}")
-
-
+    st.warning(f"Could not generate investment thesis: {e}")
 # --- Risks & Concerns ---
 st.markdown("## ⚠️ Risks & Concerns")
 
 try:
     if stock and stock.info:
-        risk_messages = []
-
         debt_equity = stock.info.get("debtToEquity")
         current_ratio = stock.info.get("currentRatio")
-        profit_margin = stock.info.get("profitMargins")
+        net_margin = stock.info.get("profitMargins")
+        op_margin = stock.info.get("operatingMargins")
+        free_cashflow = stock.cashflow.loc["Total Cash From Operating Activities"] - stock.cashflow.loc["Capital Expenditures"]
+        fcf_latest = free_cashflow.dropna().iloc[0] if not free_cashflow.empty else None
 
-        if debt_equity is not None and debt_equity > 1:
-            risk_messages.append(
-                f"**High Leverage Risk**: Debt-to-Equity ratio is **{debt_equity:.2f}**, indicating significant leverage that may raise refinancing or solvency concerns."
-            )
+        risk_points = []
 
-        if current_ratio is not None and current_ratio < 1.0:
-            risk_messages.append(
-                f"**Liquidity Risk**: Current Ratio is **{current_ratio:.2f}**, suggesting potential short-term liquidity pressure."
-            )
+        if debt_equity and debt_equity > 1:
+            risk_points.append(f"- **High Leverage**: Debt-to-equity ratio of **{debt_equity:.2f}** signals high financial leverage.")
+        if current_ratio and current_ratio < 1:
+            risk_points.append(f"- **Weak Liquidity**: Current ratio of **{current_ratio:.2f}** indicates potential cash flow challenges.")
+        if net_margin and net_margin < 0.05:
+            risk_points.append(f"- **Low Profitability**: Net margin of **{net_margin*100:.1f}%** may constrain reinvestment capacity.")
+        if op_margin and op_margin < 0.1:
+            risk_points.append(f"- **Operating Margin Pressure**: Operating margin is only **{op_margin*100:.1f}%**, possibly due to rising costs.")
+        if fcf_latest and fcf_latest < 0:
+            risk_points.append(f"- **Negative Free Cash Flow**: Latest free cash flow is **${fcf_latest:,.0f}**, indicating potential capital efficiency issues.")
 
-        if profit_margin is not None and profit_margin < 0.05:
-            risk_messages.append(
-                f"**Low Profitability**: Profit margin is only **{profit_margin:.2%}**, indicating limited earnings buffer."
-            )
+        # Optional: Use headlines if NewsAPI is integrated
+        # if articles:
+        #     for a in articles:
+        #         if "regulation" in a["title"].lower() or "lawsuit" in a["title"].lower():
+        #             risk_points.append("- **Regulatory Risk**: Recent news mentions legal or compliance challenges.")
 
-        if risk_messages:
-            for msg in risk_messages:
-                st.error(msg)
+        if risk_points:
+            st.error("**Identified Risks:**\n" + "\n".join(risk_points))
         else:
-            st.info("✅ No major red flags based on leverage, liquidity, or profitability ratios.")
+            st.info("✅ No major red flags detected based on current financial indicators.")
     else:
-        st.warning("⚠️ Financial metrics not available to assess risk profile.")
-
+        st.warning("⚠️ Company info not available for risk evaluation.")
 except Exception as e:
-    st.warning(f"⚠️ Could not assess risk metrics: {e}")
+    st.warning(f"Could not generate risk section: {e}")
