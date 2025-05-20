@@ -512,32 +512,36 @@ except Exception as e:
 # --- Risks & Concerns ---
 st.markdown("## ⚠️ Risks & Concerns")
 
-# Extract key ratios
-key_metrics = {}
 try:
-    key_metrics = {
-        "Debt to Equity": stock.info.get("debtToEquity"),
-        "Current Ratio": stock.info.get("currentRatio"),
-        "Profit Margin": stock.info.get("profitMargins"),
-    }
-except Exception as e:
-    st.warning(f"⚠️ Could not extract key financial metrics: {e}")
+    if stock and stock.info:
+        risk_messages = []
 
-
-try:
-    # Make sure `key_metrics` exists before accessing
-    if 'key_metrics' in locals() and isinstance(key_metrics, dict):
-        debt_equity = key_metrics.get("Debt to Equity", None)
+        debt_equity = stock.info.get("debtToEquity")
+        current_ratio = stock.info.get("currentRatio")
+        profit_margin = stock.info.get("profitMargins")
 
         if debt_equity is not None and debt_equity > 1:
-            st.error(f"""
-            **High Leverage Risk**: The company has a Debt-to-Equity ratio of **{debt_equity:.2f}**, indicating it is significantly leveraged.
-            
-            This could expose it to refinancing risks in tighter credit environments.
-            """)
+            risk_messages.append(
+                f"**High Leverage Risk**: Debt-to-Equity ratio is **{debt_equity:.2f}**, indicating significant leverage that may raise refinancing or solvency concerns."
+            )
+
+        if current_ratio is not None and current_ratio < 1.0:
+            risk_messages.append(
+                f"**Liquidity Risk**: Current Ratio is **{current_ratio:.2f}**, suggesting potential short-term liquidity pressure."
+            )
+
+        if profit_margin is not None and profit_margin < 0.05:
+            risk_messages.append(
+                f"**Low Profitability**: Profit margin is only **{profit_margin:.2%}**, indicating limited earnings buffer."
+            )
+
+        if risk_messages:
+            for msg in risk_messages:
+                st.error(msg)
         else:
-            st.info("No major debt-related risks based on the current leverage ratio.")
+            st.info("✅ No major red flags based on leverage, liquidity, or profitability ratios.")
     else:
         st.warning("⚠️ Financial metrics not available to assess risk profile.")
+
 except Exception as e:
     st.warning(f"⚠️ Could not assess risk metrics: {e}")
