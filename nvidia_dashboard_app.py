@@ -283,74 +283,41 @@ except Exception as e:
 # -------------------- FINANCIAL METRICS & KEY RATIOS --------------------
 st.header("📉 Financial Metrics & Key Ratios")
 
-@st.cache_data
-def get_clean_ratios(ticker):
-    stock = yf.Ticker(ticker)
-    info = stock.info
+# --- Market Valuation Multiples ---
+st.subheader("📊 Market Valuation Multiples")
 
-    try:
-        total_debt = stock.balance_sheet.loc['Total Debt'].iloc[0]
-        cash = stock.balance_sheet.loc['Cash'].iloc[0]
-        total_equity = stock.balance_sheet.loc['Total Stockholder Equity'].iloc[0]
-        ebit = stock.financials.loc['Ebit'].iloc[0]
-        operating_income = stock.financials.loc['Operating Income'].iloc[0]
-        total_assets = stock.balance_sheet.loc['Total Assets'].iloc[0]
+market_multiples = {
+    "P/E Ratio": ratios.get("Trailing P/E"),
+    "EV/EBITDA": ratios.get("Enterprise Value/EBITDA"),
+    "Price to Book": ratios.get("Price to Book")
+}
 
-        roic = (operating_income / (total_assets - cash)) if total_assets and cash else None
-        net_debt = total_debt - cash
-        net_debt_to_equity = (net_debt / total_equity) if total_equity else None
-        op_margin = info.get("operatingMargins")
+market_cleaned = {k: v for k, v in market_multiples.items() if v is not None}
 
-    except:
-        roic = None
-        net_debt_to_equity = None
-        op_margin = None
+if market_cleaned:
+    fig1 = go.Figure([go.Bar(x=list(market_cleaned.keys()), y=list(market_cleaned.values()), marker_color='indianred')])
+    fig1.update_layout(title="Market Valuation Metrics (Multiples)", xaxis_title="", yaxis_title="Value")
+    st.plotly_chart(fig1, use_container_width=True)
+else:
+    st.warning("No market valuation data available.")
 
-    ratios = {
-        "P/E Ratio": info.get("trailingPE"),
-        "EV/EBITDA": info.get("enterpriseToEbitda"),
-        "Price to Book": info.get("priceToBook"),
-        "ROIC (%)": roic * 100 if roic else None,
-        "Net Debt to Equity (%)": net_debt_to_equity * 100 if net_debt_to_equity else None,
-        "Operating Profit Margin (%)": op_margin * 100 if op_margin else None,
-    }
-    return ratios
+# --- Profitability & Leverage Ratios ---
+st.subheader("📈 Profitability & Leverage Ratios")
 
-ratios = get_clean_ratios(ticker)
+performance_ratios = {
+    "ROIC (%)": ratios.get("Return on Invested Capital"),
+    "Operating Margin (%)": ratios.get("Operating Margin"),
+    "Net Debt to Equity": ratios.get("Net Debt/Equity")
+}
 
-# --- Group ratios ---
-percent_ratios = {k: v for k, v in ratios.items() if "%" in k and v is not None}
-multiple_ratios = {k: v for k, v in ratios.items() if "%" not in k and v is not None}
+performance_cleaned = {k: v * 100 if 'Margin' in k or 'ROIC' in k else v for k, v in performance_ratios.items() if v is not None}
 
-# --- Plot: Percentage-based ratios ---
-if percent_ratios:
-    st.subheader("📊 Percentage-Based Ratios")
-    fig_percent = go.Figure([go.Bar(
-        x=list(percent_ratios.keys()),
-        y=list(percent_ratios.values()),
-        marker_color='seagreen'
-    )])
-    fig_percent.update_layout(
-        title="Key Performance (%-based)",
-        yaxis_title="Percent",
-        xaxis_title="Metric"
-    )
-    st.plotly_chart(fig_percent, use_container_width=True)
-
-# --- Plot: Multiples ---
-if multiple_ratios:
-    st.subheader("📊 Market Valuation Multiples")
-    fig_mult = go.Figure([go.Bar(
-        x=list(multiple_ratios.keys()),
-        y=list(multiple_ratios.values()),
-        marker_color='indianred'
-    )])
-    fig_mult.update_layout(
-        title="Market Valuation Metrics (Multiples)",
-        yaxis_title="Value",
-        xaxis_title="Ratio"
-    )
-    st.plotly_chart(fig_mult, use_container_width=True)
+if performance_cleaned:
+    fig2 = go.Figure([go.Bar(x=list(performance_cleaned.keys()), y=list(performance_cleaned.values()), marker_color='seagreen')])
+    fig2.update_layout(title="Profitability & Leverage Metrics", xaxis_title="", yaxis_title="Value")
+    st.plotly_chart(fig2, use_container_width=True)
+else:
+    st.warning("No profitability or leverage data available.")
 
 
 # -------------------- KPI DASHBOARD --------------------
