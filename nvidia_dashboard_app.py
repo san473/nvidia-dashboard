@@ -515,42 +515,57 @@ try:
         st.warning("⚠️ Company info not available.")
 except Exception as e:
     st.warning(f"Could not generate investment thesis: {e}")
+
 # --- Risks & Concerns ---
 st.markdown("## ⚠️ Risks & Concerns")
 
 try:
-    if stock and stock.info:
-        debt_equity = stock.info.get("debtToEquity")
-        current_ratio = stock.info.get("currentRatio")
-        net_margin = stock.info.get("profitMargins")
-        op_margin = stock.info.get("operatingMargins")
-        free_cashflow = stock.cashflow.loc["Total Cash From Operating Activities"] - stock.cashflow.loc["Capital Expenditures"]
-        fcf_latest = free_cashflow.dropna().iloc[0] if not free_cashflow.empty else None
+    risk_points = []
 
-        risk_points = []
+    # --- Fallback-safe access to financial metrics ---
+    debt_equity = key_metrics.get("Debt to Equity", None)
+    profit_margin = key_metrics.get("Profit Margin", None)
+    current_ratio = key_metrics.get("Current Ratio", None)
 
-        if debt_equity and debt_equity > 1:
-            risk_points.append(f"- **High Leverage**: Debt-to-equity ratio of **{debt_equity:.2f}** signals high financial leverage.")
-        if current_ratio and current_ratio < 1:
-            risk_points.append(f"- **Weak Liquidity**: Current ratio of **{current_ratio:.2f}** indicates potential cash flow challenges.")
-        if net_margin and net_margin < 0.05:
-            risk_points.append(f"- **Low Profitability**: Net margin of **{net_margin*100:.1f}%** may constrain reinvestment capacity.")
-        if op_margin and op_margin < 0.1:
-            risk_points.append(f"- **Operating Margin Pressure**: Operating margin is only **{op_margin*100:.1f}%**, possibly due to rising costs.")
-        if fcf_latest and fcf_latest < 0:
-            risk_points.append(f"- **Negative Free Cash Flow**: Latest free cash flow is **${fcf_latest:,.0f}**, indicating potential capital efficiency issues.")
+    # Risk 1: High leverage
+    if debt_equity is not None and debt_equity > 1.0:
+        risk_points.append(f"- **High Leverage**: Debt-to-Equity is **{debt_equity:.2f}**, suggesting reliance on debt.")
 
-        # Optional: Use headlines if NewsAPI is integrated
-        # if articles:
-        #     for a in articles:
-        #         if "regulation" in a["title"].lower() or "lawsuit" in a["title"].lower():
-        #             risk_points.append("- **Regulatory Risk**: Recent news mentions legal or compliance challenges.")
+    # Risk 2: Margin Compression
+    if profit_margin is not None and profit_margin < 0.1:
+        risk_points.append(f"- **Low Profitability**: Profit margin is **{profit_margin:.2%}**, indicating margin pressure.")
 
-        if risk_points:
-            st.error("**Identified Risks:**\n" + "\n".join(risk_points))
-        else:
-            st.info("✅ No major red flags detected based on current financial indicators.")
+    # Risk 3: Weak Liquidity
+    if current_ratio is not None and current_ratio < 1.0:
+        risk_points.append(f"- **Liquidity Risk**: Current ratio is **{current_ratio:.2f}**, suggesting short-term financial stress.")
+
+    # Risk 4: Free Cash Flow (with safe lookup)
+    try:
+        cf_df = stock.cashflow
+        op_cash = cf_df.loc[cf_df.index.str.contains("Total Cash From Operating Activities", case=False)].dropna()
+        capex = cf_df.loc[cf_df.index.str.contains("Capital Expenditures", case=False)].dropna()
+
+        if not op_cash.empty and not capex.empty:
+            fcf_latest = op_cash.iloc[0] - abs(capex.iloc[0])
+            if fcf_latest < 0:
+                risk_points.append(f"- **Negative Free Cash Flow**: Latest FCF is **${fcf_latest:,.0f}**, indicating cash burn.")
+    except Exception:
+        pass  # Safe fallback if missing cashflow
+
+    # Risk 5: Peer comparison (optional)
+    if peers_df is not None and not peers_df.empty:
+        try:
+            industry_avg_margin = peers_df["Profit Margin"].dropna().mean()
+            if profit_margin is not None and industry_avg_margin and profit_margin < industry_avg_margin * 0.8:
+                risk_points.append("- **Competitive Disadvantage**: Profit margin is significantly below industry peers.")
+        except Exception:
+            pass
+
+    # Output block
+    if risk_points:
+        st.error("**Identified Risk Factors:**\n\n" + "\n".join(risk_points))
     else:
-        st.warning("⚠️ Company info not available for risk evaluation.")
+        st.info("No material red flags identified in debt, liquidity, or free cash flow.")
+
 except Exception as e:
-    st.warning(f"Could not generate risk section: {e}")
+    st.warning(f"⚠️ Could not generate risk section: {e}")
