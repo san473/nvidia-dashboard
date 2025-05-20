@@ -105,112 +105,54 @@ with st.expander("🌍 Geographic & Business Overview"):
         st.warning("Geographic and company summary data not available.")
 
 
-# ------------------- DCF VALUATION -------------------
-st.header("💰 Discounted Cash Flow (DCF) Valuation")
-
-# --- User-Defined Assumptions ---
-st.subheader("📈 DCF Assumptions")
-col1, col2, col3 = st.columns(3)
-with col1:
-    forecast_years = st.slider("Forecast Years", min_value=3, max_value=10, value=5)
-with col2:
-    growth_rate = st.slider("FCF Growth Rate (%)", min_value=0.0, max_value=20.0, value=10.0, step=0.5) / 100
-with col3:
-    discount_rate = st.slider("Discount Rate / WACC (%)", min_value=5.0, max_value=15.0, value=9.0, step=0.5) / 100
-
-# --- DCF Calculation ---
-def calculate_dcf(ticker, forecast_years, growth_rate, discount_rate):
-    try:
-        stock = yf.Ticker(ticker)
-        cashflow = stock.cashflow
-
-        st.write("📌 Available Cashflow Rows:", list(cashflow.index))
-
-        if 'Total Cash From Operating Activities' in cashflow.index and 'Capital Expenditures' in cashflow.index:
-            fcf = cashflow.loc['Total Cash From Operating Activities'] - cashflow.loc['Capital Expenditures']
-        elif 'Operating Cash Flow' in cashflow.index and 'Capital Expenditures' in cashflow.index:
-            fcf = cashflow.loc['Operating Cash Flow'] - cashflow.loc['Capital Expenditures']
-            st.info("Using fallback row: **Operating Cash Flow**")
-        else:
-            st.warning("DCF valuation failed: Required cash flow rows not found.")
-            return None
-
-        fcf = fcf.dropna()
-        if fcf.empty:
-            st.warning("DCF valuation failed: FCF data is empty after dropna.")
-            return None
-
-        latest_fcf = fcf.iloc[0]
-        terminal_growth_rate = 0.03
-
-        projected_fcfs = [latest_fcf * (1 + growth_rate) ** i for i in range(1, forecast_years + 1)]
-        discounted_fcfs = [val / (1 + discount_rate) ** i for i, val in enumerate(projected_fcfs, start=1)]
-        terminal_value = projected_fcfs[-1] * (1 + terminal_growth_rate) / (discount_rate - terminal_growth_rate)
-        discounted_terminal = terminal_value / (1 + discount_rate) ** forecast_years
-
-        enterprise_value = sum(discounted_fcfs) + discounted_terminal
-        debt = stock.balance_sheet.loc['Total Debt'].iloc[0] if 'Total Debt' in stock.balance_sheet.index else 0
-        cash = stock.balance_sheet.loc['Cash'].iloc[0] if 'Cash' in stock.balance_sheet.index else 0
-        shares_outstanding = stock.info.get('sharesOutstanding', 0)
-
-        equity_value = enterprise_value - debt + cash
-        fair_value_per_share = equity_value / shares_outstanding if shares_outstanding > 0 else None
-
-        return {
-            'enterprise_value': enterprise_value,
-            'equity_value': equity_value,
-            'fair_value_per_share': fair_value_per_share
-        }
-
-    except Exception as e:
-        st.error(f"DCF valuation failed due to error: {e}")
-        return None
-
-# --- Run and Display DCF ---
-dcf_result = calculate_dcf(ticker, forecast_years, growth_rate, discount_rate)
-
-if dcf_result and dcf_result['fair_value_per_share']:
-    current_price = info.get('currentPrice', 0)
-   
 
 
-# ------------------------ PEER COMPARISON ------------------------
+# -------------------- Peer Comparison --------------------
 st.header("🔍 Peer Comparison")
 
-@st.cache_data
-def get_peers(ticker):
-    stock = yf.Ticker(ticker)
-    try:
-        sector = stock.info.get("sector")
-        if not sector:
-            return None
-        all_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "NFLX", "ADBE", "ORCL"]
-        peers = []
-        for peer in all_tickers:
-            try:
-                peer_info = yf.Ticker(peer).info
-                if peer_info.get("sector") == sector:
-                    peers.append({
-                        "Ticker": peer,
-                        "Name": peer_info.get("shortName"),
-                        "Market Cap": peer_info.get("marketCap"),
-                        "P/E": peer_info.get("trailingPE"),
-                        "Forward P/E": peer_info.get("forwardPE"),
-                        "Price to Book": peer_info.get("priceToBook"),
-                        "ROE": peer_info.get("returnOnEquity"),
-                        "Debt to Equity": peer_info.get("debtToEquity")
-                    })
-            except:
-                continue
-        return pd.DataFrame(peers)
-    except:
-        return None
+# ✅ Curated list of valid peer tickers and labels
+peer_options = {
+    "AMD": "Advanced Micro Devices (AMD)",
+    "INTC": "Intel Corporation (INTC)",
+    "AVGO": "Broadcom Inc. (AVGO)",
+    "QCOM": "Qualcomm Inc. (QCOM)",
+    "TSM": "Taiwan Semiconductor (TSM)",
+    "TXN": "Texas Instruments (TXN)",
+    "MU": "Micron Technology (MU)",
+    "AMAT": "Applied Materials (AMAT)"
+}
 
-peer_df = get_peers(ticker)
-if peer_df is not None and not peer_df.empty:
-    st.dataframe(peer_df.set_index("Ticker"))
+selected_peers = st.multiselect(
+    "Select peer companies to compare:",
+    options=list(peer_options.keys()),
+    format_func=lambda x: peer_options[x],
+    default=["AMD", "INTC"]  # Optional default selection
+)
+
+if selected_peers:
+    comparison_data = []
+
+    for peer_ticker in selected_peers:
+        peer = yf.Ticker(peer_ticker)
+        info = peer.info
+
+        comparison_data.append({
+            "Company": peer_options[peer_ticker],
+            "Ticker": peer_ticker,
+            "Price": info.get("currentPrice"),
+            "Market Cap (B)": info.get("marketCap", 0) / 1e9,
+            "PE Ratio": info.get("trailingPE"),
+            "Revenue (B)": info.get("totalRevenue", 0) / 1e9,
+            "Net Margin (%)": (info.get("netMargins", 0) or 0) * 100,
+            "Return on Equity (%)": (info.get("returnOnEquity", 0) or 0) * 100,
+        })
+
+    df_peers = pd.DataFrame(comparison_data)
+    st.dataframe(df_peers.set_index("Ticker"), use_container_width=True)
+
 else:
-    st.warning("No peer data available for this ticker.")
+    st.warning("Please select one or more companies to compare.")
+
 
 # ------------------------ REAL-TIME NEWS ------------------------
 st.subheader("📰 Real-Time News Feed")
@@ -226,13 +168,99 @@ else:
     st.info("No recent news available.")
 
 
-# ---------------------------------------------
-# 
+# ---------------------- INTERACTIVE VISUALIZATIONS ----------------------
+st.header("📈 Interactive Financial Visualizations")
 
-# ------------------------ INTERACTIVE VISUALIZATIONS ------------------------
-st.header("📊 Interactive Visualizations")
+@st.cache_data
+def get_quarterly_financials(ticker):
+    stock = yf.Ticker(ticker)
+    income_stmt = stock.quarterly_financials
+    cashflow_stmt = stock.quarterly_cashflow
+    return income_stmt, cashflow_stmt
 
-stock = yf.Ticker(ticker)
+try:
+    income_stmt, cashflow_stmt = get_quarterly_financials(ticker)
+
+    # Convert to regular format
+    income_df = income_stmt.T
+    cashflow_df = cashflow_stmt.T
+
+    # --- Operating Cash Flow ---
+    if 'Total Cash From Operating Activities' in cashflow_df.columns:
+        fig_ocf = go.Figure()
+        fig_ocf.add_trace(go.Scatter(
+            x=cashflow_df.index, 
+            y=cashflow_df['Total Cash From Operating Activities'], 
+            mode='lines+markers', 
+            name='Operating Cash Flow',
+            line=dict(color='royalblue')
+        ))
+        fig_ocf.update_layout(
+            title="Operating Cash Flow (Quarterly)", 
+            yaxis_title="USD", 
+            xaxis_title="Date"
+        )
+        st.plotly_chart(fig_ocf, use_container_width=True)
+
+    # --- Free Cash Flow (Operating Cash Flow - CapEx) ---
+    if 'Total Cash From Operating Activities' in cashflow_df.columns and 'Capital Expenditures' in cashflow_df.columns:
+        fcf = cashflow_df['Total Cash From Operating Activities'] - cashflow_df['Capital Expenditures']
+        fig_fcf = go.Figure()
+        fig_fcf.add_trace(go.Scatter(
+            x=cashflow_df.index, 
+            y=fcf, 
+            mode='lines+markers', 
+            name='Free Cash Flow',
+            line=dict(color='green')
+        ))
+        fig_fcf.update_layout(
+            title="Free Cash Flow (Quarterly)", 
+            yaxis_title="USD", 
+            xaxis_title="Date"
+        )
+        st.plotly_chart(fig_fcf, use_container_width=True)
+
+    # --- Net Profit Margin vs Sales ---
+    if 'Total Revenue' in income_df.columns and 'Net Income' in income_df.columns:
+        net_margin = income_df['Net Income'] / income_df['Total Revenue'] * 100
+        fig_margin = go.Figure()
+
+        fig_margin.add_trace(go.Scatter(
+            x=income_df.index, 
+            y=income_df['Total Revenue'], 
+            mode='lines+markers',
+            name='Total Revenue',
+            yaxis='y1',
+            line=dict(color='orange')
+        ))
+
+        fig_margin.add_trace(go.Scatter(
+            x=income_df.index, 
+            y=net_margin, 
+            mode='lines+markers',
+            name='Net Profit Margin (%)',
+            yaxis='y2',
+            line=dict(color='red')
+        ))
+
+        fig_margin.update_layout(
+            title="Net Profit Margin vs Sales",
+            xaxis_title="Date",
+            yaxis=dict(
+                title="Revenue (USD)",
+                side='left'
+            ),
+            yaxis2=dict(
+                title="Net Margin (%)",
+                overlaying='y',
+                side='right'
+            ),
+            legend=dict(x=0.01, y=1.15, orientation='h')
+        )
+        st.plotly_chart(fig_margin, use_container_width=True)
+
+except Exception as e:
+    st.warning(f"Unable to load financial visualizations: {e}")
 
 # -------- Revenue Trends --------
 try:
@@ -251,72 +279,134 @@ try:
 except Exception as e:
     st.error(f"Failed to load revenue trend: {e}")
 
-# -------- Financial Ratios Bar Chart --------
-with st.expander("📊 Financial Ratios"):
+
+# -------------------- FINANCIAL METRICS & KEY RATIOS --------------------
+st.header("📉 Financial Metrics & Key Ratios")
+
+@st.cache_data
+def get_clean_ratios(ticker):
+    stock = yf.Ticker(ticker)
+    info = stock.info
+
     try:
-        ratios_for_chart = {
-            "P/E": ratios.get("Trailing P/E"),
-            "Forward P/E": ratios.get("Forward P/E"),
-            "Price to Book": ratios.get("Price to Book"),
-            "ROA": ratios.get("Return on Assets (ROA)"),
-            "ROE": ratios.get("Return on Equity (ROE)"),
-            "Profit Margin": ratios.get("Profit Margin"),
-            "Debt to Equity": ratios.get("Debt to Equity")
-        }
+        total_debt = stock.balance_sheet.loc['Total Debt'].iloc[0]
+        cash = stock.balance_sheet.loc['Cash'].iloc[0]
+        total_equity = stock.balance_sheet.loc['Total Stockholder Equity'].iloc[0]
+        ebit = stock.financials.loc['Ebit'].iloc[0]
+        operating_income = stock.financials.loc['Operating Income'].iloc[0]
+        total_assets = stock.balance_sheet.loc['Total Assets'].iloc[0]
 
-        # Filter out non-numeric values
-        ratios_cleaned = {k: v for k, v in ratios_for_chart.items() if isinstance(v, (int, float))}
+        roic = (operating_income / (total_assets - cash)) if total_assets and cash else None
+        net_debt = total_debt - cash
+        net_debt_to_equity = (net_debt / total_equity) if total_equity else None
+        op_margin = info.get("operatingMargins")
 
-        if not ratios_cleaned:
-            st.warning("No valid numeric ratios available to plot.")
-        else:
-            fig_ratios = go.Figure([go.Bar(
-                x=list(ratios_cleaned.keys()),
-                y=list(ratios_cleaned.values()),
-                marker_color='mediumseagreen'
-            )])
-            fig_ratios.update_layout(
-                title="Key Financial Ratios",
-                xaxis_title="Ratio",
-                yaxis_title="Value",
-                xaxis_tickangle=-45
-            )
-            st.plotly_chart(fig_ratios, use_container_width=True)
+    except:
+        roic = None
+        net_debt_to_equity = None
+        op_margin = None
 
-    except Exception as e:
-        st.error(f"Failed to render financial ratios chart: {e}")
+    ratios = {
+        "P/E Ratio": info.get("trailingPE"),
+        "EV/EBITDA": info.get("enterpriseToEbitda"),
+        "Price to Book": info.get("priceToBook"),
+        "ROIC (%)": roic * 100 if roic else None,
+        "Net Debt to Equity (%)": net_debt_to_equity * 100 if net_debt_to_equity else None,
+        "Operating Profit Margin (%)": op_margin * 100 if op_margin else None,
+    }
+    return ratios
+
+ratios = get_clean_ratios(ticker)
+
+# --- Group ratios ---
+percent_ratios = {k: v for k, v in ratios.items() if "%" in k and v is not None}
+multiple_ratios = {k: v for k, v in ratios.items() if "%" not in k and v is not None}
+
+# --- Plot: Percentage-based ratios ---
+if percent_ratios:
+    st.subheader("📊 Percentage-Based Ratios")
+    fig_percent = go.Figure([go.Bar(
+        x=list(percent_ratios.keys()),
+        y=list(percent_ratios.values()),
+        marker_color='seagreen'
+    )])
+    fig_percent.update_layout(
+        title="Key Performance (%-based)",
+        yaxis_title="Percent",
+        xaxis_title="Metric"
+    )
+    st.plotly_chart(fig_percent, use_container_width=True)
+
+# --- Plot: Multiples ---
+if multiple_ratios:
+    st.subheader("📊 Market Valuation Multiples")
+    fig_mult = go.Figure([go.Bar(
+        x=list(multiple_ratios.keys()),
+        y=list(multiple_ratios.values()),
+        marker_color='indianred'
+    )])
+    fig_mult.update_layout(
+        title="Market Valuation Metrics (Multiples)",
+        yaxis_title="Value",
+        xaxis_title="Ratio"
+    )
+    st.plotly_chart(fig_mult, use_container_width=True)
 
 
-# -------- KPI Toggles --------
-st.subheader("🎛️ KPI Toggles")
-kpi_options = ["Revenue Growth", "Net Margin", "Sales"]
-selected_kpi = st.selectbox("Select KPI", kpi_options)
+# -------------------- KPI DASHBOARD --------------------
+st.header("📌 Key Performance Indicators (KPIs)")
 
+kpi_options = [
+    "Revenue",
+    "Revenue Growth (%)",
+    "Net Profit Margin (%)",
+    "EPS (Earnings Per Share)",
+    "Free Cash Flow (FCF)",
+    "Return on Equity (%)"
+]
+
+selected_kpis = st.multiselect(
+    "Select KPIs to display:",
+    options=kpi_options,
+    default=["Revenue", "Net Profit Margin (%)", "EPS (Earnings Per Share)"]
+)
+
+# --- Data ---
 try:
-    if selected_kpi == "Revenue Growth":
-        rev = income_stmt.loc['Total Revenue']
-        rev = rev.sort_index()
-        growth = rev.pct_change().dropna() * 100
-        fig_kpi = go.Figure()
-        fig_kpi.add_trace(go.Bar(x=growth.index, y=growth.values, name="Revenue Growth (%)"))
-        fig_kpi.update_layout(title="Revenue Growth (%)", xaxis_title="Year", yaxis_title="Growth %")
-        st.plotly_chart(fig_kpi, use_container_width=True)
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    financials = stock.financials
+    cashflow = stock.cashflow
+    balance_sheet = stock.balance_sheet
 
-    elif selected_kpi == "Net Margin":
-        net_income = income_stmt.loc['Net Income']
-        net_margin = (net_income / income_stmt.loc['Total Revenue']) * 100
-        net_margin = net_margin.sort_index()
-        fig_kpi = go.Figure()
-        fig_kpi.add_trace(go.Scatter(x=net_margin.index, y=net_margin.values, name="Net Margin", mode='lines+markers'))
-        fig_kpi.update_layout(title="Net Margin (%)", xaxis_title="Year", yaxis_title="Net Margin %")
-        st.plotly_chart(fig_kpi, use_container_width=True)
+    revenue = info.get("totalRevenue")
+    net_income = info.get("netIncome")
+    eps = info.get("trailingEps")
+    fcf = None
 
-    elif selected_kpi == "Sales":
-        sales = income_stmt.loc['Total Revenue']
-        sales = sales.sort_index()
-        fig_kpi = go.Figure()
-        fig_kpi.add_trace(go.Scatter(x=sales.index, y=sales.values / 1e9, mode='lines+markers', name="Sales"))
-        fig_kpi.update_layout(title="Sales Over Time", xaxis_title="Year", yaxis_title="Sales (B USD)")
-        st.plotly_chart(fig_kpi, use_container_width=True)
+    if 'Total Cash From Operating Activities' in cashflow.index and 'Capital Expenditures' in cashflow.index:
+        fcf_series = cashflow.loc['Total Cash From Operating Activities'] - cashflow.loc['Capital Expenditures']
+        fcf = fcf_series.iloc[0] if not fcf_series.empty else None
+
+    total_equity = balance_sheet.loc["Total Stockholder Equity"].iloc[0] if "Total Stockholder Equity" in balance_sheet.index else None
+    roe = (net_income / total_equity * 100) if net_income and total_equity else None
+
+    revenue_growth = info.get("revenueGrowth", None)
+    profit_margin = info.get("profitMargins", None)
+
+    kpi_values = {
+        "Revenue": f"${revenue/1e9:.2f}B" if revenue else "N/A",
+        "Revenue Growth (%)": f"{revenue_growth * 100:.2f}%" if revenue_growth else "N/A",
+        "Net Profit Margin (%)": f"{profit_margin * 100:.2f}%" if profit_margin else "N/A",
+        "EPS (Earnings Per Share)": f"${eps:.2f}" if eps else "N/A",
+        "Free Cash Flow (FCF)": f"${fcf/1e9:.2f}B" if fcf else "N/A",
+        "Return on Equity (%)": f"{roe:.2f}%" if roe else "N/A"
+    }
+
+    cols = st.columns(len(selected_kpis))
+    for i, kpi in enumerate(selected_kpis):
+        with cols[i]:
+            st.metric(label=kpi, value=kpi_values[kpi])
+
 except Exception as e:
-    st.warning(f"Unable to display KPI: {e}")
+    st.error(f"KPI section failed: {e}")
