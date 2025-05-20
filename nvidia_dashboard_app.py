@@ -477,3 +477,58 @@ for i, kpi in enumerate(selected_kpis):
             st.metric(kpi, formatted)
         else:
             st.metric(kpi, "N/A")
+
+# --- Investment Thesis & Upside Potential ---
+st.header("💡 Investment Thesis & Upside Potential")
+
+thesis_points = []
+
+if intrinsic_value and current_price:
+    if intrinsic_value > current_price:
+        upside = ((intrinsic_value - current_price) / current_price) * 100
+        thesis_points.append(
+            f"📈 The stock appears undervalued based on DCF, with an upside potential of **{upside:.1f}%**."
+        )
+    elif intrinsic_value < current_price:
+        thesis_points.append("📉 DCF suggests the stock may be overvalued, but growth prospects might justify the premium.")
+
+pe_ratio = get_ratio("Trailing P/E", "PE Ratio", "P/E")
+if pe_ratio and pe_ratio < 25:
+    thesis_points.append(f"💰 Attractive valuation with a trailing P/E of **{pe_ratio:.1f}**.")
+
+roe = get_ratio("Return on Equity (ROE)")
+if roe and roe > 15:
+    thesis_points.append(f"🚀 Strong profitability with ROE at **{roe:.1f}%**.")
+
+revenue_growth = revenue_trend_df["Revenue"].pct_change().mean() * 100 if not revenue_trend_df.empty else None
+if revenue_growth and revenue_growth > 10:
+    thesis_points.append(f"📊 Solid revenue growth trend averaging **{revenue_growth:.1f}% YoY**.")
+
+if not thesis_points:
+    st.info("No compelling thesis identified based on current data.")
+else:
+    for point in thesis_points:
+        st.markdown(f"- {point}")
+
+# --- Risks & Concerns ---
+st.header("⚠️ Risks & Concerns")
+
+risk_points = []
+
+debt_equity = get_ratio("Debt to Equity")
+if debt_equity and debt_equity > 1:
+    risk_points.append(f"⚠️ High leverage with a debt-to-equity ratio of **{debt_equity:.2f}**, which could pressure finances during downturns.")
+
+peg = get_ratio("PEG Ratio")
+if peg and peg > 2:
+    risk_points.append(f"📌 High PEG ratio of **{peg:.2f}**, suggesting the stock may be expensive relative to growth.")
+
+profit_margin = get_ratio("Profit Margin")
+if profit_margin and profit_margin < 10:
+    risk_points.append(f"📉 Low profit margins (**{profit_margin:.1f}%**), limiting bottom-line growth.")
+
+if not risk_points:
+    st.success("No major concerns based on current financial data.")
+else:
+    for point in risk_points:
+        st.markdown(f"- {point}")
