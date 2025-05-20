@@ -356,12 +356,29 @@ if multiple_ratios:
 # -------------------- KPI DASHBOARD --------------------
 st.subheader("📌 Key Performance Indicators (KPIs)")
 
-# Re-fetch info and cashflow for safety
 stock = yf.Ticker(ticker)
 info = stock.info
 cashflow = stock.cashflow
+financials = stock.financials
 
-# Define KPI logic
+# Safely compute FCF
+def get_fcf(cashflow):
+    try:
+        if "Total Cash From Operating Activities" in cashflow.index and "Capital Expenditures" in cashflow.index:
+            return cashflow.loc["Total Cash From Operating Activities"].dropna().iloc[0] - cashflow.loc["Capital Expenditures"].dropna().iloc[0]
+        elif "Operating Cash Flow" in cashflow.index and "Capital Expenditures" in cashflow.index:
+            return cashflow.loc["Operating Cash Flow"].dropna().iloc[0] - cashflow.loc["Capital Expenditures"].dropna().iloc[0]
+    except:
+        return None
+
+# Fallback net profit margin calculation
+def get_net_profit_margin(info, financials):
+    net_income = financials.loc["Net Income"].dropna().iloc[0] if "Net Income" in financials.index else None
+    revenue = info.get("totalRevenue", None)
+    if net_income is not None and revenue:
+        return net_income / revenue
+    return info.get("netMargins", None)
+
 kpi_data = {
     "Revenue": {
         "value": info.get("totalRevenue"),
@@ -369,7 +386,7 @@ kpi_data = {
         "divisor": 1e9
     },
     "Net Profit Margin (%)": {
-        "value": info.get("netMargins", None),
+        "value": get_net_profit_margin(info, financials),
         "format": "{:.2%}",
         "divisor": 1
     },
@@ -379,15 +396,7 @@ kpi_data = {
         "divisor": 1
     },
     "Free Cash Flow (FCF)": {
-        "value": (
-            cashflow.loc["Total Cash From Operating Activities"].iloc[0]
-            - cashflow.loc["Capital Expenditures"].iloc[0]
-            if "Total Cash From Operating Activities" in cashflow.index
-            and "Capital Expenditures" in cashflow.index
-            and pd.notnull(cashflow.loc["Total Cash From Operating Activities"].iloc[0])
-            and pd.notnull(cashflow.loc["Capital Expenditures"].iloc[0])
-            else None
-        ),
+        "value": get_fcf(cashflow),
         "format": "${:,.2f}B",
         "divisor": 1e9
     },
