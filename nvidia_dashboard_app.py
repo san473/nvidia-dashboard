@@ -301,35 +301,38 @@ if market_cleaned:
 else:
     st.warning("No market valuation data available.")
 
-# --- Profitability & Leverage Ratios ---
+   # --- Profitability & Leverage Ratios ---
 st.subheader("📈 Profitability & Leverage Ratios")
 
-def get_ratio(*keys):
-    for key in keys:
+# Show available ratio keys for debugging
+st.write("📊 Available keys in ratios:", list(ratios.keys()))
+
+def get_ratio(*possible_keys):
+    for key in possible_keys:
         val = ratios.get(key)
         if val is not None:
             return val
     return None
 
 performance_ratios = {
-    "ROIC (%)": get_ratio("Return on Invested Capital", "Return on Capital"),
-    "Operating Margin (%)": get_ratio("Operating Margin", "Operating Profit Margin"),
-    "Net Debt to Equity": get_ratio("Net Debt/Equity", "Net Debt/Equity Ratio")
+    "ROIC (%)": get_ratio("Return on Invested Capital", "Return on Capital Employed", "Return on Capital"),
+    "Operating Margin (%)": get_ratio("Operating Margin", "Operating Profit Margin", "Operating Income Margin"),
+    "Net Debt to Equity": get_ratio("Net Debt/Equity", "Net Debt to Equity Ratio", "Net Debt to Equity")
 }
 
-# Convert percentages
+# Convert percentages only if value is not None
 performance_cleaned = {
-    k: v * 100 if "Margin" in k or "ROIC" in k else v
+    k: v * 100 if v is not None and "%" in k else v
     for k, v in performance_ratios.items() if v is not None
 }
 
+# Display the chart or a warning
 if performance_cleaned:
     fig2 = go.Figure([go.Bar(x=list(performance_cleaned.keys()), y=list(performance_cleaned.values()), marker_color='seagreen')])
     fig2.update_layout(title="Profitability & Leverage Metrics", xaxis_title="", yaxis_title="Value")
     st.plotly_chart(fig2, use_container_width=True)
 else:
     st.warning("No profitability or leverage data available.")
-
 
 
 # -------------------- KPI DASHBOARD --------------------
