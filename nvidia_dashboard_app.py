@@ -354,68 +354,57 @@ if multiple_ratios:
 
 
 # -------------------- KPI DASHBOARD --------------------
-# --------- KPI Toggles ---------
 st.subheader("📌 Key Performance Indicators (KPIs)")
 
 kpi_options = [
-    "Revenue", "Net Profit Margin (%)", "EPS (Earnings Per Share)",
-    "Free Cash Flow (FCF)", "Return on Equity (%)", "Revenue Growth (%)"
+    "Revenue", 
+    "Net Profit Margin (%)", 
+    "EPS (Earnings Per Share)", 
+    "Free Cash Flow (FCF)", 
+    "Return on Equity (%)", 
+    "Revenue Growth (%)"
 ]
 
-selected_kpis = st.multiselect("Select KPIs to display:", kpi_options, default=kpi_options)
+selected_kpis = st.multiselect("Select KPIs to display:", options=kpi_options, default=kpi_options)
 
-try:
-    kpi_data = {}
-    currency = info.get("financialCurrency", "USD")
-    units = {"USD": "$", "EUR": "€", "GBP": "£"}
-    symbol = units.get(currency, "$")
+# Safely extract KPIs
+def safe_get(source, keys):
+    for key in keys:
+        if key in source:
+            return source[key]
+    return None
 
-    # Pull from info dict or compute
-    if "Revenue" in selected_kpis:
-        revenue = info.get("totalRevenue")
-        kpi_data["Revenue"] = f"{symbol}{revenue / 1e9:.2f}B" if revenue else "N/A"
+info = stock.info
+financials = stock.financials
+cashflow = stock.cashflow
+balance_sheet = stock.balance_sheet
 
-    if "Net Profit Margin (%)" in selected_kpis:
-        margin = info.get("profitMargins")
-        kpi_data["Net Profit Margin (%)"] = f"{margin * 100:.2f}%" if margin else "N/A"
+# Compute KPIs
+kpis = {
+    "Revenue": safe_get(info, ['totalRevenue']),
+    "Net Profit Margin (%)": safe_get(info, ['netMargins']) * 100 if safe_get(info, ['netMargins']) is not None else None,
+    "EPS (Earnings Per Share)": safe_get(info, ['trailingEps']),
+    "Free Cash Flow (FCF)": (
+        safe_get(cashflow, ['Total Cash From Operating Activities']) - 
+        safe_get(cashflow, ['Capital Expenditures']) 
+        if all(k in cashflow.index for k in ['Total Cash From Operating Activities', 'Capital Expenditures']) 
+        else None
+    ),
+    "Return on Equity (%)": safe_get(info, ['returnOnEquity']) * 100 if safe_get(info, ['returnOnEquity']) is not None else None,
+    "Revenue Growth (%)": safe_get(info, ['revenueGrowth']) * 100 if safe_get(info, ['revenueGrowth']) is not None else None,
+}
 
-    if "EPS (Earnings Per Share)" in selected_kpis:
-        eps = info.get("trailingEps")
-        kpi_data["EPS (Earnings Per Share)"] = f"{symbol}{eps:.2f}" if eps else "N/A"
-
-    if "Free Cash Flow (FCF)" in selected_kpis:
-        try:
-            cashflow_stmt = stock.cashflow
-            op_cf = cashflow_stmt.loc["Total Cash From Operating Activities"].iloc[0]
-            capex = cashflow_stmt.loc["Capital Expenditures"].iloc[0]
-            fcf = op_cf + capex  # CapEx is negative
-            kpi_data["Free Cash Flow (FCF)"] = f"{symbol}{fcf / 1e9:.2f}B"
-        except:
-            kpi_data["Free Cash Flow (FCF)"] = "N/A"
-
-    if "Return on Equity (%)" in selected_kpis:
-        try:
-            net_income = stock.financials.loc["Net Income"].iloc[0]
-            equity = stock.balance_sheet.loc["Total Stockholder Equity"].iloc[0]
-            roe = net_income / equity
-            kpi_data["Return on Equity (%)"] = f"{roe * 100:.2f}%"
-        except:
-            kpi_data["Return on Equity (%)"] = "N/A"
-
-    if "Revenue Growth (%)" in selected_kpis:
-        try:
-            hist = stock.history(period="2y")
-            recent = hist["Close"].resample("Q").last()
-            revenue_growth = ((recent[-1] - recent[-5]) / recent[-5]) * 100
-            kpi_data["Revenue Growth (%)"] = f"{revenue_growth:.2f}%"
-        except:
-            kpi_data["Revenue Growth (%)"] = "N/A"
-
-    # --- Display selected KPIs ---
-    kpi_cols = st.columns(len(selected_kpis))
-    for idx, kpi in enumerate(selected_kpis):
-        value = kpi_data.get(kpi, "N/A")
-        kpi_cols[idx].metric(label=kpi, value=value)
-
-except Exception as e:
-    st.error(f"Failed to render KPI section: {e}")
+# Render KPI cards
+cols = st.columns(len(selected_kpis))
+for col, kpi in zip(cols, selected_kpis):
+    val = kpis.get(kpi)
+    if val is not None:
+        if "($" in kpi or "Revenue" in kpi or "FCF" in kpi:
+            val_str = f"${val:,.2f}B" if abs(val) > 1e9 else f"${val:,.2f}M"
+        elif "%" in kpi:
+            val_str = f"{val:.2f}%"
+        else:
+            val_str = f"${val:.2f}" if isinstance(val, (float, int)) else str(val)
+    else:
+        val_str = "N/A"
+    col.metric(label=kpi, value=val_str)
