@@ -533,52 +533,62 @@ except Exception as e:
 st.markdown("## ⚠️ Risks & Concerns")
 
 try:
-    risk_points = []
+    # Get financial metrics
+    debt_equity = key_metrics.get("Debt to Equity")
+    gross_margin = key_metrics.get("Gross Margin")
+    net_margin = key_metrics.get("Net Margin")
+    operating_margin = key_metrics.get("Operating Margin")
+    
+    # Try extracting Free Cash Flow directly from Yahoo
+    cashflow_stmt = stock.get_cashflow()
+    fcf = None
+    for label in ['Total Cash From Operating Activities', 'Free Cash Flow']:
+        if label in cashflow_stmt.index:
+            fcf = cashflow_stmt.loc[label].iloc[0]
+            break
 
-    # --- Fallback-safe access to financial metrics ---
-    debt_equity = key_metrics.get("Debt to Equity", None)
-    profit_margin = key_metrics.get("Profit Margin", None)
-    current_ratio = key_metrics.get("Current Ratio", None)
+    # Fetch peer symbols
+    peer_symbols = stock.get_peers()
+    peer_symbols = [p for p in peer_symbols if p != ticker][:5]
 
-    # Risk 1: High leverage
-    if debt_equity is not None and debt_equity > 1.0:
-        risk_points.append(f"- **High Leverage**: Debt-to-Equity is **{debt_equity:.2f}**, suggesting reliance on debt.")
-
-    # Risk 2: Margin Compression
-    if profit_margin is not None and profit_margin < 0.1:
-        risk_points.append(f"- **Low Profitability**: Profit margin is **{profit_margin:.2%}**, indicating margin pressure.")
-
-    # Risk 3: Weak Liquidity
-    if current_ratio is not None and current_ratio < 1.0:
-        risk_points.append(f"- **Liquidity Risk**: Current ratio is **{current_ratio:.2f}**, suggesting short-term financial stress.")
-
-    # Risk 4: Free Cash Flow (with safe lookup)
-    try:
-        cf_df = stock.cashflow
-        op_cash = cf_df.loc[cf_df.index.str.contains("Total Cash From Operating Activities", case=False)].dropna()
-        capex = cf_df.loc[cf_df.index.str.contains("Capital Expenditures", case=False)].dropna()
-
-        if not op_cash.empty and not capex.empty:
-            fcf_latest = op_cash.iloc[0] - abs(capex.iloc[0])
-            if fcf_latest < 0:
-                risk_points.append(f"- **Negative Free Cash Flow**: Latest FCF is **${fcf_latest:,.0f}**, indicating cash burn.")
-    except Exception:
-        pass  # Safe fallback if missing cashflow
-
-    # Risk 5: Peer comparison (optional)
-    if peers_df is not None and not peers_df.empty:
+    # Fetch peer financials
+    peer_data = []
+    for p in peer_symbols:
         try:
-            industry_avg_margin = peers_df["Profit Margin"].dropna().mean()
-            if profit_margin is not None and industry_avg_margin and profit_margin < industry_avg_margin * 0.8:
-                risk_points.append("- **Competitive Disadvantage**: Profit margin is significantly below industry peers.")
-        except Exception:
-            pass
+            peer = yf.Ticker(p)
+            peer_info = peer.info
+            peer_data.append({
+                'symbol': p,
+                'debt_to_equity': peer_info.get('debtToEquity'),
+                'gross_margin': peer_info.get('grossMargins'),
+                'net_margin': peer_info.get('netMargins'),
+                'operating_margin': peer_info.get('operatingMargins')
+            })
+        except:
+            continue
 
-    # Output block
-    if risk_points:
-        st.error("**Identified Risk Factors:**\n\n" + "\n".join(risk_points))
+    peers_df = pd.DataFrame(peer_data)
+
+    risk_flags = []
+
+    if debt_equity is not None and debt_equity > 1:
+        risk_flags.append(f"- **High Leverage**: Debt/Equity ratio is **{debt_equity:.2f}**, which may indicate over-leverage.")
+
+    if fcf is not None and fcf < 0:
+        risk_flags.append(f"- **Negative Free Cash Flow**: Latest FCF is **${fcf:,.0f}**, suggesting the firm might be struggling to generate internal capital.")
+
+    if net_margin is not None and net_margin < 0:
+        risk_flags.append(f"- **Negative Profitability**: Net margin is **{net_margin:.2%}**, pointing to ongoing losses.")
+
+    if not peers_df.empty:
+        avg_op_margin = peers_df['operating_margin'].mean()
+        if operating_margin is not None and operating_margin < avg_op_margin * 0.8:
+            risk_flags.append(f"- **Weak Competitive Profitability**: Operating margin is **{operating_margin:.2%}**, significantly below peer average (**{avg_op_margin:.2%}**).")
+
+    if risk_flags:
+        st.error("### ⚠️ Potential Risks Detected:\n" + "\n".join(risk_flags))
     else:
-        st.info("No material red flags identified in debt, liquidity, or free cash flow.")
+        st.info("✅ No major red flags found based on financial metrics and peer comparison.")
 
 except Exception as e:
     st.warning(f"⚠️ Could not generate risk section: {e}")
