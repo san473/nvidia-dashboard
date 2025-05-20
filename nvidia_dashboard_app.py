@@ -479,36 +479,32 @@ for i, kpi in enumerate(selected_kpis):
             st.metric(kpi, "N/A")
 
 # --- Investment Thesis & Upside Potential ---
-st.header("💡 Investment Thesis & Upside Potential")
+# --- Investment Thesis & Upside Potential ---
+st.markdown("## 💡 Investment Thesis & Upside Potential")
 
-thesis_points = []
+if 'intrinsic_value' in locals() and 'current_price' in locals() and intrinsic_value and current_price:
+    upside_pct = ((intrinsic_value - current_price) / current_price) * 100
+    if upside_pct > 20:
+        st.success(f"""
+        **Strong Upside**: Based on our DCF valuation, the intrinsic value (${intrinsic_value:,.2f}) is **{upside_pct:.1f}%** higher than the current price (${current_price:,.2f}).
 
-if intrinsic_value and current_price:
-    if intrinsic_value > current_price:
-        upside = ((intrinsic_value - current_price) / current_price) * 100
-        thesis_points.append(
-            f"📈 The stock appears undervalued based on DCF, with an upside potential of **{upside:.1f}%**."
-        )
-    elif intrinsic_value < current_price:
-        thesis_points.append("📉 DCF suggests the stock may be overvalued, but growth prospects might justify the premium.")
+        This indicates significant upside potential driven by robust fundamentals, growth expectations, and market leadership.
+        """)
+    elif upside_pct > 0:
+        st.info(f"""
+        **Modest Upside**: The intrinsic value (${intrinsic_value:,.2f}) is slightly higher than the current price (${current_price:,.2f}), with an upside of **{upside_pct:.1f}%**.
 
-pe_ratio = get_ratio("Trailing P/E", "PE Ratio", "P/E")
-if pe_ratio and pe_ratio < 25:
-    thesis_points.append(f"💰 Attractive valuation with a trailing P/E of **{pe_ratio:.1f}**.")
+        There is potential for long-term gains, especially if current growth trajectories hold.
+        """)
+    else:
+        st.warning(f"""
+        **Limited Upside**: The intrinsic value (${intrinsic_value:,.2f}) is below the current price (${current_price:,.2f}), suggesting downside risk of **{abs(upside_pct):.1f}%**.
 
-roe = get_ratio("Return on Equity (ROE)")
-if roe and roe > 15:
-    thesis_points.append(f"🚀 Strong profitability with ROE at **{roe:.1f}%**.")
-
-revenue_growth = revenue_trend_df["Revenue"].pct_change().mean() * 100 if not revenue_trend_df.empty else None
-if revenue_growth and revenue_growth > 10:
-    thesis_points.append(f"📊 Solid revenue growth trend averaging **{revenue_growth:.1f}% YoY**.")
-
-if not thesis_points:
-    st.info("No compelling thesis identified based on current data.")
+        Investors should proceed with caution or wait for a better entry point.
+        """)
 else:
-    for point in thesis_points:
-        st.markdown(f"- {point}")
+    st.warning("⚠️ Intrinsic value or current price is not available to assess upside potential.")
+
 
 # --- Risks & Concerns ---
 st.header("⚠️ Risks & Concerns")
