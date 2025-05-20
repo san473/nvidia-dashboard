@@ -365,11 +365,18 @@ financials = stock.financials
 def get_fcf(cashflow):
     try:
         if "Total Cash From Operating Activities" in cashflow.index and "Capital Expenditures" in cashflow.index:
-            return cashflow.loc["Total Cash From Operating Activities"].dropna().iloc[0] - cashflow.loc["Capital Expenditures"].dropna().iloc[0]
+            op = cashflow.loc["Total Cash From Operating Activities"].dropna()
+            capex = cashflow.loc["Capital Expenditures"].dropna()
+            if not op.empty and not capex.empty:
+                return op.iloc[0] - capex.iloc[0]
         elif "Operating Cash Flow" in cashflow.index and "Capital Expenditures" in cashflow.index:
-            return cashflow.loc["Operating Cash Flow"].dropna().iloc[0] - cashflow.loc["Capital Expenditures"].dropna().iloc[0]
+            op = cashflow.loc["Operating Cash Flow"].dropna()
+            capex = cashflow.loc["Capital Expenditures"].dropna()
+            if not op.empty and not capex.empty:
+                return op.iloc[0] - capex.iloc[0]
     except:
         return None
+
 
 # Fallback net profit margin calculation
 def get_net_profit_margin(info, financials):
