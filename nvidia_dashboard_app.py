@@ -479,48 +479,38 @@ for i, kpi in enumerate(selected_kpis):
             st.metric(kpi, "N/A")
 
 # --- Investment Thesis & Upside Potential ---
-# --- Investment Thesis & Upside Potential ---
+# --- Investment Thesis ---
 st.markdown("## 💡 Investment Thesis & Upside Potential")
 
-if 'intrinsic_value' in locals() and 'current_price' in locals() and intrinsic_value and current_price:
-    upside_pct = ((intrinsic_value - current_price) / current_price) * 100
-    if upside_pct > 20:
+try:
+    if 'intrinsic_value' in locals() and 'current_price' in locals() and intrinsic_value and current_price:
+        upside = ((intrinsic_value - current_price) / current_price) * 100
         st.success(f"""
-        **Strong Upside**: Based on our DCF valuation, the intrinsic value (${intrinsic_value:,.2f}) is **{upside_pct:.1f}%** higher than the current price (${current_price:,.2f}).
-
-        This indicates significant upside potential driven by robust fundamentals, growth expectations, and market leadership.
-        """)
-    elif upside_pct > 0:
-        st.info(f"""
-        **Modest Upside**: The intrinsic value (${intrinsic_value:,.2f}) is slightly higher than the current price (${current_price:,.2f}), with an upside of **{upside_pct:.1f}%**.
-
-        There is potential for long-term gains, especially if current growth trajectories hold.
+        **Valuation Upside**: Based on your DCF model, the intrinsic value is **${intrinsic_value:.2f}**, compared to the current market price of **${current_price:.2f}**.
+        
+        This implies an upside potential of **{upside:.1f}%**, suggesting that the stock may be undervalued.
+        
+        **Investment Thesis**: The company shows strong fundamentals, future growth potential, and favorable valuation metrics.
         """)
     else:
-        st.warning(f"""
-        **Limited Upside**: The intrinsic value (${intrinsic_value:,.2f}) is below the current price (${current_price:,.2f}), suggesting downside risk of **{abs(upside_pct):.1f}%**.
+        st.warning("⚠️ Intrinsic value or current price is not available to assess upside potential.")
+except Exception as e:
+    st.warning(f"⚠️ Could not generate thesis: {e}")
 
-        Investors should proceed with caution or wait for a better entry point.
-        """)
-else:
-    st.warning("⚠️ Intrinsic value or current price is not available to assess upside potential.")
-
-
-# --- Risks & Concerns ---
 # --- Risks & Concerns ---
 st.markdown("## ⚠️ Risks & Concerns")
 
 try:
-    debt_equity = key_metrics.get("Debt to Equity", None)  # or ratios.get(...) depending on your setup
+    debt_equity = key_metrics.get("Debt to Equity", None)
 
-    if debt_equity and debt_equity > 1:
+    if debt_equity is not None and debt_equity > 1:
         st.error(f"""
         **High Leverage Risk**: The company has a Debt-to-Equity ratio of **{debt_equity:.2f}**, indicating it is significantly leveraged.
-
-        High debt levels could expose it to refinancing risks, especially in a rising interest rate environment.
+        
+        This could expose it to refinancing risks in tighter credit environments.
         """)
     else:
-        st.info("No significant debt-related risks detected based on current ratios.")
+        st.info("No major debt-related risks based on the current leverage ratio.")
 
 except Exception as e:
     st.warning(f"Could not assess risk metrics: {e}")
