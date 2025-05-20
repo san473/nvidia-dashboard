@@ -9,7 +9,10 @@ from bs4 import BeautifulSoup
 import plotly.express as px
 
 
-NEWSAPI_KEY = st.secrets["newsapi"]
+NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
+
+
+
 def fetch_news(ticker):
     try:
         url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWSAPI_KEY}&sortBy=publishedAt&language=en"
