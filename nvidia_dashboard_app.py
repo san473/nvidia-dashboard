@@ -304,13 +304,24 @@ else:
 # --- Profitability & Leverage Ratios ---
 st.subheader("📈 Profitability & Leverage Ratios")
 
+def get_ratio(*keys):
+    for key in keys:
+        val = ratios.get(key)
+        if val is not None:
+            return val
+    return None
+
 performance_ratios = {
-    "ROIC (%)": ratios.get("Return on Invested Capital"),
-    "Operating Margin (%)": ratios.get("Operating Margin"),
-    "Net Debt to Equity": ratios.get("Net Debt/Equity")
+    "ROIC (%)": get_ratio("Return on Invested Capital", "Return on Capital"),
+    "Operating Margin (%)": get_ratio("Operating Margin", "Operating Profit Margin"),
+    "Net Debt to Equity": get_ratio("Net Debt/Equity", "Net Debt/Equity Ratio")
 }
 
-performance_cleaned = {k: v * 100 if 'Margin' in k or 'ROIC' in k else v for k, v in performance_ratios.items() if v is not None}
+# Convert percentages
+performance_cleaned = {
+    k: v * 100 if "Margin" in k or "ROIC" in k else v
+    for k, v in performance_ratios.items() if v is not None
+}
 
 if performance_cleaned:
     fig2 = go.Figure([go.Bar(x=list(performance_cleaned.keys()), y=list(performance_cleaned.values()), marker_color='seagreen')])
@@ -318,6 +329,7 @@ if performance_cleaned:
     st.plotly_chart(fig2, use_container_width=True)
 else:
     st.warning("No profitability or leverage data available.")
+
 
 
 # -------------------- KPI DASHBOARD --------------------
