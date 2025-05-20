@@ -354,59 +354,74 @@ if multiple_ratios:
 
 
 # -------------------- KPI DASHBOARD --------------------
-st.header("📌 Key Performance Indicators (KPIs)")
+st.subheader("📌 Key Performance Indicators (KPIs)")
 
 kpi_options = [
     "Revenue",
-    "Revenue Growth (%)",
     "Net Profit Margin (%)",
     "EPS (Earnings Per Share)",
     "Free Cash Flow (FCF)",
-    "Return on Equity (%)"
+    "Return on Equity (%)",
+    "Revenue Growth (%)"
 ]
 
-selected_kpis = st.multiselect(
-    "Select KPIs to display:",
-    options=kpi_options,
-    default=["Revenue", "Net Profit Margin (%)", "EPS (Earnings Per Share)"]
-)
+selected_kpis = st.multiselect("Select KPIs to display:", kpi_options, default=kpi_options)
 
-# --- Data ---
-try:
-    stock = yf.Ticker(ticker)
-    info = stock.info
-    financials = stock.financials
-    cashflow = stock.cashflow
-    balance_sheet = stock.balance_sheet
+# --- Fetch KPI values with fallback logic ---
+kpis = {}
 
-    revenue = info.get("totalRevenue")
-    net_income = info.get("netIncome")
-    eps = info.get("trailingEps")
-    fcf = None
+# Revenue
+kpis["Revenue"] = info.get("totalRevenue")
 
-    if 'Total Cash From Operating Activities' in cashflow.index and 'Capital Expenditures' in cashflow.index:
-        fcf_series = cashflow.loc['Total Cash From Operating Activities'] - cashflow.loc['Capital Expenditures']
-        fcf = fcf_series.iloc[0] if not fcf_series.empty else None
+# Net Profit Margin (%)
+net_margin = info.get("netMargins")
+kpis["Net Profit Margin (%)"] = net_margin * 100 if net_margin is not None else None
 
-    total_equity = balance_sheet.loc["Total Stockholder Equity"].iloc[0] if "Total Stockholder Equity" in balance_sheet.index else None
-    roe = (net_income / total_equity * 100) if net_income and total_equity else None
+# EPS
+kpis["EPS (Earnings Per Share)"] = info.get("trailingEps")
 
-    revenue_growth = info.get("revenueGrowth", None)
-    profit_margin = info.get("profitMargins", None)
+# Free Cash Flow (FCF)
+fcf_value = info.get("freeCashflow")
+if fcf_value is None:
+    try:
+        cf_data = stock.cashflow
+        if "Total Cash From Operating Activities" in cf_data.index and "Capital Expenditures" in cf_data.index:
+            fcf_series = cf_data.loc["Total Cash From Operating Activities"] - cf_data.loc["Capital Expenditures"]
+            fcf_value = fcf_series.dropna().iloc[0]
+    except:
+        fcf_value = None
+kpis["Free Cash Flow (FCF)"] = fcf_value
 
-    kpi_values = {
-        "Revenue": f"${revenue/1e9:.2f}B" if revenue else "N/A",
-        "Revenue Growth (%)": f"{revenue_growth * 100:.2f}%" if revenue_growth else "N/A",
-        "Net Profit Margin (%)": f"{profit_margin * 100:.2f}%" if profit_margin else "N/A",
-        "EPS (Earnings Per Share)": f"${eps:.2f}" if eps else "N/A",
-        "Free Cash Flow (FCF)": f"${fcf/1e9:.2f}B" if fcf else "N/A",
-        "Return on Equity (%)": f"{roe:.2f}%" if roe else "N/A"
-    }
+# Return on Equity (%)
+roe = info.get("returnOnEquity")
+kpis["Return on Equity (%)"] = roe * 100 if roe is not None else None
 
-    cols = st.columns(len(selected_kpis))
-    for i, kpi in enumerate(selected_kpis):
-        with cols[i]:
-            st.metric(label=kpi, value=kpi_values[kpi])
+# Revenue Growth (%)
+rev_growth = info.get("revenueGrowth")
+kpis["Revenue Growth (%)"] = rev_growth * 100 if rev_growth is not None else None
 
-except Exception as e:
-    st.error(f"KPI section failed: {e}")
+# --- Display KPIs with Arrows ---
+cols = st.columns(len(selected_kpis))
+
+for i, kpi in enumerate(selected_kpis):
+    value = kpis.get(kpi)
+
+    # Default display and delta
+    if value is None:
+        display = "N/A"
+        delta = ""
+    elif "Margin" in kpi or "Growth" in kpi or "Return" in kpi:
+        display = f"{value:.2f}%"
+        delta = "🔺" if value >= 0 else "🔻"
+    elif "EPS" in kpi:
+        display = f"${value:.2f}"
+        delta = "🔺" if value >= 0 else "🔻"
+    elif "Revenue" in kpi or "Cash Flow" in kpi:
+        display = f"${value / 1e9:.2f}B"
+        delta = "🔺" if value >= 0 else "🔻"
+    else:
+        display = value
+        delta = ""
+
+    # Show metric with trend arrow
+    cols[i].metric(label=kpi, value=display, delta=delta)
