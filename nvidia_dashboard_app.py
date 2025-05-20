@@ -367,6 +367,9 @@ kpi_options = [
 
 selected_kpis = st.multiselect("Select KPIs to display:", options=kpi_options, default=kpi_options)
 
+stock = yf.Ticker(ticker)
+
+
 # Safely extract KPIs
 def safe_get(source, keys):
     for key in keys:
