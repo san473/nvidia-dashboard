@@ -6,6 +6,8 @@ import numpy as np
 import requests
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
+import plotly.express as px
+
 
 NEWSAPI_KEY = st.secrets["newsapi"]
 def fetch_news(ticker):
