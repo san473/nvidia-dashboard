@@ -265,7 +265,9 @@ except Exception as e:
     st.warning(f"Unable to load financial visualizations: {e}")
 
 # -------- Revenue Trends --------
+
 try:
+    stock = yf.Ticker(ticker)
     st.subheader("📈 Revenue Trend")
     income_stmt = stock.financials
     if not income_stmt.empty:
