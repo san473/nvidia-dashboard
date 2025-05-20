@@ -516,6 +516,19 @@ try:
 except Exception as e:
     st.warning(f"Could not generate investment thesis: {e}")
 
+# --- Extract Key Financial Ratios (required for risk assessment) ---
+try:
+    fin_ratios = stock.info  # or wherever you assign stock info via yfinance
+    key_metrics = {
+        "Debt to Equity": fin_ratios.get("debtToEquity", None),
+        "Profit Margin": fin_ratios.get("profitMargins", None),
+        "Current Ratio": fin_ratios.get("currentRatio", None),
+        "Return on Equity": fin_ratios.get("returnOnEquity", None),
+    }
+except Exception as e:
+    key_metrics = {}
+    st.warning(f"Could not extract key metrics: {e}")
+
 # --- Risks & Concerns ---
 st.markdown("## ⚠️ Risks & Concerns")
 
