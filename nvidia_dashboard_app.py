@@ -356,58 +356,63 @@ if multiple_ratios:
 # -------------------- KPI DASHBOARD --------------------
 st.subheader("📌 Key Performance Indicators (KPIs)")
 
-kpi_options = [
-    "Revenue", 
-    "Net Profit Margin (%)", 
-    "EPS (Earnings Per Share)", 
-    "Free Cash Flow (FCF)", 
-    "Return on Equity (%)", 
-    "Revenue Growth (%)"
-]
-
-selected_kpis = st.multiselect("Select KPIs to display:", options=kpi_options, default=kpi_options)
-
+# Re-fetch info and cashflow for safety
 stock = yf.Ticker(ticker)
-
-
-# Safely extract KPIs
-def safe_get(source, keys):
-    for key in keys:
-        if key in source:
-            return source[key]
-    return None
-
 info = stock.info
-financials = stock.financials
 cashflow = stock.cashflow
-balance_sheet = stock.balance_sheet
 
-# Compute KPIs
-kpis = {
-    "Revenue": safe_get(info, ['totalRevenue']),
-    "Net Profit Margin (%)": safe_get(info, ['netMargins']) * 100 if safe_get(info, ['netMargins']) is not None else None,
-    "EPS (Earnings Per Share)": safe_get(info, ['trailingEps']),
-    "Free Cash Flow (FCF)": (
-        safe_get(cashflow, ['Total Cash From Operating Activities']) - 
-        safe_get(cashflow, ['Capital Expenditures']) 
-        if all(k in cashflow.index for k in ['Total Cash From Operating Activities', 'Capital Expenditures']) 
-        else None
-    ),
-    "Return on Equity (%)": safe_get(info, ['returnOnEquity']) * 100 if safe_get(info, ['returnOnEquity']) is not None else None,
-    "Revenue Growth (%)": safe_get(info, ['revenueGrowth']) * 100 if safe_get(info, ['revenueGrowth']) is not None else None,
+# Define KPI logic
+kpi_data = {
+    "Revenue": {
+        "value": info.get("totalRevenue"),
+        "format": "${:,.2f}B",
+        "divisor": 1e9
+    },
+    "Net Profit Margin (%)": {
+        "value": info.get("netMargins", None),
+        "format": "{:.2%}",
+        "divisor": 1
+    },
+    "EPS (Earnings Per Share)": {
+        "value": info.get("trailingEps", None),
+        "format": "${:,.2f}",
+        "divisor": 1
+    },
+    "Free Cash Flow (FCF)": {
+        "value": (
+            cashflow.loc["Total Cash From Operating Activities"].iloc[0]
+            - cashflow.loc["Capital Expenditures"].iloc[0]
+            if "Total Cash From Operating Activities" in cashflow.index
+            and "Capital Expenditures" in cashflow.index
+            and pd.notnull(cashflow.loc["Total Cash From Operating Activities"].iloc[0])
+            and pd.notnull(cashflow.loc["Capital Expenditures"].iloc[0])
+            else None
+        ),
+        "format": "${:,.2f}B",
+        "divisor": 1e9
+    },
+    "Return on Equity (%)": {
+        "value": info.get("returnOnEquity", None),
+        "format": "{:.2%}",
+        "divisor": 1
+    },
+    "Revenue Growth (%)": {
+        "value": info.get("revenueGrowth", None),
+        "format": "{:.2%}",
+        "divisor": 1
+    },
 }
 
-# Render KPI cards
+# Dropdown for selection
+selected_kpis = st.multiselect("Select KPIs to display:", list(kpi_data.keys()), default=list(kpi_data.keys()))
+
+# Display KPIs
 cols = st.columns(len(selected_kpis))
-for col, kpi in zip(cols, selected_kpis):
-    val = kpis.get(kpi)
-    if val is not None:
-        if "($" in kpi or "Revenue" in kpi or "FCF" in kpi:
-            val_str = f"${val:,.2f}B" if abs(val) > 1e9 else f"${val:,.2f}M"
-        elif "%" in kpi:
-            val_str = f"{val:.2f}%"
+for i, kpi in enumerate(selected_kpis):
+    with cols[i]:
+        val = kpi_data[kpi]["value"]
+        if val is not None and pd.notnull(val):
+            formatted = kpi_data[kpi]["format"].format(val / kpi_data[kpi]["divisor"])
+            st.metric(kpi, formatted)
         else:
-            val_str = f"${val:.2f}" if isinstance(val, (float, int)) else str(val)
-    else:
-        val_str = "N/A"
-    col.metric(label=kpi, value=val_str)
+            st.metric(kpi, "N/A")
