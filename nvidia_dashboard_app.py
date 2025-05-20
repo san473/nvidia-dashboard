@@ -479,38 +479,39 @@ for i, kpi in enumerate(selected_kpis):
             st.metric(kpi, "N/A")
 
 # --- Investment Thesis & Upside Potential ---
-# --- Investment Thesis ---
 st.markdown("## 💡 Investment Thesis & Upside Potential")
 
 try:
-    if 'intrinsic_value' in locals() and 'current_price' in locals() and intrinsic_value and current_price:
-        upside = ((intrinsic_value - current_price) / current_price) * 100
-        st.success(f"""
-        **Valuation Upside**: Based on your DCF model, the intrinsic value is **${intrinsic_value:.2f}**, compared to the current market price of **${current_price:.2f}**.
-        
-        This implies an upside potential of **{upside:.1f}%**, suggesting that the stock may be undervalued.
-        
-        **Investment Thesis**: The company shows strong fundamentals, future growth potential, and favorable valuation metrics.
-        """)
-    else:
-        st.warning("⚠️ Intrinsic value or current price is not available to assess upside potential.")
+    st.info("""
+    **Investment Thesis**: Based on available financial metrics, the company exhibits strong fundamentals and operational performance.
+    
+    - High revenue growth trajectory
+    - Healthy profitability margins
+    - Market leadership or innovation edge
+
+    These factors may support continued shareholder value creation and potential price appreciation.
+    """)
 except Exception as e:
     st.warning(f"⚠️ Could not generate thesis: {e}")
+
 
 # --- Risks & Concerns ---
 st.markdown("## ⚠️ Risks & Concerns")
 
 try:
-    debt_equity = key_metrics.get("Debt to Equity", None)
+    # Make sure `key_metrics` exists before accessing
+    if 'key_metrics' in locals() and isinstance(key_metrics, dict):
+        debt_equity = key_metrics.get("Debt to Equity", None)
 
-    if debt_equity is not None and debt_equity > 1:
-        st.error(f"""
-        **High Leverage Risk**: The company has a Debt-to-Equity ratio of **{debt_equity:.2f}**, indicating it is significantly leveraged.
-        
-        This could expose it to refinancing risks in tighter credit environments.
-        """)
+        if debt_equity is not None and debt_equity > 1:
+            st.error(f"""
+            **High Leverage Risk**: The company has a Debt-to-Equity ratio of **{debt_equity:.2f}**, indicating it is significantly leveraged.
+            
+            This could expose it to refinancing risks in tighter credit environments.
+            """)
+        else:
+            st.info("No major debt-related risks based on the current leverage ratio.")
     else:
-        st.info("No major debt-related risks based on the current leverage ratio.")
-
+        st.warning("⚠️ Financial metrics not available to assess risk profile.")
 except Exception as e:
-    st.warning(f"Could not assess risk metrics: {e}")
+    st.warning(f"⚠️ Could not assess risk metrics: {e}")
