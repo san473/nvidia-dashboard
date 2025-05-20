@@ -354,69 +354,68 @@ if multiple_ratios:
 
 
 # -------------------- KPI DASHBOARD --------------------
-# ------- KPI Toggles -------
+# --------- KPI Toggles ---------
 st.subheader("📌 Key Performance Indicators (KPIs)")
 
-# User KPI selections
 kpi_options = [
-    "Revenue",
-    "Net Profit Margin (%)",
-    "EPS (Earnings Per Share)",
-    "Free Cash Flow (FCF)",
-    "Return on Equity (%)",
-    "Revenue Growth (%)"
+    "Revenue", "Net Profit Margin (%)", "EPS (Earnings Per Share)",
+    "Free Cash Flow (FCF)", "Return on Equity (%)", "Revenue Growth (%)"
 ]
 
 selected_kpis = st.multiselect("Select KPIs to display:", kpi_options, default=kpi_options)
 
-# --- Fetch KPI values with fallback logic ---
-kpis = {}
+try:
+    kpi_data = {}
+    currency = info.get("financialCurrency", "USD")
+    units = {"USD": "$", "EUR": "€", "GBP": "£"}
+    symbol = units.get(currency, "$")
 
-# Revenue
-kpis["Revenue"] = info.get("totalRevenue")
+    # Pull from info dict or compute
+    if "Revenue" in selected_kpis:
+        revenue = info.get("totalRevenue")
+        kpi_data["Revenue"] = f"{symbol}{revenue / 1e9:.2f}B" if revenue else "N/A"
 
-# Net Profit Margin (%)
-net_margin = info.get("netMargins")
-kpis["Net Profit Margin (%)"] = net_margin * 100 if net_margin is not None else None
+    if "Net Profit Margin (%)" in selected_kpis:
+        margin = info.get("profitMargins")
+        kpi_data["Net Profit Margin (%)"] = f"{margin * 100:.2f}%" if margin else "N/A"
 
-# EPS
-kpis["EPS (Earnings Per Share)"] = info.get("trailingEps")
+    if "EPS (Earnings Per Share)" in selected_kpis:
+        eps = info.get("trailingEps")
+        kpi_data["EPS (Earnings Per Share)"] = f"{symbol}{eps:.2f}" if eps else "N/A"
 
-# Free Cash Flow (FCF)
-fcf_value = info.get("freeCashflow")
-if fcf_value is None:
-    try:
-        cf_data = stock.cashflow
-        if "Total Cash From Operating Activities" in cf_data.index and "Capital Expenditures" in cf_data.index:
-            fcf_series = cf_data.loc["Total Cash From Operating Activities"] - cf_data.loc["Capital Expenditures"]
-            fcf_value = fcf_series.dropna().iloc[0]
-    except:
-        fcf_value = None
-kpis["Free Cash Flow (FCF)"] = fcf_value
+    if "Free Cash Flow (FCF)" in selected_kpis:
+        try:
+            cashflow_stmt = stock.cashflow
+            op_cf = cashflow_stmt.loc["Total Cash From Operating Activities"].iloc[0]
+            capex = cashflow_stmt.loc["Capital Expenditures"].iloc[0]
+            fcf = op_cf + capex  # CapEx is negative
+            kpi_data["Free Cash Flow (FCF)"] = f"{symbol}{fcf / 1e9:.2f}B"
+        except:
+            kpi_data["Free Cash Flow (FCF)"] = "N/A"
 
-# Return on Equity (%)
-roe = info.get("returnOnEquity")
-kpis["Return on Equity (%)"] = roe * 100 if roe is not None else None
+    if "Return on Equity (%)" in selected_kpis:
+        try:
+            net_income = stock.financials.loc["Net Income"].iloc[0]
+            equity = stock.balance_sheet.loc["Total Stockholder Equity"].iloc[0]
+            roe = net_income / equity
+            kpi_data["Return on Equity (%)"] = f"{roe * 100:.2f}%"
+        except:
+            kpi_data["Return on Equity (%)"] = "N/A"
 
-# Revenue Growth (%)
-rev_growth = info.get("revenueGrowth")
-kpis["Revenue Growth (%)"] = rev_growth * 100 if rev_growth is not None else None
+    if "Revenue Growth (%)" in selected_kpis:
+        try:
+            hist = stock.history(period="2y")
+            recent = hist["Close"].resample("Q").last()
+            revenue_growth = ((recent[-1] - recent[-5]) / recent[-5]) * 100
+            kpi_data["Revenue Growth (%)"] = f"{revenue_growth:.2f}%"
+        except:
+            kpi_data["Revenue Growth (%)"] = "N/A"
 
-# --- Display KPIs ---
-cols = st.columns(len(selected_kpis))
-for i, kpi in enumerate(selected_kpis):
-    value = kpis.get(kpi)
-    
-    # Format based on type
-    if value is None:
-        display = "N/A"
-    elif "Margin" in kpi or "Growth" in kpi or "Return" in kpi:
-        display = f"{value:.2f}%"
-    elif "EPS" in kpi:
-        display = f"${value:.2f}"
-    elif "Revenue" in kpi or "Cash Flow" in kpi:
-        display = f"${value / 1e9:.2f}B"
-    else:
-        display = value
+    # --- Display selected KPIs ---
+    kpi_cols = st.columns(len(selected_kpis))
+    for idx, kpi in enumerate(selected_kpis):
+        value = kpi_data.get(kpi, "N/A")
+        kpi_cols[idx].metric(label=kpi, value=value)
 
-    cols[i].metric(kpi, display)
+except Exception as e:
+    st.error(f"Failed to render KPI section: {e}")
