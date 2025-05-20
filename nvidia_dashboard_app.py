@@ -354,10 +354,9 @@ if multiple_ratios:
 
 
 # -------------------- KPI DASHBOARD --------------------
-# ------- KPI Toggles -------
 st.subheader("📌 Key Performance Indicators (KPIs)")
 
-# User KPI selections
+# KPI options
 kpi_options = [
     "Revenue",
     "Net Profit Margin (%)",
@@ -367,56 +366,62 @@ kpi_options = [
     "Revenue Growth (%)"
 ]
 
-selected_kpis = st.multiselect("Select KPIs to display:", kpi_options, default=kpi_options)
+# User selection
+selected_kpis = st.multiselect("Select KPIs to display:", options=kpi_options, default=kpi_options)
 
-# --- Fetch KPI values with fallback logic ---
-kpis = {}
-
-# Revenue
-kpis["Revenue"] = info.get("totalRevenue")
-
-# Net Profit Margin (%)
-net_margin = info.get("netMargins")
-kpis["Net Profit Margin (%)"] = net_margin * 100 if net_margin is not None else None
-
-# EPS
-kpis["EPS (Earnings Per Share)"] = info.get("trailingEps")
-
-# Free Cash Flow (FCF)
-fcf_value = info.get("freeCashflow")
-if fcf_value is None:
+# --- Free Cash Flow Calculation ---
+def get_fcf(stock):
     try:
-        cf_data = stock.cashflow
-        if "Total Cash From Operating Activities" in cf_data.index and "Capital Expenditures" in cf_data.index:
-            fcf_series = cf_data.loc["Total Cash From Operating Activities"] - cf_data.loc["Capital Expenditures"]
-            fcf_value = fcf_series.dropna().iloc[0]
-    except:
-        fcf_value = None
-kpis["Free Cash Flow (FCF)"] = fcf_value
+        cf = stock.cashflow
+        if 'Total Cash From Operating Activities' in cf.index and 'Capital Expenditures' in cf.index:
+            ocf = cf.loc['Total Cash From Operating Activities'].dropna()
+            capex = cf.loc['Capital Expenditures'].dropna()
+            if not ocf.empty and not capex.empty:
+                fcf = ocf.iloc[0] - capex.iloc[0]
+                return fcf
+        elif 'Operating Cash Flow' in cf.index and 'Capital Expenditures' in cf.index:
+            ocf = cf.loc['Operating Cash Flow'].dropna()
+            capex = cf.loc['Capital Expenditures'].dropna()
+            if not ocf.empty and not capex.empty:
+                fcf = ocf.iloc[0] - capex.iloc[0]
+                return fcf
+    except Exception as e:
+        st.warning(f"FCF calculation failed: {e}")
+    return None
 
-# Return on Equity (%)
-roe = info.get("returnOnEquity")
-kpis["Return on Equity (%)"] = roe * 100 if roe is not None else None
+# Fetch data
+fcf = get_fcf(yf.Ticker(ticker))
 
-# Revenue Growth (%)
-rev_growth = info.get("revenueGrowth")
-kpis["Revenue Growth (%)"] = rev_growth * 100 if rev_growth is not None else None
+# KPI dictionary
+kpis = {
+    "Revenue": info.get("totalRevenue"),
+    "Net Profit Margin (%)": info.get("netMargins", None) * 100 if info.get("netMargins") is not None else None,
+    "EPS (Earnings Per Share)": info.get("trailingEps"),
+    "Free Cash Flow (FCF)": fcf,
+    "Return on Equity (%)": info.get("returnOnEquity", None) * 100 if info.get("returnOnEquity") is not None else None,
+    "Revenue Growth (%)": info.get("revenueGrowth", None) * 100 if info.get("revenueGrowth") is not None else None
+}
 
-# --- Display KPIs ---
+# Display KPIs
 cols = st.columns(len(selected_kpis))
+
 for i, kpi in enumerate(selected_kpis):
     value = kpis.get(kpi)
     
-    # Format based on type
     if value is None:
         display = "N/A"
-    elif "Margin" in kpi or "Growth" in kpi or "Return" in kpi:
-        display = f"{value:.2f}%"
-    elif "EPS" in kpi:
-        display = f"${value:.2f}"
-    elif "Revenue" in kpi or "Cash Flow" in kpi:
-        display = f"${value / 1e9:.2f}B"
+        icon = ""
     else:
-        display = value
+        if "Margin" in kpi or "Return" in kpi or "Growth" in kpi:
+            display = f"{value:.2f}%"
+        elif "EPS" in kpi:
+            display = f"${value:.2f}"
+        elif "Cash Flow" in kpi or "Revenue" in kpi:
+            display = f"${value / 1e9:.2f}B"
+        else:
+            display = f"{value:.2f}"
 
-    cols[i].metric(kpi, display)
+        icon = "🟢 ▲" if value >= 0 else "🔴 ▼"
+
+    with cols[i]:
+        st.metric(label=kpi, value=f"{icon} {display}")
