@@ -13,11 +13,20 @@ from streamlit.runtime.caching import cache_data
 
 # Setup Gemini API key
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel(model_name="models/gemini-pro")
+response = model.generate_content(prompt)
+summary = response.text
 
 NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
 
+# --- Example function to summarize news ---
+def summarize_news_with_gemini(prompt):
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"❌ GPT summary failed: {str(e)}"
 
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
@@ -297,9 +306,11 @@ Text:
 # Fetch + summarize
 articles = fetch_news_articles(ticker)
 
-st.subheader("🧠 GPT Summary of Market Sentiment")
-summary = summarize_with_gemini(articles)
+summary = summarize_news_with_gemini(prompt)
+st.markdown("### 🧠 GPT Summary of Market Sentiment")
 st.markdown(summary)
+
+
 
 # Show raw news articles
 st.subheader("📰 Latest Headlines")
@@ -308,6 +319,7 @@ if articles:
         st.markdown(f"- [{article['title']}]({article['url']}) — `{article['source']['name']}`")
 else:
     st.warning("No news articles found.")
+
 
 
 
