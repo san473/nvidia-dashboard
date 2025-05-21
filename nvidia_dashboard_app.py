@@ -14,11 +14,11 @@ from streamlit.runtime.caching import cache_data
 # Setup Gemini API key
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-pro")
+model = genai.GenerativeModel(model_name="models/gemini-pro")
 
 NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
 
-from streamlit.runtime.caching import cache_data
+
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
 
