@@ -7,9 +7,11 @@ import requests
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import plotly.express as px
+from openai import OpenAI
+from streamlit.runtime.caching import cache_data
+st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
 
-NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
 
 
 
@@ -24,7 +26,7 @@ def fetch_news(ticker):
         return []
 
 
-st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
+
 
 # ------------------------ HEADER ------------------------
 st.title("📊 Comprehensive Stock Dashboard")
@@ -109,6 +111,92 @@ with st.expander("🌍 Geographic & Business Overview"):
     except Exception as e:
         st.warning("Geographic and company summary data not available.")
 
+# ------------------- DCF VALUATION -------------------
+st.header("💰 Discounted Cash Flow (DCF) Valuation")
+
+# --- User-Defined Assumptions ---
+st.subheader("📈 DCF Assumptions")
+col1, col2, col3 = st.columns(3)
+with col1:
+    forecast_years = st.slider("Forecast Years", min_value=3, max_value=10, value=5)
+with col2:
+    growth_rate = st.slider("FCF Growth Rate (%)", min_value=0.0, max_value=20.0, value=10.0, step=0.5) / 100
+with col3:
+    discount_rate = st.slider("Discount Rate / WACC (%)", min_value=5.0, max_value=15.0, value=9.0, step=0.5) / 100
+
+# --- DCF Calculation ---
+def calculate_dcf(ticker, forecast_years, growth_rate, discount_rate):
+    try:
+        stock = yf.Ticker(ticker)
+        cashflow = stock.cashflow
+
+        st.write("📌 Available Cashflow Rows:", list(cashflow.index))
+
+        if 'Total Cash From Operating Activities' in cashflow.index and 'Capital Expenditures' in cashflow.index:
+            fcf = cashflow.loc['Total Cash From Operating Activities'] - cashflow.loc['Capital Expenditures']
+        elif 'Operating Cash Flow' in cashflow.index and 'Capital Expenditures' in cashflow.index:
+            fcf = cashflow.loc['Operating Cash Flow'] - cashflow.loc['Capital Expenditures']
+            st.info("Using fallback row: **Operating Cash Flow**")
+        else:
+            st.warning("DCF valuation failed: Required cash flow rows not found.")
+            return None
+
+        fcf = fcf.dropna()
+        if fcf.empty:
+            st.warning("DCF valuation failed: FCF data is empty after dropna.")
+            return None
+
+        latest_fcf = fcf.iloc[0]
+        terminal_growth_rate = 0.03
+
+        projected_fcfs = [latest_fcf * (1 + growth_rate) ** i for i in range(1, forecast_years + 1)]
+        discounted_fcfs = [val / (1 + discount_rate) ** i for i, val in enumerate(projected_fcfs, start=1)]
+        terminal_value = projected_fcfs[-1] * (1 + terminal_growth_rate) / (discount_rate - terminal_growth_rate)
+        discounted_terminal = terminal_value / (1 + discount_rate) ** forecast_years
+
+        enterprise_value = sum(discounted_fcfs) + discounted_terminal
+        debt = stock.balance_sheet.loc['Total Debt'].iloc[0] if 'Total Debt' in stock.balance_sheet.index else 0
+        cash = stock.balance_sheet.loc['Cash'].iloc[0] if 'Cash' in stock.balance_sheet.index else 0
+        shares_outstanding = stock.info.get('sharesOutstanding', 0)
+
+        equity_value = enterprise_value - debt + cash
+        fair_value_per_share = equity_value / shares_outstanding if shares_outstanding > 0 else None
+
+        return {
+            'enterprise_value': enterprise_value,
+            'equity_value': equity_value,
+            'fair_value_per_share': fair_value_per_share
+        }
+
+    except Exception as e:
+        st.error(f"DCF valuation failed due to error: {e}")
+        return None
+
+# --- Run and Display DCF ---
+dcf_result = calculate_dcf(ticker, forecast_years, growth_rate, discount_rate)
+
+if dcf_result and dcf_result['fair_value_per_share']:
+    current_price = info.get('currentPrice', 0)
+    fair_value = dcf_result['fair_value_per_share']
+
+    st.markdown(f"""
+    ### 💡 DCF Summary  
+    - Forecast Period: `{forecast_years}` years  
+    - FCF Growth Rate: `{growth_rate * 100:.1f}%`  
+    - Discount Rate (WACC): `{discount_rate * 100:.1f}%`  
+    - Terminal Growth Rate: `3.0%`  
+    """)
+
+    st.success(f"**Intrinsic Value Estimate (DCF): ${dcf_result['equity_value']:,.2f}**")
+    st.info(f"**Current Market Price:** ${current_price:,.2f}")
+    st.success(f"**Intrinsic Value per Share:** ${fair_value:,.2f}")
+
+    if fair_value > current_price:
+        st.markdown("✅ The stock appears **undervalued** based on DCF.")
+    else:
+        st.markdown("⚠️ The stock appears **overvalued** based on DCF.")
+else:
+    st.warning("DCF valuation data not available.")
 
 
 
@@ -161,34 +249,69 @@ else:
 
 
 # -------------------- Real-Time News Feed --------------------
-import requests
-import yfinance as yf
-from datetime import datetime
 
-st.header("📰 Real-Time News Feed")
 
-def fetch_news(ticker):
+st.header("🧠 AI-Summarized Market News")
+
+openai.api_key = st.secrets["openai_api_key"]
+NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
+
+# ------------------- Fetch articles with 60 sec caching -------------------
+@cache_data(ttl=60)
+def fetch_news_articles(ticker):
+    url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWSAPI_KEY}&sortBy=publishedAt&language=en&pageSize=5"
     try:
-        stock = yf.Ticker(ticker)
-        query = stock.info.get("longName", ticker)  # Use full company name if available
-        url = f"https://newsapi.org/v2/everything?q={query}&sortBy=publishedAt&language=en&apiKey={st.secrets['NEWSAPI_KEY']}"
         response = requests.get(url)
-        response.raise_for_status()
-        articles = response.json().get("articles", [])[:5]
+        articles = response.json().get("articles", [])
         return articles
     except Exception as e:
-        st.error(f"Failed to fetch news: {e}")
+        st.warning(f"Error fetching news: {e}")
         return []
 
-articles = fetch_news(ticker)
+# ------------------- GPT News Summary -------------------
+def summarize_news_with_gpt(articles):
+    headlines = "\n".join([f"- {article['title']}" for article in articles if article.get('title')])
+
+    prompt = f"""
+You are a financial news analyst. Given the following recent news headlines about a stock, summarize the sentiment and insights into three sections: 
+1. ✅ Positive Developments 
+2. ⚠️ Risks & Negative Sentiment 
+3. 🌱 Emerging Themes or Opportunities.
+
+Headlines:
+{headlines}
+
+Each section should include 2–3 bullet points with relevant financial context.
+"""
+    try:
+        client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        summary = response.choices[0].message.content
+        return summary
+    except Exception as e:
+        st.error(f"⚠️ GPT summary failed:\n\n{e}")
+        return None
+
+# ------------------- UI + Integration -------------------
+ticker = st.session_state.get("ticker", "AAPL")  # fallback if not defined
+articles = fetch_news_articles(ticker)
 
 if articles:
+    st.subheader("🧠 GPT Summary of Market Sentiment")
+    summary = summarize_news_with_gpt(articles)
+    if summary:
+        st.success(summary)
+
+    st.subheader("📰 Latest News Articles")
     for article in articles:
-        published_at = datetime.strptime(article['publishedAt'], "%Y-%m-%dT%H:%M:%SZ")
-        st.markdown(f"**[{article['title']}]({article['url']})**  \n*{article['source']['name']} - {published_at.strftime('%b %d, %Y %H:%M')}*  \n{article['description']}\n")
-        st.divider()
+        st.markdown(f"**[{article['title']}]({article['url']})**  \n:calendar: {article['publishedAt'][:10]} | :newspaper: {article['source']['name']}")
 else:
-    st.info("No recent news available.")
+    st.info("No recent news found.")
+
+
 
 
 # ---------------------- INTERACTIVE VISUALIZATIONS ----------------------
