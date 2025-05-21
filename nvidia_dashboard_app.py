@@ -7,7 +7,17 @@ import requests
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import plotly.express as px
-from openai import OpenAI
+import google.generativeai as genai
+from datetime import datetime
+from streamlit.runtime.caching import cache_data
+
+# Setup Gemini API key
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-pro")
+
+NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
+
 from streamlit.runtime.caching import cache_data
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
@@ -249,14 +259,10 @@ else:
 
 
 # -------------------- Real-Time News Feed --------------------
-
-
+# ---------------------------------------------
 st.header("🧠 AI-Summarized Market News")
+ticker = st.session_state.get("selected_ticker", "AAPL")
 
-openai.api_key = st.secrets["openai_api_key"]
-NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
-
-# ------------------- Fetch articles with 60 sec caching -------------------
 @cache_data(ttl=60)
 def fetch_news_articles(ticker):
     url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWSAPI_KEY}&sortBy=publishedAt&language=en&pageSize=5"
@@ -265,51 +271,45 @@ def fetch_news_articles(ticker):
         articles = response.json().get("articles", [])
         return articles
     except Exception as e:
-        st.warning(f"Error fetching news: {e}")
         return []
 
-# ------------------- GPT News Summary -------------------
-def summarize_news_with_gpt(articles):
-    headlines = "\n".join([f"- {article['title']}" for article in articles if article.get('title')])
-
-    prompt = f"""
-You are a financial news analyst. Given the following recent news headlines about a stock, summarize the sentiment and insights into three sections: 
-1. ✅ Positive Developments 
-2. ⚠️ Risks & Negative Sentiment 
-3. 🌱 Emerging Themes or Opportunities.
-
-Headlines:
-{headlines}
-
-Each section should include 2–3 bullet points with relevant financial context.
-"""
+def summarize_with_gemini(articles):
     try:
-        client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        summary = response.choices[0].message.content
-        return summary
-    except Exception as e:
-        st.error(f"⚠️ GPT summary failed:\n\n{e}")
-        return None
+        content = "\n\n".join([f"Title: {a['title']}\nDescription: {a['description']}" for a in articles if a['description']])
+        if not content.strip():
+            return "No content to summarize."
 
-# ------------------- UI + Integration -------------------
-ticker = st.session_state.get("ticker", "AAPL")  # fallback if not defined
+        prompt = f"""
+You are a financial news assistant. Summarize the following news headlines into 3 categories with bullet points:
+- Positive Developments
+- Risks & Negative Sentiment
+- Emerging Themes
+
+Text:
+{content}
+"""
+        response = model.generate_content(prompt)
+        return response.text
+
+    except Exception as e:
+        return f"❌ GPT summary failed: {str(e)}"
+
+# Fetch + summarize
 articles = fetch_news_articles(ticker)
 
-if articles:
-    st.subheader("🧠 GPT Summary of Market Sentiment")
-    summary = summarize_news_with_gpt(articles)
-    if summary:
-        st.success(summary)
+st.subheader("🧠 GPT Summary of Market Sentiment")
+summary = summarize_with_gemini(articles)
+st.markdown(summary)
 
-    st.subheader("📰 Latest News Articles")
+# Show raw news articles
+st.subheader("📰 Latest Headlines")
+if articles:
     for article in articles:
-        st.markdown(f"**[{article['title']}]({article['url']})**  \n:calendar: {article['publishedAt'][:10]} | :newspaper: {article['source']['name']}")
+        st.markdown(f"- [{article['title']}]({article['url']}) — `{article['source']['name']}`")
 else:
-    st.info("No recent news found.")
+    st.warning("No news articles found.")
+
+
 
 
 
