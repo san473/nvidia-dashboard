@@ -1,11 +1,9 @@
 streamlit
 yfinance
 pandas
-plotly
-numpy
-requests
+matplotlib
+scikit-learn
 beautifulsoup4
-transformers
-torch
+plotly
 transformers==4.40.1
-echo "transformers==4.40.1"
+torch
