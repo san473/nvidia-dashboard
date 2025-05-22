@@ -7,7 +7,6 @@ import requests
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import plotly.express as px
-import google.generativeai as genai
 from datetime import datetime
 from streamlit.runtime.caching import cache_data
 import requests
@@ -259,94 +258,71 @@ else:
     st.warning("Please select one or more companies to compare.")
 
 # -------------------- Real-Time News Feed --------------------
+# -------------------- Real-Time News Feed --------------------
 st.header("🧠 AI-Summarized Market News")
 ticker = st.session_state.get("selected_ticker", "AAPL")
 
 from transformers import pipeline
-from datetime import datetime
+from streamlit.runtime.caching import cache_data
+import requests
+import torch
 
-# Load BART summarization pipeline
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+# Use a smaller summarization model for lower memory
+summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
 
-@st.cache_data(ttl=60)
+@cache_data(ttl=60)
 def fetch_news_articles(ticker):
     url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWSAPI_KEY}&sortBy=publishedAt&language=en&pageSize=5"
     try:
         response = requests.get(url)
-        return response.json().get("articles", [])
-    except:
+        articles = response.json().get("articles", [])
+        return articles
+    except Exception as e:
         return []
 
-@st.cache_data(ttl=60)
-def summarize_articles(articles):
-    summaries = []
-    for article in articles:
-        try:
-            text = article.get("description") or article.get("content") or ""
-            if not text.strip():
-                continue
+def local_summarize_articles(articles):
+    try:
+        content = "\n\n".join([f"{a['title']}. {a['description']}" for a in articles if a.get("description")])
+        if not content.strip():
+            return "No content to summarize."
+        
+        # BART-style models have a token cap (~1024). Truncate if needed.
+        content = content[:3000]
+        summary_text = summarizer(content, max_length=200, min_length=60, do_sample=False)[0]["summary_text"]
+        
+        # Structure summary into 3 refined categories
+        summary = f"""
+### ✅ Key Highlights
+- {summary_text.split('. ')[0].strip()}.
+- {summary_text.split('. ')[1].strip()}.
 
-            # Limit to 1024 characters
-            if len(text) > 1024:
-                text = text[:1024]
+### ⚠️ Risks & Negative Sentiment
+- {summary_text.split('. ')[2].strip()}.
+- {summary_text.split('. ')[3].strip()}.
 
-            summary = summarizer(text, max_length=100, min_length=30, do_sample=False)[0]["summary_text"]
-            summaries.append({
-                "title": article["title"],
-                "summary": summary,
-                "source": article["source"]["name"],
-                "url": article["url"]
-            })
-        except:
-            continue
-    return summaries
+### 🔍 Emerging Themes
+- {summary_text.split('. ')[4].strip()}.
+- {summary_text.split('. ')[5].strip()}.
+"""
+        return summary
 
-# Fetch + summarize
-raw_articles = fetch_news_articles(ticker)
-summarized_articles = summarize_articles(raw_articles)
+    except Exception as e:
+        return f"❌ Summary failed: {str(e)}"
 
-# --- Display Summaries ---
-st.markdown("### 🧠 News Summary by Category")
+# Fetch and summarize news
+articles = fetch_news_articles(ticker)
+summary = local_summarize_articles(articles)
 
-if summarized_articles:
-    positive, negative, themes = [], [], []
+st.markdown("### 🧠 News Summary")
+st.markdown(summary)
 
-    for art in summarized_articles:
-        text = art["summary"].lower()
-        if any(x in text for x in ["growth", "record", "profit", "gain", "strong", "optimism", "increase"]):
-            positive.append(art)
-        elif any(x in text for x in ["lawsuit", "decline", "drop", "loss", "warning", "concern", "downturn"]):
-            negative.append(art)
-        else:
-            themes.append(art)
-
-    def display_bullets(label, items):
-        st.markdown(f"#### {label}")
-        if not items:
-            st.markdown("- _No items in this category._")
-            return
-        for art in items:
-            st.markdown(f"- **{art['title']}**  \n  _{art['summary']}_")
-
-    display_bullets("✅ Positive Developments", positive)
-    display_bullets("⚠️ Risks & Negative Sentiment", negative)
-    display_bullets("🔎 Emerging Themes", themes)
-else:
-    st.info("No summaries available at the moment.")
-
-# --- Show raw article links ---
+# Show raw news articles
 st.subheader("📰 Latest Headlines")
-if raw_articles:
-    for article in raw_articles:
+if articles:
+    for article in articles:
         st.markdown(f"- [{article['title']}]({article['url']}) — `{article['source']['name']}`")
 else:
     st.warning("No news articles found.")
-
-
-
-
-
-
 
 
 
