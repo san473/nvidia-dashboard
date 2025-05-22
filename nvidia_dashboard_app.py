@@ -256,67 +256,83 @@ selected_ticker = ticker_input
 
 
 # --------------------- Dynamic Peer Comparison ---------------------
-with st.container():
-    st.header("📊 Peer Comparison")
+# ----------------------- PEER COMPARISON -----------------------
+st.header("📊 Peer Comparison")
 
-    try:
-        selected_ticker = ticker_input  # Ensure this is defined
+try:
+    selected_ticker = ticker_input  # or use: ticker = st.session_state.get("selected_ticker", "AAPL")
+    current_row = sp500_df[sp500_df["symbol"].str.upper() == selected_ticker.upper()]
+    
+    if current_row.empty:
+        st.warning(f"No data found for {selected_ticker}.")
+    else:
+        selected_industry = current_row["industry"].values[0]
+        selected_sector = current_row["sector"].values[0]
+        selected_marketcap = current_row["marketcap"].values[0]
 
-        # Get row for the current ticker
-        current_row = sp500_df[sp500_df["symbol"].str.upper() == selected_ticker]
-        if current_row.empty:
-            st.warning(f"No data found for {selected_ticker}.")
-        else:
-            selected_industry = current_row["industry"].values[0]
-            selected_sector = current_row["sector"].values[0]
-            selected_marketcap = current_row["marketcap"].values[0]
+        lower_bound = selected_marketcap * 0.4
+        upper_bound = selected_marketcap * 2.5
 
-            lower_bound = selected_marketcap * 0.5
-            upper_bound = selected_marketcap * 1.5
+        peer_df = sp500_df[
+            (sp500_df["symbol"].str.upper() != selected_ticker.upper()) &
+            (sp500_df["industry"] == selected_industry) &
+            (sp500_df["marketcap"] >= lower_bound) &
+            (sp500_df["marketcap"] <= upper_bound)
+        ]
 
-            # 1. Try strict match: same industry + similar market cap
+        # Fallback: sector-based peers if not enough industry matches
+        if peer_df.empty:
+            st.warning("⚠️ No comparable peers found using market cap range. Showing sector-based peers.")
             peer_df = sp500_df[
-                (sp500_df["symbol"].str.upper() != selected_ticker) &
-                (sp500_df["industry"] == selected_industry) &
+                (sp500_df["symbol"].str.upper() != selected_ticker.upper()) &
+                (sp500_df["sector"] == selected_sector) &
                 (sp500_df["marketcap"] >= lower_bound) &
                 (sp500_df["marketcap"] <= upper_bound)
             ]
 
-            if peer_df.empty:
-                st.warning("⚠️ No comparable peers found using market cap range. Showing closest by market cap in industry.")
+        if peer_df.empty:
+            st.warning("⚠️ Still no comparable peers found.")
+        else:
+            peer_symbols = peer_df["symbol"].unique().tolist()
+            selected_peers = st.multiselect("Select Peers", peer_symbols, default=peer_symbols[:5])
 
-                # 2. Relax market cap constraint: closest 5 in industry
-                industry_peers = sp500_df[
-                    (sp500_df["symbol"].str.upper() != selected_ticker) &
-                    (sp500_df["industry"] == selected_industry)
-                ].copy()
+            if selected_peers:
+                # Fetch real-time financial data from yfinance
+                data = []
+                for sym in selected_peers:
+                    try:
+                        stock = yf.Ticker(sym)
+                        info = stock.info
+                        fast_info = stock.fast_info
+                        pe_ratio = info.get("trailingPE", None)
+                        pb_ratio = info.get("priceToBook", None)
+                        peg_ratio = info.get("pegRatio", None)
+                        earnings_yield = (1 / pe_ratio) if pe_ratio and pe_ratio > 0 else None
+                        ev_to_ebitda = info.get("enterpriseToEbitda", None)
+                        ev_to_ebit = info.get("enterpriseToEbit", None)
 
-                if not industry_peers.empty:
-                    industry_peers["marketcap_diff"] = (industry_peers["marketcap"] - selected_marketcap).abs()
-                    peer_df = industry_peers.nsmallest(5, "marketcap_diff")
+                        data.append({
+                            "symbol": sym,
+                            "longname": info.get("longName", "N/A"),
+                            "sector": info.get("sector", "N/A"),
+                            "industry": info.get("industry", "N/A"),
+                            "currentprice": fast_info.get("lastPrice", None),
+                            "marketcap": info.get("marketCap", None),
+                            "P/E": pe_ratio,
+                            "P/B": pb_ratio,
+                            "PEG": peg_ratio,
+                            "Earnings Yield": earnings_yield,
+                            "EV/EBITDA": ev_to_ebitda,
+                            "EV/EBIT": ev_to_ebit,
+                        })
+                    except Exception as e:
+                        st.error(f"Error loading data for {sym}: {e}")
 
-            if peer_df.empty:
-                st.warning("⚠️ Still no comparable peers found in industry. Falling back to same sector.")
+                peer_comparison_df = pd.DataFrame(data)
+                st.dataframe(peer_comparison_df)
 
-                # 3. Final fallback: top 5 closest in same sector
-                sector_peers = sp500_df[
-                    (sp500_df["symbol"].str.upper() != selected_ticker) &
-                    (sp500_df["sector"] == selected_sector)
-                ].copy()
-
-                if not sector_peers.empty:
-                    sector_peers["marketcap_diff"] = (sector_peers["marketcap"] - selected_marketcap).abs()
-                    peer_df = sector_peers.nsmallest(5, "marketcap_diff")
-
-            if peer_df.empty:
-                st.warning("⚠️ Still no comparable peers found.")
-            else:
-                selected_columns = ["symbol", "exchange", "shortname", "longname", "sector", "industry", "currentprice", "marketcap"]
-                st.dataframe(display_dataframe_pretty(peer_df, selected_columns))
-
-    except Exception as e:
-        st.error(f"Error finding peers: {e}")
-
+except Exception as e:
+    st.error(f"Error finding peers: {e}")
 
 # -------------------- Real-Time News Feed --------------------
 st.header("🧠 Market News Summary")
