@@ -23,6 +23,7 @@ def load_sp500_data():
 
 
 sp500_df = load_sp500_data()
+st.write("Columns:", sp500_df.columns.tolist())
 
 
 
@@ -220,44 +221,47 @@ else:
 
 
 # --------------------- Dynamic Peer Comparison ---------------------
-st.subheader("📊 Peer Comparison")
+# ─────────────────────────────
+# 📊 Peer Comparison
+# ─────────────────────────────
+st.markdown("### 📊 Peer Comparison")
 
-def get_peers(ticker, sp500_df, top_n=5):
-    try:
-        company = sp500_df[sp500_df["Symbol"] == ticker.upper()].iloc[0]
-        sector = company["Sector"]
-        market_cap = company["Market Cap"]
+try:
+    if 'Symbol' in sp500_df.columns and 'Sector' in sp500_df.columns and 'MarketCap' in sp500_df.columns:
+        company_info = sp500_df[sp500_df['Symbol'].str.upper() == ticker.upper()]
 
-        # Filter by same sector
-        sector_peers = sp500_df[sp500_df["Sector"] == sector]
+        if not company_info.empty:
+            company_sector = company_info.iloc[0]['Sector']
+            company_marketcap = company_info.iloc[0]['MarketCap']
 
-        # Calculate absolute difference in market cap
-        sector_peers = sector_peers.assign(
-            MarketCapDiff=(sector_peers["Market Cap"] - market_cap).abs()
-        )
+            # Filter by same sector
+            peers = sp500_df[
+                (sp500_df['Sector'] == company_sector) &
+                (sp500_df['Symbol'].str.upper() != ticker.upper())
+            ].copy()
 
-        # Exclude the selected company itself
-        sector_peers = sector_peers[sector_peers["Symbol"] != ticker.upper()]
+            # Narrow down to peers with similar market cap (within ±50%)
+            peers = peers[
+                (peers['MarketCap'] >= 0.5 * company_marketcap) &
+                (peers['MarketCap'] <= 1.5 * company_marketcap)
+            ]
 
-        # Sort by closest market cap and return top N
-        peers = sector_peers.sort_values("MarketCapDiff").head(top_n)
-        return peers[["Symbol", "Name", "Market Cap"]]
+            if not peers.empty:
+                peer_options = peers['Symbol'].unique().tolist()
+                selected_peers = st.multiselect("Select peer tickers to compare:", peer_options, default=peer_options[:3])
 
-    except Exception as e:
-        st.error(f"Error finding peers: {e}")
-        return pd.DataFrame()
+                if selected_peers:
+                    # Example comparison (you can extend this)
+                    st.write(f"Comparing **{ticker}** with peers: {', '.join(selected_peers)}")
+            else:
+                st.warning("⚠️ No comparable peers found.")
+        else:
+            st.warning(f"⚠️ Ticker {ticker} not found in S&P 500 dataset.")
+    else:
+        st.warning("⚠️ Required columns not found in the S&P 500 data.")
+except Exception as e:
+    st.error(f"Error finding peers: {e}")
 
-# Show peers for selected ticker
-ticker = st.session_state.get("selected_ticker", "AAPL")
-
-peers_df = get_peers(ticker, sp500_df)
-
-if not peers_df.empty:
-    selected_peer = st.selectbox("Compare with Peers:", peers_df["Symbol"])
-    st.write("**Selected Peer Companies:**")
-    st.dataframe(peers_df.set_index("Symbol"))
-else:
-    st.warning("⚠️ No comparable peers found.")
 
 # -------------------- Real-Time News Feed --------------------
 st.header("🧠 Market News Summary")
