@@ -259,70 +259,46 @@ else:
 
 # -------------------- Real-Time News Feed --------------------
 # -------------------- Real-Time News Feed --------------------
-st.header("🧠 AI-Summarized Market News")
+st.header("🧠 Market News Summary")
 ticker = st.session_state.get("selected_ticker", "AAPL")
 
-from transformers import pipeline
-from streamlit.runtime.caching import cache_data
-import requests
-import torch
-
-# Use a smaller summarization model for lower memory
-summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
-
-@cache_data(ttl=60)
+@st.cache_data(ttl=60)
 def fetch_news_articles(ticker):
     url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWSAPI_KEY}&sortBy=publishedAt&language=en&pageSize=5"
     try:
         response = requests.get(url)
         articles = response.json().get("articles", [])
         return articles
-    except Exception as e:
+    except Exception:
         return []
 
-def local_summarize_articles(articles):
-    try:
-        content = "\n\n".join([f"{a['title']}. {a['description']}" for a in articles if a.get("description")])
-        if not content.strip():
-            return "No content to summarize."
-        
-        # BART-style models have a token cap (~1024). Truncate if needed.
-        content = content[:3000]
-        summary_text = summarizer(content, max_length=200, min_length=60, do_sample=False)[0]["summary_text"]
-        
-        # Structure summary into 3 refined categories
-        summary = f"""
-### ✅ Key Highlights
-- {summary_text.split('. ')[0].strip()}.
-- {summary_text.split('. ')[1].strip()}.
+def simple_logical_summary(articles):
+    if not articles:
+        return "No recent news found."
 
-### ⚠️ Risks & Negative Sentiment
-- {summary_text.split('. ')[2].strip()}.
-- {summary_text.split('. ')[3].strip()}.
+    titles = [a['title'] for a in articles if a.get('title')]
+    highlights = "\n".join([f"- {title}" for title in titles[:5]])
 
-### 🔍 Emerging Themes
-- {summary_text.split('. ')[4].strip()}.
-- {summary_text.split('. ')[5].strip()}.
+    return f"""
+### ✅ Key Headlines for {ticker}
+{highlights}
+
+Note: Full AI summarization has been temporarily disabled to reduce memory usage.
 """
-        return summary
 
-    except Exception as e:
-        return f"❌ Summary failed: {str(e)}"
-
-# Fetch and summarize news
 articles = fetch_news_articles(ticker)
-summary = local_summarize_articles(articles)
+summary = simple_logical_summary(articles)
 
-st.markdown("### 🧠 News Summary")
+st.markdown("### 🧠 Summary of Key Headlines")
 st.markdown(summary)
 
-# Show raw news articles
-st.subheader("📰 Latest Headlines")
+st.subheader("📰 Full Headlines")
 if articles:
     for article in articles:
         st.markdown(f"- [{article['title']}]({article['url']}) — `{article['source']['name']}`")
 else:
     st.warning("No news articles found.")
+
 
 
 
