@@ -11,6 +11,14 @@ from datetime import datetime
 from streamlit.runtime.caching import cache_data
 import requests
 
+import pandas as pd
+
+@st.cache_data
+def load_sp500_data():
+    df = pd.read_excel("sp500_companies.csv.xlsx", sheet_name="sp500_companies")
+    return df
+
+sp500_df = load_sp500_data()
 
 
 
@@ -209,53 +217,46 @@ else:
 
 
 
-# -------------------- Peer Comparison --------------------
-st.header("🔍 Peer Comparison")
+# --------------------- Dynamic Peer Comparison ---------------------
+st.subheader("📊 Peer Comparison")
 
-# ✅ Curated list of valid peer tickers and labels
-peer_options = {
-    "AMD": "Advanced Micro Devices (AMD)",
-    "INTC": "Intel Corporation (INTC)",
-    "AVGO": "Broadcom Inc. (AVGO)",
-    "QCOM": "Qualcomm Inc. (QCOM)",
-    "TSM": "Taiwan Semiconductor (TSM)",
-    "TXN": "Texas Instruments (TXN)",
-    "MU": "Micron Technology (MU)",
-    "AMAT": "Applied Materials (AMAT)"
-}
+def get_peers(ticker, sp500_df, top_n=5):
+    try:
+        company = sp500_df[sp500_df["Symbol"] == ticker.upper()].iloc[0]
+        sector = company["Sector"]
+        market_cap = company["Market Cap"]
 
-selected_peers = st.multiselect(
-    "Select peer companies to compare:",
-    options=list(peer_options.keys()),
-    format_func=lambda x: peer_options[x],
-    default=["AMD", "INTC"]  # Optional default selection
-)
+        # Filter by same sector
+        sector_peers = sp500_df[sp500_df["Sector"] == sector]
 
-if selected_peers:
-    comparison_data = []
+        # Calculate absolute difference in market cap
+        sector_peers = sector_peers.assign(
+            MarketCapDiff=(sector_peers["Market Cap"] - market_cap).abs()
+        )
 
-    for peer_ticker in selected_peers:
-        peer = yf.Ticker(peer_ticker)
-        info = peer.info
+        # Exclude the selected company itself
+        sector_peers = sector_peers[sector_peers["Symbol"] != ticker.upper()]
 
-        comparison_data.append({
-            "Company": peer_options[peer_ticker],
-            "Ticker": peer_ticker,
-            "Price": info.get("currentPrice"),
-            "Market Cap (B)": info.get("marketCap", 0) / 1e9,
-            "PE Ratio": info.get("trailingPE"),
-            "Revenue (B)": info.get("totalRevenue", 0) / 1e9,
-            "Net Margin (%)": (info.get("netMargins", 0) or 0) * 100,
-            "Return on Equity (%)": (info.get("returnOnEquity", 0) or 0) * 100,
-        })
+        # Sort by closest market cap and return top N
+        peers = sector_peers.sort_values("MarketCapDiff").head(top_n)
+        return peers[["Symbol", "Name", "Market Cap"]]
 
-    df_peers = pd.DataFrame(comparison_data)
-    st.dataframe(df_peers.set_index("Ticker"), use_container_width=True)
+    except Exception as e:
+        st.error(f"Error finding peers: {e}")
+        return pd.DataFrame()
 
+# Show peers for selected ticker
+ticker = st.session_state.get("selected_ticker", "AAPL")
+
+peers_df = get_peers(ticker, sp500_df)
+
+if not peers_df.empty:
+    selected_peer = st.selectbox("Compare with Peers:", peers_df["Symbol"])
+    st.write("**Selected Peer Companies:**")
+    st.dataframe(peers_df.set_index("Symbol"))
 else:
-    st.warning("Please select one or more companies to compare.")
+    st.warning("⚠️ No comparable peers found.")
 
-# -------------------- Real-Time News Feed --------------------
 # -------------------- Real-Time News Feed --------------------
 st.header("🧠 Market News Summary")
 ticker = st.session_state.get("selected_ticker", "AAPL")
