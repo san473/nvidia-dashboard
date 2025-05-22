@@ -12,12 +12,15 @@ from streamlit.runtime.caching import cache_data
 import requests
 
 import pandas as pd
-st.cache_data.clear()
 
+st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
+st.cache_data.clear()
 @st.cache_data
 def load_sp500_data():
-    df = pd.read_excel("sp500_companies.csv.xlsx", sheet_name="sp500_companies")
+    df = pd.read_csv("sp500_companies.csv")
     return df
+
+
 
 sp500_df = load_sp500_data()
 
@@ -26,8 +29,6 @@ sp500_df = load_sp500_data()
 NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
 
 
-
-st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
 
 
