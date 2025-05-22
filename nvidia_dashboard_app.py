@@ -251,6 +251,8 @@ if dcf_result and dcf_result['fair_value_per_share']:
 else:
     st.warning("DCF valuation data not available.")
 
+# Use main input ticker for peer logic
+selected_ticker = ticker_input
 
 
 # --------------------- Dynamic Peer Comparison ---------------------
