@@ -146,6 +146,7 @@ except Exception as e:
     st.error(f"Failed to fetch data for ticker {ticker_input}. Error: {e}")
 
 
+
     # ------------------------ GEOGRAPHIC REVENUE / HQ INFO ------------------------
 with st.expander("🌍 Geographic & Business Overview"):
     try:
