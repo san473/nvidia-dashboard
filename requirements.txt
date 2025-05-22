@@ -7,3 +7,5 @@ requests
 beautifulsoup4
 transformers
 torch
+transformers==4.40.1
+echo "transformers==4.40.1"
