@@ -16,14 +16,29 @@ import pandas as pd
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 st.cache_data.clear()
 @st.cache_data
+# REMOVE cache temporarily to force reload
 def load_sp500_data():
     df = pd.read_excel("sp500_companies.xlsx")
+    df.columns = df.columns.str.strip()
+    st.write("✅ Columns loaded from Excel:", df.columns.tolist())  # DEBUG
     return df
+
+sp500_df = load_sp500_data()
+# Check if 'Market Cap' exists
+if 'Market Cap' not in sp500_df.columns:
+    st.error("❌ 'Market Cap' column not found. Here are the columns:")
+    for col in sp500_df.columns:
+        st.write(repr(col))  # Shows hidden characters
+
+
+
 
 
 
 sp500_df = load_sp500_data()
-st.write("Columns:", sp500_df.columns.tolist())
+sp500_df.columns = sp500_df.columns.str.strip().str.lower()
+
+
 
 
 
@@ -221,46 +236,54 @@ else:
 
 
 # --------------------- Dynamic Peer Comparison ---------------------
-# ─────────────────────────────
-# 📊 Peer Comparison
-# ─────────────────────────────
-st.markdown("### 📊 Peer Comparison")
+# 🧠 Dynamic Peer Comparison (Updated to match cleaned column names)
+with st.container():
+    st.markdown("## 📊 Peer Comparison")
 
-try:
-    if 'Symbol' in sp500_df.columns and 'Sector' in sp500_df.columns and 'MarketCap' in sp500_df.columns:
-        company_info = sp500_df[sp500_df['Symbol'].str.upper() == ticker.upper()]
+    try:
+        # Standardize the column names
+        sp500_df.columns = sp500_df.columns.str.strip().str.lower()
 
-        if not company_info.empty:
-            company_sector = company_info.iloc[0]['Sector']
-            company_marketcap = company_info.iloc[0]['MarketCap']
+        # Ensure all string columns are lowercase for matching
+        sp500_df['symbol'] = sp500_df['symbol'].str.upper()
+        sp500_df['sector'] = sp500_df['sector'].str.strip()
 
-            # Filter by same sector
+        current_row = sp500_df[sp500_df['symbol'] == selected_ticker.upper()]
+        
+        if not current_row.empty:
+            current_sector = current_row['sector'].values[0]
+            current_marketcap = float(str(current_row['marketcap'].values[0]).replace(",", "").replace("₹", "").replace("$", "").strip())
+
+            # Filter peers within same sector and ±30% market cap
             peers = sp500_df[
-                (sp500_df['Sector'] == company_sector) &
-                (sp500_df['Symbol'].str.upper() != ticker.upper())
+                (sp500_df['sector'] == current_sector) &
+                (sp500_df['symbol'] != selected_ticker.upper())
             ].copy()
 
-            # Narrow down to peers with similar market cap (within ±50%)
+            peers['marketcap_numeric'] = peers['marketcap'].astype(str).str.replace(",", "").astype(float)
             peers = peers[
-                (peers['MarketCap'] >= 0.5 * company_marketcap) &
-                (peers['MarketCap'] <= 1.5 * company_marketcap)
+                (peers['marketcap_numeric'] >= current_marketcap * 0.7) &
+                (peers['marketcap_numeric'] <= current_marketcap * 1.3)
             ]
 
-            if not peers.empty:
-                peer_options = peers['Symbol'].unique().tolist()
-                selected_peers = st.multiselect("Select peer tickers to compare:", peer_options, default=peer_options[:3])
-
-                if selected_peers:
-                    # Example comparison (you can extend this)
-                    st.write(f"Comparing **{ticker}** with peers: {', '.join(selected_peers)}")
-            else:
+            if peers.empty:
                 st.warning("⚠️ No comparable peers found.")
+            else:
+                peer_symbols = peers['symbol'].tolist()
+                selected_peers = st.multiselect("Select Peers", peer_symbols, default=peer_symbols[:3])
+                
+                if selected_peers:
+                    st.dataframe(peers[peers['symbol'].isin(selected_peers)].set_index("symbol"))
+                else:
+                    st.info("ℹ️ Please select at least one peer to compare.")
         else:
-            st.warning(f"⚠️ Ticker {ticker} not found in S&P 500 dataset.")
-    else:
-        st.warning("⚠️ Required columns not found in the S&P 500 data.")
-except Exception as e:
-    st.error(f"Error finding peers: {e}")
+            st.warning(f"⚠️ Ticker '{selected_ticker}' not found in the S&P 500 list.")
+
+    except KeyError as e:
+        st.error(f"❌ Column not found: {e}. Here are the available columns:\n\n{sp500_df.columns.tolist()}")
+    except Exception as e:
+        st.error(f"❌ Error finding peers: {e}")
+
 
 
 # -------------------- Real-Time News Feed --------------------
