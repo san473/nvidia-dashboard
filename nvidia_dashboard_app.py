@@ -143,7 +143,8 @@ try:
     st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Failed to fetch data for ticker {ticker}. Error: {e}")
+    st.error(f"Failed to fetch data for ticker {ticker_input}. Error: {e}")
+
 
     # ------------------------ GEOGRAPHIC REVENUE / HQ INFO ------------------------
 with st.expander("🌍 Geographic & Business Overview"):
