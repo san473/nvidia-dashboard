@@ -10,10 +10,8 @@ import plotly.express as px
 from datetime import datetime
 from streamlit.runtime.caching import cache_data
 import requests
-from transformers import pipeline
 
-# Initialize local summarizer pipeline
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+
 
 
 NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
