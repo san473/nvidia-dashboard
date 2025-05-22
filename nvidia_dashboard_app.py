@@ -82,7 +82,7 @@ st.title("📊 Comprehensive Stock Dashboard")
 
 ticker_input = st.text_input("Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL").upper()
 
-
+ticker = ticker_input
 @st.cache_data
 def get_data(ticker):
     stock = yf.Ticker(ticker)
