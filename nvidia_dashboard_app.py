@@ -17,7 +17,7 @@ st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 st.cache_data.clear()
 @st.cache_data
 def load_sp500_data():
-    df = pd.read_csv("sp500_companies.csv")
+    df = pd.read_excel("sp500_companies.xlsx")
     return df
 
 
