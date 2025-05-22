@@ -11,22 +11,10 @@ import google.generativeai as genai
 from datetime import datetime
 from streamlit.runtime.caching import cache_data
 
-# Setup Gemini API key
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel(model_name="models/gemini-pro")
-response = model.generate_content(prompt)
-summary = response.text
 
 NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
 
-# --- Example function to summarize news ---
-def summarize_news_with_gemini(prompt):
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"❌ GPT summary failed: {str(e)}"
+
 
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
@@ -268,9 +256,19 @@ else:
 
 
 # -------------------- Real-Time News Feed --------------------
-# ---------------------------------------------
 st.header("🧠 AI-Summarized Market News")
 ticker = st.session_state.get("selected_ticker", "AAPL")
+
+import feedparser
+import requests
+from transformers import pipeline
+from newspaper import Article
+from streamlit.runtime.caching import cache_data
+
+# Load BART summarizer
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+
+NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
 
 @cache_data(ttl=60)
 def fetch_news_articles(ticker):
@@ -282,39 +280,57 @@ def fetch_news_articles(ticker):
     except Exception as e:
         return []
 
-def summarize_with_gemini(articles):
-    try:
-        content = "\n\n".join([f"Title: {a['title']}\nDescription: {a['description']}" for a in articles if a['description']])
-        if not content.strip():
-            return "No content to summarize."
+def summarize_with_bart(articles):
+    positive, negative, themes = [], [], []
 
-        prompt = f"""
-You are a financial news assistant. Summarize the following news headlines into 3 categories with bullet points:
-- Positive Developments
-- Risks & Negative Sentiment
-- Emerging Themes
+    for article in articles:
+        try:
+            a = Article(article["url"])
+            a.download()
+            a.parse()
+            text = a.text.strip()
 
-Text:
-{content}
-"""
-        response = model.generate_content(prompt)
-        return response.text
+            if not text or len(text.split()) < 50:
+                continue
 
-    except Exception as e:
-        return f"❌ GPT summary failed: {str(e)}"
+            summary = summarizer(text[:1024], max_length=120, min_length=30, do_sample=False)[0]["summary_text"]
+
+            # Simple sentiment-based bucketing
+            lower_summary = summary.lower()
+            if any(word in lower_summary for word in ["growth", "record", "exceeded", "strong", "profit", "gain"]):
+                positive.append(f"- **{article['title']}**: {summary}")
+            elif any(word in lower_summary for word in ["decline", "lawsuit", "loss", "risk", "fall", "missed"]):
+                negative.append(f"- **{article['title']}**: {summary}")
+            else:
+                themes.append(f"- **{article['title']}**: {summary}")
+
+        except:
+            continue
+
+    return positive, negative, themes
 
 # Fetch + summarize
 articles = fetch_news_articles(ticker)
 
-summary = summarize_news_with_gemini(prompt)
-st.markdown("### 🧠 GPT Summary of Market Sentiment")
-st.markdown(summary)
-
-
-
-# Show raw news articles
-st.subheader("📰 Latest Headlines")
 if articles:
+    pos, neg, them = summarize_with_bart(articles)
+
+    st.markdown("### 🧠 GPT-style Summary of Market Sentiment")
+
+    if pos:
+        st.markdown("#### ✅ Positive Developments")
+        st.markdown("\n".join(pos))
+    if neg:
+        st.markdown("#### ⚠️ Risks & Negative Sentiment")
+        st.markdown("\n".join(neg))
+    if them:
+        st.markdown("#### 🔍 Emerging Themes")
+        st.markdown("\n".join(them))
+
+    st.divider()
+
+    # Show raw articles
+    st.subheader("📰 Latest Headlines")
     for article in articles:
         st.markdown(f"- [{article['title']}]({article['url']}) — `{article['source']['name']}`")
 else:
