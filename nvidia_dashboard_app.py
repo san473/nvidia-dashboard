@@ -12,6 +12,7 @@ from streamlit.runtime.caching import cache_data
 import requests
 
 import pandas as pd
+st.cache_data.clear()
 
 @st.cache_data
 def load_sp500_data():
