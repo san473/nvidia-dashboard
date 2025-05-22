@@ -30,6 +30,17 @@ if 'Market Cap' not in sp500_df.columns:
     for col in sp500_df.columns:
         st.write(repr(col))  # Shows hidden characters
 
+# Ticker selection
+st.header("🔍 Ticker Selection")
+
+# Get available tickers from the Excel file
+available_tickers = sp500_df["Symbol"].dropna().unique().tolist()
+
+# Set default to NVDA if it's in the list
+default_index = available_tickers.index("NVDA") if "NVDA" in available_tickers else 0
+
+# Create dropdown for ticker selection
+selected_ticker = st.selectbox("Choose a ticker:", available_tickers, index=default_index)
 
 
 
