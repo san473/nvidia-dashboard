@@ -17,12 +17,29 @@ st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 st.cache_data.clear()
 @st.cache_data
 # REMOVE cache temporarily to force reload
+@st.cache_data
 def load_sp500_data():
     df = pd.read_excel("sp500_companies.xlsx")
-    df.columns = df.columns.str.strip()
-    st.write("✅ Columns loaded from Excel:", df.columns.tolist())  # DEBUG
+    df.columns = df.columns.str.strip().str.lower()  # Normalize for reliable access
     return df
+COLUMN_DISPLAY_NAMES = {
+    "symbol": "Symbol",
+    "exchange": "Exchange",
+    "shortname": "Short Name",
+    "longname": "Long Name",
+    "sector": "Sector",
+    "industry": "Industry",
+    "currentprice": "Current Price",
+    "marketcap": "Market Cap",
+    "ebitda": "EBITDA",
+    "revenuegrowth": "Revenue Growth",
+    "state": "State",
+    "country": "Country",
+    "weight": "Weight",
+}
 
+def display_dataframe_pretty(df, columns):
+    return df[columns].rename(columns={col: COLUMN_DISPLAY_NAMES.get(col, col) for col in columns})
 sp500_df = load_sp500_data()
 
 
@@ -233,46 +250,45 @@ else:
 
 
 # --------------------- Dynamic Peer Comparison ---------------------
-# 📊 Peer Comparison
-st.markdown("## 📊 Peer Comparison")
+st.subheader("📊 Peer Comparison")
 
 try:
-    # Find the selected company row from the S&P 500 Excel data
-    selected_row = sp500_df[sp500_df["Symbol"] == selected_ticker]
+    # Get info for the selected ticker
+    company_row = sp500_df[sp500_df["symbol"].str.upper() == selected_ticker.upper()]
+    if company_row.empty:
+        raise ValueError(f"No data found for ticker '{selected_ticker}'")
 
-    if selected_row.empty:
-        st.error(f"⚠️ Ticker '{selected_ticker}' not found in S&P 500 data.")
+    selected_industry = company_row["industry"].values[0]
+    selected_marketcap = float(company_row["marketcap"].values[0])
+
+    # Filter peers by industry (excluding the selected company)
+    peers = sp500_df[
+        (sp500_df["industry"] == selected_industry) &
+        (sp500_df["symbol"].str.upper() != selected_ticker.upper())
+    ].copy()
+
+    if peers.empty:
+        st.warning("⚠️ No comparable peers found in the same industry.")
     else:
-        selected_industry = selected_row["Industry"].values[0]
-        selected_marketcap = selected_row["Marketcap"].values[0]
+        # Calculate market cap difference
+        peers["marketcap"] = pd.to_numeric(peers["marketcap"], errors="coerce")
+        peers["cap_diff"] = abs(peers["marketcap"] - selected_marketcap)
 
-        # Clean data
-        peer_df = sp500_df.copy()
-        peer_df["Marketcap"] = pd.to_numeric(peer_df["Marketcap"], errors="coerce")
-        peer_df["Currentprice"] = pd.to_numeric(peer_df["Currentprice"], errors="coerce")
+        # Sort and show top 5 closest peers
+        sorted_peers = peers.sort_values("cap_diff").head(5)
 
-        # Filter peers in same industry and similar size
-        industry_peers = peer_df[peer_df["Industry"] == selected_industry]
-        industry_peers = industry_peers[industry_peers["Symbol"] != selected_ticker]
-
-        # Filter by similar market cap (within ±40%)
-        lower_bound = selected_marketcap * 0.6
-        upper_bound = selected_marketcap * 1.4
-        comparable_peers = industry_peers[
-            (industry_peers["Marketcap"] >= lower_bound) &
-            (industry_peers["Marketcap"] <= upper_bound)
+        # Columns to display
+        cols_to_display = [
+            "symbol", "exchange", "shortname", "longname",
+            "sector", "industry", "currentprice", "marketcap"
         ]
 
-        # Display
-        if not comparable_peers.empty:
-            peer_choices = st.multiselect("Select Peers", comparable_peers["Symbol"].tolist(), default=comparable_peers["Symbol"].tolist()[:3])
-            selected_peers = comparable_peers[comparable_peers["Symbol"].isin(peer_choices)]
-            st.dataframe(selected_peers[["Symbol", "Exchange", "Shortname", "Longname", "Sector", "Industry", "Currentprice", "Marketcap"]])
-        else:
-            st.warning("⚠️ No comparable peers found.")
+        # Show formatted table
+        st.dataframe(display_dataframe_pretty(sorted_peers, cols_to_display))
+
 except Exception as e:
     st.error(f"❌ Error finding peers: {e}")
-
+    st.write("Available columns in S&P500 data:", sp500_df.columns.tolist())
 
 
 # -------------------- Real-Time News Feed --------------------
