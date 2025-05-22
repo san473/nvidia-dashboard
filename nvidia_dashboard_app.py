@@ -263,14 +263,9 @@ st.header("🧠 AI-Summarized Market News")
 ticker = st.session_state.get("selected_ticker", "AAPL")
 
 from transformers import pipeline
-from newspaper import Article
 from datetime import datetime
-import nltk
 
-# Ensure punkt is downloaded
-nltk.download('punkt')
-
-# Use a pre-trained summarization model (e.g., facebook/bart-large-cnn)
+# Load BART summarization pipeline
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
 @st.cache_data(ttl=60)
@@ -287,39 +282,34 @@ def summarize_articles(articles):
     summaries = []
     for article in articles:
         try:
-            url = article["url"]
-            news = Article(url)
-            news.download()
-            news.parse()
-            news.nlp()
-            full_text = news.text
+            text = article.get("description") or article.get("content") or ""
+            if not text.strip():
+                continue
 
-            # Shorten if too long
-            if len(full_text) > 1024:
-                full_text = full_text[:1024]
+            # Limit to 1024 characters
+            if len(text) > 1024:
+                text = text[:1024]
 
-            summary = summarizer(full_text, max_length=120, min_length=30, do_sample=False)[0]["summary_text"]
+            summary = summarizer(text, max_length=100, min_length=30, do_sample=False)[0]["summary_text"]
             summaries.append({
                 "title": article["title"],
                 "summary": summary,
                 "source": article["source"]["name"],
                 "url": article["url"]
             })
-        except Exception as e:
+        except:
             continue
     return summaries
 
-# Run fetch and summarize
+# Fetch + summarize
 raw_articles = fetch_news_articles(ticker)
 summarized_articles = summarize_articles(raw_articles)
 
-# --- Display Summaries in Sections ---
+# --- Display Summaries ---
 st.markdown("### 🧠 News Summary by Category")
 
 if summarized_articles:
-    positive = []
-    negative = []
-    themes = []
+    positive, negative, themes = [], [], []
 
     for art in summarized_articles:
         text = art["summary"].lower()
@@ -330,8 +320,8 @@ if summarized_articles:
         else:
             themes.append(art)
 
-    def display_bullets(category_name, items):
-        st.markdown(f"#### {category_name}")
+    def display_bullets(label, items):
+        st.markdown(f"#### {label}")
         if not items:
             st.markdown("- _No items in this category._")
             return
@@ -342,15 +332,15 @@ if summarized_articles:
     display_bullets("⚠️ Risks & Negative Sentiment", negative)
     display_bullets("🔎 Emerging Themes", themes)
 else:
-    st.warning("No relevant summaries available.")
+    st.info("No summaries available at the moment.")
 
-# --- Raw Article Links at Bottom ---
+# --- Show raw article links ---
 st.subheader("📰 Latest Headlines")
 if raw_articles:
     for article in raw_articles:
         st.markdown(f"- [{article['title']}]({article['url']}) — `{article['source']['name']}`")
 else:
-    st.info("No news articles found.")
+    st.warning("No news articles found.")
 
 
 

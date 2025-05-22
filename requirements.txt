@@ -5,7 +5,5 @@ plotly
 numpy
 requests
 beautifulsoup4
-google-generativeai>=0.3.2
 transformers
-newspaper3k
 torch
