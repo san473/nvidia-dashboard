@@ -267,29 +267,25 @@ else:
     lower_bound = selected_marketcap * 0.4
     upper_bound = selected_marketcap * 1.6
 
-    # Primary peer filter
-    peer_df = sp500_df[
-        (sp500_df["symbol"].str.upper() != ticker) &
-        (sp500_df["industry"] == selected_industry) &
-        (sp500_df["marketcap"] >= lower_bound) &
-        (sp500_df["marketcap"] <= upper_bound)
-    ]
+    # --- Filter 1: strict bounds on market cap and industry ---
+peer_df = sp500_df[
+    (sp500_df["symbol"].str.upper() != selected_ticker) &
+    (sp500_df["industry"].str.lower() == selected_industry.lower()) &
+    (sp500_df["marketcap"] >= lower_bound) &
+    (sp500_df["marketcap"] <= upper_bound)
+]
 
-    # Fallback: if no peers found, show top 5 closest in same industry
-    if peer_df.empty:
-        st.warning("⚠️ No comparable peers found using market cap range. Showing closest by market cap in industry.")
-        peer_df = sp500_df[
-            (sp500_df["symbol"].str.upper() != ticker) &
-            (sp500_df["industry"] == selected_industry)
-        ].copy()
-        peer_df["cap_distance"] = abs(peer_df["marketcap"] - selected_marketcap)
-        peer_df = peer_df.sort_values(by="cap_distance").head(5)
-        peer_df.drop(columns=["cap_distance"], inplace=True)
-
-    if not peer_df.empty:
-        st.dataframe(display_dataframe_pretty(peer_df, [
-            "symbol", "exchange", "shortname", "longname", "sector", "industry", "currentprice", "marketcap"
-        ]))
+# --- Fallback 1: industry match only, get closest by market cap ---
+if peer_df.empty:
+    st.warning("⚠️ No comparable peers found using market cap range. Showing closest by market cap in industry.")
+    fallback_df = sp500_df[
+        (sp500_df["symbol"].str.upper() != selected_ticker) &
+        (sp500_df["industry"].str.lower() == selected_industry.lower())
+    ].copy()
+    
+    if not fallback_df.empty:
+        fallback_df["cap_diff"] = (fallback_df["marketcap"] - selected_marketcap).abs()
+        peer_df = fallback_df.nsmallest(5, "cap_diff")
     else:
         st.warning("⚠️ Still no comparable peers found.")
 
