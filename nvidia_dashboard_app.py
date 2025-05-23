@@ -13,11 +13,21 @@ import requests
 
 import pandas as pd
 
+
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 st.cache_data.clear()
 @st.cache_data
 # REMOVE cache temporarily to force reload
 @st.cache_data
+
+ticker = None
+ticker_obj = None
+
+ticker_input = st.text_input("Enter Ticker Symbol")
+
+if ticker_input:
+    ticker = ticker_input.upper()
+    ticker_obj = yf.Ticker(ticker)
 def load_sp500_data():
     df = pd.read_excel("sp500_companies.xlsx")
     df.columns = df.columns.str.strip().str.lower()  # Normalize for reliable access
@@ -166,6 +176,7 @@ with st.expander("🌍 Geographic & Business Overview"):
 
 st.subheader("🔍 Debug: Available Financial Rows")
 
+
 try:
     st.write("**Cash Flow Statement Rows:**")
     st.write(ticker_obj.cashflow)
@@ -183,6 +194,12 @@ except Exception as e:
 
 
 # ------------------- DCF VALUATION -------------------
+import yfinance as yf
+
+# Make sure this comes BEFORE the DCF section
+ticker = ticker_input.upper()  # Assuming 'ticker_input' is your main ticker field
+ticker_obj = yf.Ticker(ticker)
+
 st.markdown("### 📊 Discounted Cash Flow (DCF) Valuation")
 
 try:
@@ -259,6 +276,7 @@ try:
 
 except Exception as e:
     st.error(f"DCF valuation failed: {e}")
+
 
 
 
