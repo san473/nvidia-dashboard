@@ -182,6 +182,68 @@ with st.expander("🌍 Geographic & Business Overview"):
     except Exception as e:
         st.warning("Geographic and company summary data not available.")
 
+# === DYNAMIC KPI, INVESTMENT THESIS, RISKS BLOCK ===
+try:
+    info = yf.Ticker(ticker).info
+
+    st.markdown("## 📊 Key Financial Metrics")
+    kpi_cols = st.columns(3)
+    kpi_cols[0].metric("Market Cap", f"${info.get('marketCap', 0):,}")
+    kpi_cols[1].metric("PE Ratio (TTM)", f"{info.get('trailingPE', 'N/A')}")
+    kpi_cols[2].metric("PEG Ratio", f"{info.get('pegRatio', 'N/A')}")
+
+    kpi_cols = st.columns(3)
+    kpi_cols[0].metric("Price to Book", f"{info.get('priceToBook', 'N/A')}")
+    kpi_cols[1].metric("Return on Equity", f"{info.get('returnOnEquity', 'N/A'):.2%}" if info.get("returnOnEquity") else "N/A")
+    kpi_cols[2].metric("Debt to Equity", f"{info.get('debtToEquity', 'N/A')}")
+
+    # --- Investment Thesis ---
+    st.markdown("## 🧠 Investment Thesis & Upside Potential")
+    thesis_points = []
+
+    if info.get("growthQuarterlyRevenueYoy") and info["growthQuarterlyRevenueYoy"] > 0.1:
+        thesis_points.append("• Strong revenue growth in recent quarters.")
+    if info.get("returnOnEquity", 0) > 0.15:
+        thesis_points.append("• High return on equity indicates efficient capital usage.")
+    if info.get("grossMargins", 0) > 0.5:
+        thesis_points.append("• Robust gross margins suggest solid product/service economics.")
+    if info.get("totalCash", 0) > info.get("totalDebt", 0):
+        thesis_points.append("• Healthy balance sheet with more cash than debt.")
+    if info.get("forwardPE", 0) < info.get("trailingPE", 999):
+        thesis_points.append("• Forward PE lower than trailing PE implies expected earnings growth.")
+
+    if thesis_points:
+        for point in thesis_points:
+            st.markdown(point)
+    else:
+        st.markdown("*No strong upside signals identified based on current data.*")
+
+    # --- Risks & Concerns ---
+    st.markdown("## ⚠️ Risks & Concerns")
+    risk_points = []
+
+    if info.get("operatingMargins", 0) < 0.1:
+        risk_points.append("• Low operating margins may signal profitability challenges.")
+    if info.get("debtToEquity", 0) > 1.0:
+        risk_points.append("• High debt-to-equity ratio suggests potential leverage risk.")
+    if info.get("revenueGrowth", 0) < 0.05:
+        risk_points.append("• Weak revenue growth could limit long-term upside.")
+    if info.get("profitMargins", 0) < 0.05:
+        risk_points.append("• Thin profit margins may be vulnerable to cost pressures.")
+    if not info.get("freeCashflow"):
+        risk_points.append("• Missing or negative free cash flow data.")
+
+    if risk_points:
+        for point in risk_points:
+            st.markdown(point)
+    else:
+        st.markdown("*No major risks identified based on current financials.*")
+
+except Exception as e:
+    st.warning(f"Unable to generate KPI/Thesis/Risks: {e}")
+
+
+
 import yfinance as yf
 import pandas as pd
 
