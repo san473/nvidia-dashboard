@@ -497,44 +497,68 @@ except Exception as e:
 
 # -------------------- Real-Time News Feed --------------------
 st.header("🧠 Market News Summary")
-ticker = st.session_state.get("selected_ticker", "AAPL")
 
 @st.cache_data(ttl=60)
-def fetch_news_articles(ticker):
-    url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWSAPI_KEY}&sortBy=publishedAt&language=en&pageSize=5"
-    try:
-        response = requests.get(url)
-        articles = response.json().get("articles", [])
-        return articles
-    except Exception:
-        return []
+def fetch_news_articles(ticker, long_name, api_key):
+    # Try long name first, then fallback to ticker
+    queries = [long_name, ticker] if long_name else [ticker]
 
-def simple_logical_summary(articles):
+    for query in queries:
+        url = f"https://newsapi.org/v2/everything?q={query}&apiKey={api_key}&sortBy=publishedAt&language=en&pageSize=5"
+        try:
+            response = requests.get(url)
+            data = response.json()
+            articles = data.get("articles", [])
+            if articles:
+                return articles, query, url, data
+        except Exception as e:
+            continue  # Try the next query
+
+    # No valid articles found
+    return [], queries[0], url, {"error": "No articles from any source"}
+
+def simple_logical_summary(query_term, articles):
     if not articles:
-        return "No recent news found."
+        return f"No recent news found for {query_term}."
 
     titles = [a['title'] for a in articles if a.get('title')]
     highlights = "\n".join([f"- {title}" for title in titles[:5]])
 
     return f"""
-### ✅ Key Headlines for {ticker}
+### ✅ Key Headlines for {query_term}
 {highlights}
 
-Note: Full AI summarization has been temporarily disabled to reduce memory usage.
+Note: Headlines are extracted directly from NewsAPI for real-time updates.
 """
 
-articles = fetch_news_articles(ticker)
-summary = simple_logical_summary(articles)
+# --- Load your NewsAPI key ---
+NEWSAPI_KEY = st.secrets.get("NEWSAPI_KEY", None)
 
-st.markdown("### 🧠 Summary of Key Headlines")
-st.markdown(summary)
-
-st.subheader("📰 Full Headlines")
-if articles:
-    for article in articles:
-        st.markdown(f"- [{article['title']}]({article['url']}) — `{article['source']['name']}`")
+if not NEWSAPI_KEY:
+    st.warning("⚠️ NEWSAPI_KEY not found in Streamlit secrets.")
 else:
-    st.warning("No news articles found.")
+    # Get company name and fallback to ticker if needed
+    long_name = info.get("longName", "")
+    articles, used_query, api_url, debug_response = fetch_news_articles(ticker, long_name, NEWSAPI_KEY)
+
+    # Summary
+    summary = simple_logical_summary(used_query, articles)
+    st.markdown("### 🧠 Summary of Key Headlines")
+    st.markdown(summary)
+
+    # Full Articles
+    st.subheader("📰 Full Headlines")
+    if articles:
+        for article in articles:
+            st.markdown(f"- [{article['title']}]({article['url']}) — `{article['source']['name']}`")
+    else:
+        st.warning("No news articles found.")
+
+    # Debug info
+    with st.expander("🔍 API Debug Info"):
+        st.write("🧠 Search Term Used:", used_query)
+        st.write("🧠 API URL Used:", api_url)
+        st.write("🧠 Raw Response:", debug_response)
 
 
 
