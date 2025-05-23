@@ -20,9 +20,9 @@ st.cache_data.clear()
 # REMOVE cache temporarily to force reload
 # @st.cache_data
 def load_sp500_data():
-    # Adjust this path and loading logic based on your actual source
-    df = pd.read_excel("data/sp500.xlsx")
+    df = pd.read_excel("sp500_companies.xlsx")
     return df
+
 # Ticker input and validation
 ticker = None
 ticker_obj = None
