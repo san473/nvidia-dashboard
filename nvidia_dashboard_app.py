@@ -183,93 +183,82 @@ with st.expander("🌍 Geographic & Business Overview"):
         st.warning("Geographic and company summary data not available.")
 
 # === DYNAMIC KPI, INVESTMENT THESIS, RISKS BLOCK ===
-import streamlit as st
 import yfinance as yf
+import streamlit as st
 
-st.subheader("📌 Key Performance Indicators (KPI)")
-
-# Ticker comes from your global input
+ticker = ticker_input  # Assuming ticker_input is already defined
 ticker_obj = yf.Ticker(ticker)
 info = ticker_obj.info
 
-# KPI Computation functions
-def get_revenue(info):
-    return info.get("totalRevenue")
+st.subheader("📌 Key Performance Indicators (KPI)")
 
-def get_net_profit_margin(info):
-    try:
-        return round(info.get("netIncome") / info.get("totalRevenue"), 4)
-    except:
-        return None
-
-def get_eps(info):
-    return info.get("trailingEps")
-
-def get_roe(info):
-    return info.get("returnOnEquity")
-
-def get_earnings_growth(info):
-    return info.get("earningsQuarterlyGrowth")
-
-# KPI Mapping
-kpi_functions = {
-    "Revenue (TTM)": get_revenue,
-    "Net Profit Margin": get_net_profit_margin,
-    "EPS (TTM)": get_eps,
-    "ROE": get_roe,
-    "Earnings Growth (YoY)": get_earnings_growth
+kpi_options = {
+    "Revenue (TTM)": "revenue",
+    "Net Profit Margin": "net_profit_margin",
+    "EPS (TTM)": "eps",
+    "ROE": "roe",
+    "Earnings Growth (YoY)": "earnings_growth"
 }
 
-# KPI Selection UI
-selected_kpis = st.multiselect(
-    "Select KPIs to display:",
-    options=list(kpi_functions.keys()),
-    default=["Revenue (TTM)", "Net Profit Margin", "EPS (TTM)"]
-)
+selected_kpis = st.multiselect("Select KPIs to display:", list(kpi_options.keys()), default=list(kpi_options.keys()))
 
-# KPI Display
+# Fetch base metrics
+revenue = info.get("totalRevenue")
+net_income = info.get("netIncomeToCommon")
+eps = info.get("trailingEps")
+roe = info.get("returnOnEquity")
+earnings_growth = info.get("earningsQuarterlyGrowth")
+
+# Calculate net profit margin safely
+net_profit_margin = (net_income / revenue) if revenue and net_income else None
+
+# Display KPI cards
+kpi_values = {
+    "Revenue (TTM)": f"${revenue / 1e9:.2f}B" if revenue else "N/A",
+    "Net Profit Margin": f"{net_profit_margin:.2%}" if net_profit_margin is not None else "N/A",
+    "EPS (TTM)": f"${eps:.2f}" if eps else "N/A",
+    "ROE": f"{roe:.2%}" if roe else "N/A",
+    "Earnings Growth (YoY)": f"{earnings_growth:.2%}" if earnings_growth else "N/A"
+}
+
 cols = st.columns(len(selected_kpis))
 for i, kpi in enumerate(selected_kpis):
-    value = kpi_functions[kpi](info)
-    if value is None:
-        display_value = "N/A"
-    elif "Margin" in kpi or "ROE" in kpi or "Growth" in kpi:
-        display_value = f"{value * 100:.2f}%"  # Convert to %
-    elif "EPS" in kpi:
-        display_value = f"${value:.2f}"
-    else:
-        display_value = f"${value/1e9:.2f}B" if value > 1e9 else f"${value/1e6:.2f}M"
+    with cols[i]:
+        st.metric(label=kpi, value=kpi_values[kpi])
 
-    cols[i].metric(label=kpi, value=display_value)
 
 
     # --- Investment Thesis ---
     # ---- INVESTMENT POTENTIAL ----
 st.subheader("📈 Investment Thesis & Upside Potential")
 
-bullet_points = []
+investment_points = []
 
-# Example logic (customize for your pipeline):
-if fin.get("grossMargins", 0) > 0.5:
-    bullet_points.append("Strong gross margins indicate pricing power or cost efficiency.")
+# Moat / competitive strength
+if info.get("grossMargins", 0) > 0.5:
+    investment_points.append("✅ High gross margins indicate strong pricing power and operational efficiency.")
 
-if fin.get("earningsQuarterlyGrowth", 0) > 0.15:
-    bullet_points.append("Earnings growing at a healthy pace, signaling operational efficiency.")
+# Strong revenue growth
+if info.get("revenueGrowth", 0) > 0.15:
+    investment_points.append("✅ Robust revenue growth suggests strong market demand and product acceptance.")
 
-if fin.get("returnOnEquity", 0) > 0.15:
-    bullet_points.append("High ROE reflects effective capital allocation.")
+# Earnings growth
+if earnings_growth and earnings_growth > 0.1:
+    investment_points.append("✅ Healthy earnings growth enhances intrinsic value and investor confidence.")
 
-if peer_medians is not None and fin.get("forwardPE", 0) < peer_medians["forwardPE"]:
-    bullet_points.append("Valuation is attractive relative to peers based on forward P/E.")
+# High ROE
+if roe and roe > 0.15:
+    investment_points.append("✅ High Return on Equity reflects efficient capital allocation and profitability.")
 
-if "artificial intelligence" in company_description.lower():
-    bullet_points.append("Exposure to rapidly growing AI sector.")
+# EPS track record
+if eps and eps > 2:
+    investment_points.append("✅ Strong EPS indicates consistent earnings performance.")
 
-if len(bullet_points) == 0:
-    bullet_points.append("No clear upside signals identified at this time.")
+if not investment_points:
+    investment_points.append("ℹ️ No strong investment indicators detected based on current financials.")
 
-for point in bullet_points:
-    st.markdown(f"- {point}")
+for point in investment_points:
+    st.markdown(point)
 
 
     # --- Risks & Concerns ---
