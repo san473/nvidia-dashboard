@@ -235,97 +235,74 @@ except Exception as e:
     st.error("Failed to load financial data.")
     fin = {}
     financial_data = {}
+import streamlit as st
 
+# ========== Extract Key Metrics ==========
+long_name = financial_data.get("longName", ticker)
+sector = financial_data.get("sector", "N/A")
+industry = financial_data.get("industry", "N/A")
+market_cap = financial_data.get("marketCap", 0)
+revenue = financial_data.get("totalRevenue", 0)
+eps = financial_data.get("trailingEps", None)
+roe = financial_data.get("returnOnEquity", None)
+earnings_growth = financial_data.get("earningsQuarterlyGrowth", None)
+profit_margin = financial_data.get("profitMargins", None)
+debt_to_equity = financial_data.get("debtToEquity", None)
+current_ratio = financial_data.get("currentRatio", None)
 
-    # --- Investment Thesis ---
-   # 🟦 INVESTMENT THESIS & UPSIDE POTENTIAL
-
-st.markdown("### 📈 Investment Thesis & Upside Potential")
-
-# Safety check: Ensure fin is defined and fallback if not
-fin = financial_data.get("financialData", {})
-summary = financial_data.get("summaryDetail", {})
-eps_ttm = fin.get("trailingEps", None)
-gross_margin = fin.get("grossMargins", None)
-revenue_growth = fin.get("revenueGrowth", None)
-earnings_growth = fin.get("earningsGrowth", None)
-
+# ========== Investment Thesis Summary ==========
 thesis_points = []
 
-# EPS growth
-if eps_ttm and eps_ttm > 3:
-    thesis_points.append("Consistently strong earnings per share indicates solid profitability.")
+if revenue and revenue > 1e9:
+    thesis_points.append(f" Strong topline performance with trailing revenue of ${revenue/1e9:.2f}B suggests robust demand.")
 
-# Gross Margin strength
-if gross_margin and gross_margin > 0.5:
-    thesis_points.append("High gross margins suggest a strong product moat and pricing power.")
+if eps and eps > 0:
+    thesis_points.append(f" Solid EPS of ${eps:.2f} indicates strong earnings power.")
 
-# Revenue growth
-if revenue_growth and revenue_growth > 0.10:
-    thesis_points.append("Double-digit revenue growth reflects strong top-line momentum.")
+if roe and roe > 0.15:
+    thesis_points.append(f" Healthy Return on Equity (ROE) of {roe*100:.1f}% highlights efficient capital allocation.")
 
-# Earnings growth
-if earnings_growth and earnings_growth > 0.10:
-    thesis_points.append("Positive earnings growth indicates expanding profitability and operational leverage.")
+if earnings_growth and earnings_growth > 0:
+    thesis_points.append(f" Positive quarterly earnings growth of {earnings_growth*100:.1f}% supports upside potential.")
 
-# Competitive positioning fallback
-if not thesis_points:
-    thesis_points.append("Strong market position with opportunities for expansion and innovation.")
+if market_cap and market_cap > 50e9:
+    thesis_points.append(f" Large-cap stability: {long_name} operates at a market cap above $50B, enhancing institutional confidence.")
 
-# Display investment thesis
+if len(thesis_points) < 3:
+    thesis_points.append(" Limited available financial highlights — further analysis recommended.")
+
+# ========== Risk Summary ==========
+risk_points = []
+
+if earnings_growth is not None and earnings_growth < 0:
+    risk_points.append(f" Negative earnings growth ({earnings_growth*100:.1f}%) may signal performance headwinds.")
+
+if profit_margin is not None and profit_margin < 0.05:
+    risk_points.append(f" Thin profit margins ({profit_margin*100:.1f}%) could limit scalability.")
+
+if roe is not None and roe < 0.05:
+    risk_points.append(f" Weak Return on Equity ({roe*100:.1f}%) may suggest inefficient operations.")
+
+if debt_to_equity is not None and debt_to_equity > 100:
+    risk_points.append(f" Elevated debt-to-equity ratio ({debt_to_equity:.0f}%) increases financial risk.")
+
+if current_ratio is not None and current_ratio < 1:
+    risk_points.append(f" Current ratio below 1.0 raises concerns over short-term liquidity.")
+
+if len(risk_points) < 3:
+    risk_points.append(" No major red flags from available metrics — monitor quarterly updates.")
+
+# ========== Render in Streamlit ==========
+st.markdown("### 📈 Investment Thesis & Upside Potential")
 for point in thesis_points:
     st.markdown(f"- {point}")
 
-
-    # --- Risks & Concerns ---
-    # 🟥 RISKS & CONCERNS
-
 st.markdown("### ⚠️ Risks & Concerns")
-
-# Extract financial fields
-ebitda_margins = fin.get("ebitdaMargins", None)
-debt_to_equity = fin.get("debtToEquity", None)
-current_ratio = fin.get("currentRatio", None)
-earnings_growth = fin.get("earningsGrowth", None)
-free_cash_flow = financial_data.get("cashflowStatementHistory", {}).get("freeCashFlow", None)
-shares_outstanding = summary.get("sharesOutstanding", None)
-diluted_eps = fin.get("trailingEps", None)
-
-risk_points = []
-
-# Margin compression
-if ebitda_margins is not None and ebitda_margins < 0.15:
-    risk_points.append("Low EBITDA margins suggest limited pricing power or cost pressures.")
-
-# Leverage
-if debt_to_equity is not None and debt_to_equity > 1.5:
-    risk_points.append("High debt-to-equity ratio may indicate financial risk due to leverage.")
-
-# Liquidity
-if current_ratio is not None and current_ratio < 1:
-    risk_points.append("Current ratio below 1 signals potential short-term liquidity concerns.")
-
-# Earnings decline
-if earnings_growth is not None and earnings_growth < 0:
-    risk_points.append("Negative earnings growth may signal operational or demand challenges.")
-
-# Cash flow concerns
-if not free_cash_flow:
-    risk_points.append("Lack of visible free cash flow data may indicate limited reinvestment capacity.")
-
-# Share dilution (placeholder check)
-if shares_outstanding and diluted_eps and diluted_eps < 1:
-    risk_points.append("Relatively low EPS may reflect prior share dilution or profitability concerns.")
-
-# Fallback
-if not risk_points:
-    risk_points.append("Minor financial or strategic risks noted, but overall position appears stable.")
-
-# Display risks
-for risk in risk_points:
-    st.markdown(f"- {risk}")
+for point in risk_points:
+    st.markdown(f"- {point}")
 
 
+   
 
 
 import yfinance as yf
