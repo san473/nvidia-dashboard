@@ -16,12 +16,13 @@ import pandas as pd
 
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 st.cache_data.clear()
-@st.cache_data
+
 # REMOVE cache temporarily to force reload
-@st.cache_data
+# @st.cache_data
 
 ticker = None
 ticker_obj = None
+
 
 ticker_input = st.text_input("Enter Ticker Symbol")
 
