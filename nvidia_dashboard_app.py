@@ -165,94 +165,94 @@ with st.expander("🌍 Geographic & Business Overview"):
         st.warning("Geographic and company summary data not available.")
 
 # ------------------- DCF VALUATION -------------------
-st.header("💰 Discounted Cash Flow (DCF) Valuation")
+import numpy as np
 
-# --- User-Defined Assumptions ---
-st.subheader("📈 DCF Assumptions")
-col1, col2, col3 = st.columns(3)
-with col1:
-    forecast_years = st.slider("Forecast Years", min_value=3, max_value=10, value=5)
-with col2:
-    growth_rate = st.slider("FCF Growth Rate (%)", min_value=0.0, max_value=20.0, value=10.0, step=0.5) / 100
-with col3:
-    discount_rate = st.slider("Discount Rate / WACC (%)", min_value=5.0, max_value=15.0, value=9.0, step=0.5) / 100
+def find_matching_row(df, keywords):
+    for keyword in keywords:
+        for row in df.index:
+            if keyword.lower() in row.lower():
+                return row
+    return None
 
-# --- DCF Calculation ---
-def calculate_dcf(ticker, forecast_years, growth_rate, discount_rate):
+def estimate_fcf_from_income(income_stmt, cashflow_stmt):
     try:
-        stock = yf.Ticker(ticker)
-        cashflow = stock.cashflow
+        net_income_row = find_matching_row(income_stmt, ['Net Income'])
+        depreciation_row = find_matching_row(cashflow_stmt, ['Depreciation', 'Depreciation & Amortization'])
+        working_cap_row = find_matching_row(cashflow_stmt, ['Change In Working Capital'])
 
-        st.write("📌 Available Cashflow Rows:", list(cashflow.index))
-
-        if 'Total Cash From Operating Activities' in cashflow.index and 'Capital Expenditures' in cashflow.index:
-            fcf = cashflow.loc['Total Cash From Operating Activities'] - cashflow.loc['Capital Expenditures']
-        elif 'Operating Cash Flow' in cashflow.index and 'Capital Expenditures' in cashflow.index:
-            fcf = cashflow.loc['Operating Cash Flow'] - cashflow.loc['Capital Expenditures']
-            st.info("Using fallback row: **Operating Cash Flow**")
-        else:
-            st.warning("DCF valuation failed: Required cash flow rows not found.")
+        if not net_income_row or not depreciation_row:
             return None
 
-        fcf = fcf.dropna()
-        if fcf.empty:
-            st.warning("DCF valuation failed: FCF data is empty after dropna.")
-            return None
+        net_income = income_stmt.loc[net_income_row]
+        depreciation = cashflow_stmt.loc[depreciation_row]
+        working_cap = cashflow_stmt.loc[working_cap_row] if working_cap_row else 0
 
-        latest_fcf = fcf.iloc[0]
-        terminal_growth_rate = 0.03
-
-        projected_fcfs = [latest_fcf * (1 + growth_rate) ** i for i in range(1, forecast_years + 1)]
-        discounted_fcfs = [val / (1 + discount_rate) ** i for i, val in enumerate(projected_fcfs, start=1)]
-        terminal_value = projected_fcfs[-1] * (1 + terminal_growth_rate) / (discount_rate - terminal_growth_rate)
-        discounted_terminal = terminal_value / (1 + discount_rate) ** forecast_years
-
-        enterprise_value = sum(discounted_fcfs) + discounted_terminal
-        debt = stock.balance_sheet.loc['Total Debt'].iloc[0] if 'Total Debt' in stock.balance_sheet.index else 0
-        cash = stock.balance_sheet.loc['Cash'].iloc[0] if 'Cash' in stock.balance_sheet.index else 0
-        shares_outstanding = stock.info.get('sharesOutstanding', 0)
-
-        equity_value = enterprise_value - debt + cash
-        fair_value_per_share = equity_value / shares_outstanding if shares_outstanding > 0 else None
-
-        return {
-            'enterprise_value': enterprise_value,
-            'equity_value': equity_value,
-            'fair_value_per_share': fair_value_per_share
-        }
-
+        est_fcf = net_income + depreciation + working_cap
+        return est_fcf
     except Exception as e:
-        st.error(f"DCF valuation failed due to error: {e}")
+        st.warning(f"Fallback FCF estimation failed: {e}")
         return None
 
-# --- Run and Display DCF ---
-dcf_result = calculate_dcf(ticker, forecast_years, growth_rate, discount_rate)
+with st.expander("📊 Discounted Cash Flow (DCF) Valuation", expanded=True):
+    try:
+        cashflow = ticker.financials.quarterly_cashflow if ticker.financials.quarterly_cashflow.shape[1] > 0 else ticker.financials.cashflow
+        income_stmt = ticker.financials.quarterly_financials if ticker.financials.quarterly_financials.shape[1] > 0 else ticker.financials.income_stmt
 
-if dcf_result and dcf_result['fair_value_per_share']:
-    current_price = info.get('currentPrice', 0)
-    fair_value = dcf_result['fair_value_per_share']
+        ocf_row = find_matching_row(cashflow, [
+            'Total Cash From Operating Activities',
+            'Net Cash Provided by Operating Activities',
+            'Cash from Operating Activities'
+        ])
+        capex_row = find_matching_row(cashflow, [
+            'Capital Expenditures',
+            'Purchase of Fixed Assets',
+            'Investments in Property Plant and Equipment'
+        ])
 
-    st.markdown(f"""
-    ### 💡 DCF Summary  
-    - Forecast Period: `{forecast_years}` years  
-    - FCF Growth Rate: `{growth_rate * 100:.1f}%`  
-    - Discount Rate (WACC): `{discount_rate * 100:.1f}%`  
-    - Terminal Growth Rate: `3.0%`  
-    """)
+        if ocf_row and capex_row:
+            ocf = cashflow.loc[ocf_row]
+            capex = cashflow.loc[capex_row]
+            fcf = ocf + capex  # CapEx is usually negative
+        else:
+            fcf = estimate_fcf_from_income(income_stmt, cashflow)
 
-    st.success(f"**Intrinsic Value Estimate (DCF): ${dcf_result['equity_value']:,.2f}**")
-    st.info(f"**Current Market Price:** ${current_price:,.2f}")
-    st.success(f"**Intrinsic Value per Share:** ${fair_value:,.2f}")
+        if fcf is None or fcf.isnull().all():
+            st.warning("DCF valuation data not available.")
+        else:
+            fcf_values = fcf.dropna().sort_index(ascending=False).values
 
-    if fair_value > current_price:
-        st.markdown("✅ The stock appears **undervalued** based on DCF.")
-    else:
-        st.markdown("⚠️ The stock appears **overvalued** based on DCF.")
-else:
-    st.warning("DCF valuation data not available.")
+            if len(fcf_values) < 3:
+                st.warning("Not enough FCF data for DCF projection.")
+            else:
+                last_fcf = fcf_values[0]
+                fcf_growth_rate = st.slider("FCF Growth Rate (%)", 0, 20, 8) / 100
+                discount_rate = st.slider("Discount Rate (%)", 5, 15, 10) / 100
+                forecast_years = st.slider("Forecast Years", 3, 10, 5)
 
-# Use main input ticker for peer logic
-selected_ticker = ticker_input
+                projected_fcfs = [last_fcf * (1 + fcf_growth_rate)**i for i in range(1, forecast_years + 1)]
+                discounted_fcfs = [fcf / (1 + discount_rate)**i for i, fcf in enumerate(projected_fcfs, start=1)]
+
+                terminal_value = projected_fcfs[-1] * (1 + fcf_growth_rate) / (discount_rate - fcf_growth_rate)
+                discounted_terminal = terminal_value / (1 + discount_rate)**forecast_years
+
+                intrinsic_value = sum(discounted_fcfs) + discounted_terminal
+                shares_outstanding = ticker.info.get("sharesOutstanding", np.nan)
+                intrinsic_per_share = intrinsic_value / shares_outstanding if shares_outstanding else None
+
+                st.subheader("DCF Valuation Result")
+                st.write(f"**Intrinsic Value:** ${intrinsic_value:,.2f}")
+                if intrinsic_per_share:
+                    current_price = ticker.info.get("currentPrice", np.nan)
+                    upside = ((intrinsic_per_share - current_price) / current_price * 100) if current_price else None
+                    st.write(f"**Per Share Value:** ${intrinsic_per_share:,.2f}")
+                    st.write(f"**Current Price:** ${current_price:,.2f}")
+                    if upside:
+                        st.write(f"**Upside Potential:** {upside:.2f}%")
+    except Exception as e:
+        st.warning(f"DCF valuation failed: {e}")
+
+
+
 
 
 # --------------------- Dynamic Peer Comparison ---------------------
