@@ -226,6 +226,15 @@ for i, kpi in enumerate(selected_kpis):
     with cols[i]:
         st.metric(label=kpi, value=kpi_values[kpi])
 
+# Ensure ticker is fetched safely
+try:
+    ticker_obj = yf.Ticker(ticker)
+    financial_data = ticker_obj.info
+    fin = financial_data
+except Exception as e:
+    st.error("Failed to load financial data.")
+    fin = {}
+    financial_data = {}
 
 
     # --- Investment Thesis ---
