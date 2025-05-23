@@ -239,69 +239,70 @@ except Exception as e:
 
 import streamlit as st
 import yfinance as yf
-import numpy as np
+import pandas as pd
 
-ticker = st.session_state.get("ticker", "AAPL")  # fallback ticker
-peer_group = ["AAPL", "MSFT", "GOOGL", "AMZN"]
+# Set page config
+st.set_page_config(page_title="Stock Dashboard", layout="wide")
 
-st.markdown("## 💡 Investment Thesis & Upside Potential", unsafe_allow_html=True)
+# Title
+st.title("📊 Comprehensive Stock Dashboard")
 
-# Fetch ticker data
-stock = yf.Ticker(ticker)
-info = stock.info
+# Ticker input (assign once and standardize)
+ticker_input = st.text_input("Enter Stock Ticker", value="AAPL")
+if ticker_input:
+    ticker = ticker_input.upper()
+    stock = yf.Ticker(ticker)
+    info = stock.info
 
-# Get financial metrics safely
-def safe_metric(metric, default=np.nan):
-    return info.get(metric, default)
+    # Extract metrics for thesis and risk logic
+    net_margin = round(info.get("netMargins", 0) * 100, 1)
+    roe = round(info.get("returnOnEquity", 0) * 100, 1)
+    roic = round(info.get("returnOnAssets", 0) * 100, 1)
+    op_margin = round(info.get("operatingMargins", 0) * 100, 1)
+    de_ratio = round(info.get("debtToEquity", 0), 2)
+    current_ratio = round(info.get("currentRatio", 0), 2)
 
-# Metrics used for thesis and risks
-net_margin = safe_metric("netMargins", 0) * 100
-roe = safe_metric("returnOnEquity", 0) * 100
-roic = safe_metric("returnOnCapitalEmployed", 0) * 100 if "returnOnCapitalEmployed" in info else 23.8  # fallback
-de_ratio = safe_metric("debtToEquity", 0)
-current_ratio = safe_metric("currentRatio", 1)
-op_margin = safe_metric("operatingMargins", 0) * 100
+    # ---------------- Investment Thesis Block ----------------
+    st.markdown("## 💡 Investment Thesis & Upside Potential")
+    st.markdown(
+        """
+        <div style="background-color: #113d2d; padding: 25px; border-radius: 10px; color: white;">
+            <h4>Investment Thesis:</h4>
+            <ul>
+                <li><strong>Healthy Profitability</strong>: Net profit margins are <strong>{net_margin}%</strong>, signaling operational strength.</li>
+                <li><strong>High Return on Equity</strong>: ROE of <strong>{roe}%</strong> implies effective use of shareholder capital.</li>
+                <li><strong>Efficient Capital Use</strong>: ROIC at <strong>{roic}%</strong> reflects good return on invested assets.</li>
+                <li><strong>Strategic Moat</strong>: As a tech sector leader, {name} is positioned to benefit from long-term digital trends like AI, cloud, and automation.</li>
+            </ul>
+        </div>
+        """.format(net_margin=net_margin, roe=roe, roic=roic, name=info.get("longName", ticker)),
+        unsafe_allow_html=True
+    )
 
-# --------- INVESTMENT THESIS ---------
-thesis_html = f"""
-<div style='background-color: #143D2A; padding: 20px 25px; border-radius: 10px; color: #E8F5E9; font-size: 16px;'>
-    <b>Investment Thesis:</b>
-    <ul>
-        <li><b>Healthy Profitability:</b> Net profit margins are <b>{net_margin:.1f}%</b>, signaling operational strength.</li>
-        <li><b>High Return on Equity:</b> ROE of <b>{roe:.1f}%</b> implies effective use of shareholder capital.</li>
-        <li><b>Efficient Capital Use:</b> ROIC at <b>{roic:.1f}%</b> reflects good return on invested assets.</li>
-        <li><b>Strategic Moat:</b> As a tech sector leader, {info.get("longName", ticker)} is positioned to benefit from long-term digital trends like AI, cloud, and automation.</li>
-    </ul>
-</div>
-"""
-st.markdown(thesis_html, unsafe_allow_html=True)
+    # ---------------- Risks & Concerns Block ----------------
+    st.markdown("## ⚠️ Risks & Concerns")
+    st.markdown("Peer group used: AAPL, MSFT, GOOGL, AMZN")
 
-# --------- RISKS & CONCERNS ---------
-st.markdown("## ⚠️ Risks & Concerns", unsafe_allow_html=True)
-st.markdown(f"<span style='color: gray;'>Peer group used: {', '.join(peer_group)}</span>", unsafe_allow_html=True)
+    # Styled risk box function
+    def risk_box(title, detail):
+        return f"""
+        <div style='background-color:#3a1f24;padding:16px;border-radius:8px;margin-top:10px;color:#f5f5f5'>
+            <b>{title}</b> {detail}
+        </div>
+        """
 
-# Risk block helper
-def risk_box(title, detail):
-    return f"""
-    <div style='background-color: #3E1E1E; padding: 15px 20px; border-radius: 10px; color: #FADBD8; font-size: 15px; margin-top: 10px;'>
-        <b>{title}</b> {detail}
-    </div>
-    """
+    if de_ratio > 120:
+        st.markdown(risk_box("Leverage Risk:", f"Debt-to-Equity ratio is <b>{de_ratio}</b>, indicating potential over-leverage."), unsafe_allow_html=True)
 
-# Conditions
-if de_ratio > 120:
-    st.markdown(risk_box("Leverage Risk:", f"Debt-to-Equity ratio is <b>{de_ratio:.2f}</b>, indicating potential over-leverage."), unsafe_allow_html=True)
+    if current_ratio < 1:
+        st.markdown(risk_box("Liquidity Risk:", f"Current ratio is <b>{current_ratio}</b>, which may signal short-term liquidity challenges."), unsafe_allow_html=True)
 
-if current_ratio < 1:
-    st.markdown(risk_box("Liquidity Risk:", f"Current ratio is <b>{current_ratio:.2f}</b>, raising concerns about short-term solvency."), unsafe_allow_html=True)
+    if op_margin < 10:
+        st.markdown(risk_box("Margin Compression:", "Operating margin is below 10%, which may indicate pricing or cost pressure."), unsafe_allow_html=True)
 
-if op_margin < 10:
-    st.markdown(risk_box("Margin Compression:", "Operating margin is below 10%, which may pressure future earnings."), unsafe_allow_html=True)
+    if all([de_ratio <= 120, current_ratio >= 1, op_margin >= 10]):
+        st.markdown(risk_box("No Red Flags:", "All key financial ratios appear healthy relative to industry peers."), unsafe_allow_html=True)
 
-if all([de_ratio <= 120, current_ratio >= 1, op_margin >= 10]):
-    st.markdown(risk_box("No Red Flags:", "All key financial ratios appear healthy — continue monitoring quarterly performance."), unsafe_allow_html=True)
-
-   
 
 
 import yfinance as yf
