@@ -183,64 +183,118 @@ with st.expander("🌍 Geographic & Business Overview"):
         st.warning("Geographic and company summary data not available.")
 
 # === DYNAMIC KPI, INVESTMENT THESIS, RISKS BLOCK ===
-try:
-    info = yf.Ticker(ticker).info
+import streamlit as st
+import yfinance as yf
 
-    st.markdown("## 📊 Key Financial Metrics")
-    kpi_cols = st.columns(3)
-    kpi_cols[0].metric("Market Cap", f"${info.get('marketCap', 0):,}")
-    kpi_cols[1].metric("PE Ratio (TTM)", f"{info.get('trailingPE', 'N/A')}")
-    kpi_cols[2].metric("PEG Ratio", f"{info.get('pegRatio', 'N/A')}")
+st.subheader("📌 Key Performance Indicators (KPI)")
 
-    kpi_cols = st.columns(3)
-    kpi_cols[0].metric("Price to Book", f"{info.get('priceToBook', 'N/A')}")
-    kpi_cols[1].metric("Return on Equity", f"{info.get('returnOnEquity', 'N/A'):.2%}" if info.get("returnOnEquity") else "N/A")
-    kpi_cols[2].metric("Debt to Equity", f"{info.get('debtToEquity', 'N/A')}")
+# Ticker comes from your global input
+ticker_obj = yf.Ticker(ticker)
+info = ticker_obj.info
+
+# KPI Computation functions
+def get_revenue(info):
+    return info.get("totalRevenue")
+
+def get_net_profit_margin(info):
+    try:
+        return round(info.get("netIncome") / info.get("totalRevenue"), 4)
+    except:
+        return None
+
+def get_eps(info):
+    return info.get("trailingEps")
+
+def get_roe(info):
+    return info.get("returnOnEquity")
+
+def get_earnings_growth(info):
+    return info.get("earningsQuarterlyGrowth")
+
+# KPI Mapping
+kpi_functions = {
+    "Revenue (TTM)": get_revenue,
+    "Net Profit Margin": get_net_profit_margin,
+    "EPS (TTM)": get_eps,
+    "ROE": get_roe,
+    "Earnings Growth (YoY)": get_earnings_growth
+}
+
+# KPI Selection UI
+selected_kpis = st.multiselect(
+    "Select KPIs to display:",
+    options=list(kpi_functions.keys()),
+    default=["Revenue (TTM)", "Net Profit Margin", "EPS (TTM)"]
+)
+
+# KPI Display
+cols = st.columns(len(selected_kpis))
+for i, kpi in enumerate(selected_kpis):
+    value = kpi_functions[kpi](info)
+    if value is None:
+        display_value = "N/A"
+    elif "Margin" in kpi or "ROE" in kpi or "Growth" in kpi:
+        display_value = f"{value * 100:.2f}%"  # Convert to %
+    elif "EPS" in kpi:
+        display_value = f"${value:.2f}"
+    else:
+        display_value = f"${value/1e9:.2f}B" if value > 1e9 else f"${value/1e6:.2f}M"
+
+    cols[i].metric(label=kpi, value=display_value)
+
 
     # --- Investment Thesis ---
-    st.markdown("## 🧠 Investment Thesis & Upside Potential")
-    thesis_points = []
+    # ---- INVESTMENT POTENTIAL ----
+st.subheader("📈 Investment Thesis & Upside Potential")
 
-    if info.get("growthQuarterlyRevenueYoy") and info["growthQuarterlyRevenueYoy"] > 0.1:
-        thesis_points.append("• Strong revenue growth in recent quarters.")
-    if info.get("returnOnEquity", 0) > 0.15:
-        thesis_points.append("• High return on equity indicates efficient capital usage.")
-    if info.get("grossMargins", 0) > 0.5:
-        thesis_points.append("• Robust gross margins suggest solid product/service economics.")
-    if info.get("totalCash", 0) > info.get("totalDebt", 0):
-        thesis_points.append("• Healthy balance sheet with more cash than debt.")
-    if info.get("forwardPE", 0) < info.get("trailingPE", 999):
-        thesis_points.append("• Forward PE lower than trailing PE implies expected earnings growth.")
+bullet_points = []
 
-    if thesis_points:
-        for point in thesis_points:
-            st.markdown(point)
-    else:
-        st.markdown("*No strong upside signals identified based on current data.*")
+# Example logic (customize for your pipeline):
+if fin.get("grossMargins", 0) > 0.5:
+    bullet_points.append("Strong gross margins indicate pricing power or cost efficiency.")
+
+if fin.get("earningsQuarterlyGrowth", 0) > 0.15:
+    bullet_points.append("Earnings growing at a healthy pace, signaling operational efficiency.")
+
+if fin.get("returnOnEquity", 0) > 0.15:
+    bullet_points.append("High ROE reflects effective capital allocation.")
+
+if peer_medians is not None and fin.get("forwardPE", 0) < peer_medians["forwardPE"]:
+    bullet_points.append("Valuation is attractive relative to peers based on forward P/E.")
+
+if "artificial intelligence" in company_description.lower():
+    bullet_points.append("Exposure to rapidly growing AI sector.")
+
+if len(bullet_points) == 0:
+    bullet_points.append("No clear upside signals identified at this time.")
+
+for point in bullet_points:
+    st.markdown(f"- {point}")
+
 
     # --- Risks & Concerns ---
-    st.markdown("## ⚠️ Risks & Concerns")
-    risk_points = []
+    # ---- RISKS & CONCERNS ----
+st.subheader("⚠️ Risks & Concerns")
 
-    if info.get("operatingMargins", 0) < 0.1:
-        risk_points.append("• Low operating margins may signal profitability challenges.")
-    if info.get("debtToEquity", 0) > 1.0:
-        risk_points.append("• High debt-to-equity ratio suggests potential leverage risk.")
-    if info.get("revenueGrowth", 0) < 0.05:
-        risk_points.append("• Weak revenue growth could limit long-term upside.")
-    if info.get("profitMargins", 0) < 0.05:
-        risk_points.append("• Thin profit margins may be vulnerable to cost pressures.")
-    if not info.get("freeCashflow"):
-        risk_points.append("• Missing or negative free cash flow data.")
+risk_points = []
 
-    if risk_points:
-        for point in risk_points:
-            st.markdown(point)
-    else:
-        st.markdown("*No major risks identified based on current financials.*")
+if fin.get("totalDebt", 0) > fin.get("totalCash", 1) * 2:
+    risk_points.append("High debt relative to cash levels may increase solvency risks.")
 
-except Exception as e:
-    st.warning(f"Unable to generate KPI/Thesis/Risks: {e}")
+if fin.get("operatingMargins", 0) < 0.1:
+    risk_points.append("Low operating margins may pressure future earnings.")
+
+if fin.get("earningsQuarterlyGrowth", 0) < 0:
+    risk_points.append("Negative earnings growth could indicate performance deterioration.")
+
+if fin.get("sharesOutstanding", 0) > fin.get("sharesOutstanding", 1) * 1.05:
+    risk_points.append("Recent dilution may impact shareholder value.")
+
+if len(risk_points) == 0:
+    risk_points.append("No major red flags identified based on current financials.")
+
+for point in risk_points:
+    st.markdown(f"- {point}")
 
 
 
