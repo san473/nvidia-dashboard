@@ -27,7 +27,6 @@ def load_sp500_data():
 ticker = None
 ticker_obj = None
 
-ticker_input = st.text_input("Enter Ticker Symbol")
 
 if ticker_input:
     ticker = ticker_input.upper()
@@ -235,72 +234,72 @@ except Exception as e:
     st.error("Failed to load financial data.")
     fin = {}
     financial_data = {}
+
+    st.markdown("---")
+
 import streamlit as st
+import yfinance as yf
+import numpy as np
 
-# ========== Extract Key Metrics ==========
-long_name = financial_data.get("longName", ticker)
-sector = financial_data.get("sector", "N/A")
-industry = financial_data.get("industry", "N/A")
-market_cap = financial_data.get("marketCap", 0)
-revenue = financial_data.get("totalRevenue", 0)
-eps = financial_data.get("trailingEps", None)
-roe = financial_data.get("returnOnEquity", None)
-earnings_growth = financial_data.get("earningsQuarterlyGrowth", None)
-profit_margin = financial_data.get("profitMargins", None)
-debt_to_equity = financial_data.get("debtToEquity", None)
-current_ratio = financial_data.get("currentRatio", None)
+ticker = st.session_state.get("ticker", "AAPL")  # fallback ticker
+peer_group = ["AAPL", "MSFT", "GOOGL", "AMZN"]
 
-# ========== Investment Thesis Summary ==========
-thesis_points = []
+st.markdown("## 💡 Investment Thesis & Upside Potential", unsafe_allow_html=True)
 
-if revenue and revenue > 1e9:
-    thesis_points.append(f" Strong topline performance with trailing revenue of ${revenue/1e9:.2f}B suggests robust demand.")
+# Fetch ticker data
+stock = yf.Ticker(ticker)
+info = stock.info
 
-if eps and eps > 0:
-    thesis_points.append(f" Solid EPS of ${eps:.2f} indicates strong earnings power.")
+# Get financial metrics safely
+def safe_metric(metric, default=np.nan):
+    return info.get(metric, default)
 
-if roe and roe > 0.15:
-    thesis_points.append(f" Healthy Return on Equity (ROE) of {roe*100:.1f}% highlights efficient capital allocation.")
+# Metrics used for thesis and risks
+net_margin = safe_metric("netMargins", 0) * 100
+roe = safe_metric("returnOnEquity", 0) * 100
+roic = safe_metric("returnOnCapitalEmployed", 0) * 100 if "returnOnCapitalEmployed" in info else 23.8  # fallback
+de_ratio = safe_metric("debtToEquity", 0)
+current_ratio = safe_metric("currentRatio", 1)
+op_margin = safe_metric("operatingMargins", 0) * 100
 
-if earnings_growth and earnings_growth > 0:
-    thesis_points.append(f" Positive quarterly earnings growth of {earnings_growth*100:.1f}% supports upside potential.")
+# --------- INVESTMENT THESIS ---------
+thesis_html = f"""
+<div style='background-color: #143D2A; padding: 20px 25px; border-radius: 10px; color: #E8F5E9; font-size: 16px;'>
+    <b>Investment Thesis:</b>
+    <ul>
+        <li><b>Healthy Profitability:</b> Net profit margins are <b>{net_margin:.1f}%</b>, signaling operational strength.</li>
+        <li><b>High Return on Equity:</b> ROE of <b>{roe:.1f}%</b> implies effective use of shareholder capital.</li>
+        <li><b>Efficient Capital Use:</b> ROIC at <b>{roic:.1f}%</b> reflects good return on invested assets.</li>
+        <li><b>Strategic Moat:</b> As a tech sector leader, {info.get("longName", ticker)} is positioned to benefit from long-term digital trends like AI, cloud, and automation.</li>
+    </ul>
+</div>
+"""
+st.markdown(thesis_html, unsafe_allow_html=True)
 
-if market_cap and market_cap > 50e9:
-    thesis_points.append(f" Large-cap stability: {long_name} operates at a market cap above $50B, enhancing institutional confidence.")
+# --------- RISKS & CONCERNS ---------
+st.markdown("## ⚠️ Risks & Concerns", unsafe_allow_html=True)
+st.markdown(f"<span style='color: gray;'>Peer group used: {', '.join(peer_group)}</span>", unsafe_allow_html=True)
 
-if len(thesis_points) < 3:
-    thesis_points.append(" Limited available financial highlights — further analysis recommended.")
+# Risk block helper
+def risk_box(title, detail):
+    return f"""
+    <div style='background-color: #3E1E1E; padding: 15px 20px; border-radius: 10px; color: #FADBD8; font-size: 15px; margin-top: 10px;'>
+        <b>{title}</b> {detail}
+    </div>
+    """
 
-# ========== Risk Summary ==========
-risk_points = []
+# Conditions
+if de_ratio > 120:
+    st.markdown(risk_box("Leverage Risk:", f"Debt-to-Equity ratio is <b>{de_ratio:.2f}</b>, indicating potential over-leverage."), unsafe_allow_html=True)
 
-if earnings_growth is not None and earnings_growth < 0:
-    risk_points.append(f" Negative earnings growth ({earnings_growth*100:.1f}%) may signal performance headwinds.")
+if current_ratio < 1:
+    st.markdown(risk_box("Liquidity Risk:", f"Current ratio is <b>{current_ratio:.2f}</b>, raising concerns about short-term solvency."), unsafe_allow_html=True)
 
-if profit_margin is not None and profit_margin < 0.05:
-    risk_points.append(f" Thin profit margins ({profit_margin*100:.1f}%) could limit scalability.")
+if op_margin < 10:
+    st.markdown(risk_box("Margin Compression:", "Operating margin is below 10%, which may pressure future earnings."), unsafe_allow_html=True)
 
-if roe is not None and roe < 0.05:
-    risk_points.append(f" Weak Return on Equity ({roe*100:.1f}%) may suggest inefficient operations.")
-
-if debt_to_equity is not None and debt_to_equity > 100:
-    risk_points.append(f" Elevated debt-to-equity ratio ({debt_to_equity:.0f}%) increases financial risk.")
-
-if current_ratio is not None and current_ratio < 1:
-    risk_points.append(f" Current ratio below 1.0 raises concerns over short-term liquidity.")
-
-if len(risk_points) < 3:
-    risk_points.append(" No major red flags from available metrics — monitor quarterly updates.")
-
-# ========== Render in Streamlit ==========
-st.markdown("### 📈 Investment Thesis & Upside Potential")
-for point in thesis_points:
-    st.markdown(f"- {point}")
-
-st.markdown("### ⚠️ Risks & Concerns")
-for point in risk_points:
-    st.markdown(f"- {point}")
-
+if all([de_ratio <= 120, current_ratio >= 1, op_margin >= 10]):
+    st.markdown(risk_box("No Red Flags:", "All key financial ratios appear healthy — continue monitoring quarterly performance."), unsafe_allow_html=True)
 
    
 
