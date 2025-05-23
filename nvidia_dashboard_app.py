@@ -182,18 +182,50 @@ with st.expander("🌍 Geographic & Business Overview"):
     except Exception as e:
         st.warning("Geographic and company summary data not available.")
 
-# --- Debug Block ---
-st.subheader("🔍 Debug: Available Financial Rows")
+import yfinance as yf
+import pandas as pd
+
+# ---------------------- Debug: Cash Flow Data Rows ----------------------
+st.markdown("### 🔍 Debug: Available Financial Rows")
 st.markdown("**Cash Flow Statement Rows:**")
 
-if ticker_obj is not None:
-    try:
-        cf_df = ticker_obj.cashflow
-        st.write(cf_df.index.tolist())  # Show cash flow row names
-    except Exception as e:
-        st.error(f"Debug failed: {e}")
+if not ticker:
+    st.warning("⚠️ Debug failed: No ticker entered.")
 else:
-    st.warning("⚠️ Debug failed: No valid ticker or cash flow data found.")
+    try:
+        yf_ticker = yf.Ticker(ticker)
+        cashflow = yf_ticker.cashflow
+
+        if cashflow.empty:
+            st.warning("⚠️ Debug failed: No cash flow data found for this ticker.")
+        else:
+            # Normalize index names (row labels)
+            cashflow.index = cashflow.index.str.lower()
+            detected_rows = list(cashflow.index)
+            st.success("✅ Cash flow data retrieved.")
+            st.write("Available rows:", detected_rows)
+
+            # Keywords to detect FCF-related rows
+            fcf_keywords = [
+                "free cash flow", 
+                "operating cash flow",
+                "total cash from operating activities",
+                "capital expenditures",
+                "cash from operations",
+                "net cash provided by operating activities"
+            ]
+
+            matched_rows = [row for row in detected_rows if any(key in row for key in fcf_keywords)]
+
+            if matched_rows:
+                st.success(f"✅ Detected FCF-related rows: {matched_rows}")
+            else:
+                st.warning("⚠️ Cash flow retrieved, but no Free Cash Flow rows matched expected patterns.")
+    
+    except Exception as e:
+        st.error(f"❌ Debug failed: {e}")
+
+
 
 # ------------------- DCF VALUATION -------------------
 import yfinance as yf
