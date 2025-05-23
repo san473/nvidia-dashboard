@@ -20,19 +20,23 @@ st.cache_data.clear()
 # REMOVE cache temporarily to force reload
 # @st.cache_data
 
+# Ticker input and validation
 ticker = None
 ticker_obj = None
-
 
 ticker_input = st.text_input("Enter Ticker Symbol")
 
 if ticker_input:
     ticker = ticker_input.upper()
-    ticker_obj = yf.Ticker(ticker)
-def load_sp500_data():
-    df = pd.read_excel("sp500_companies.xlsx")
-    df.columns = df.columns.str.strip().str.lower()  # Normalize for reliable access
-    return df
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        # Try fetching cash flow to validate data availability
+        if ticker_obj.cashflow is None or ticker_obj.cashflow.empty:
+            st.warning("⚠️ Cash flow data not available for this ticker.")
+            ticker_obj = None
+    except Exception as e:
+        st.error(f"❌ Failed to load ticker data: {e}")
+        ticker_obj = None
 COLUMN_DISPLAY_NAMES = {
     "symbol": "Symbol",
     "exchange": "Exchange",
@@ -175,24 +179,18 @@ with st.expander("🌍 Geographic & Business Overview"):
     except Exception as e:
         st.warning("Geographic and company summary data not available.")
 
+# --- Debug Block ---
 st.subheader("🔍 Debug: Available Financial Rows")
+st.markdown("**Cash Flow Statement Rows:**")
 
-
-try:
-    st.write("**Cash Flow Statement Rows:**")
-    st.write(ticker_obj.cashflow)
-
-    st.write("**Cash Flow Row Index:**")
-    st.write(list(ticker_obj.cashflow.index))
-
-    st.write("**Income Statement Rows:**")
-    st.write(list(ticker_obj.financials.index))
-
-    st.write("**Balance Sheet Rows:**")
-    st.write(list(ticker_obj.balance_sheet.index))
-except Exception as e:
-    st.error(f"Debug failed: {e}")
-
+if ticker_obj is not None:
+    try:
+        cf_df = ticker_obj.cashflow
+        st.write(cf_df.index.tolist())  # Show cash flow row names
+    except Exception as e:
+        st.error(f"Debug failed: {e}")
+else:
+    st.warning("⚠️ Debug failed: No valid ticker or cash flow data found.")
 
 # ------------------- DCF VALUATION -------------------
 import yfinance as yf
