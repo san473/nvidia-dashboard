@@ -164,91 +164,101 @@ with st.expander("🌍 Geographic & Business Overview"):
     except Exception as e:
         st.warning("Geographic and company summary data not available.")
 
-# ------------------- DCF VALUATION -------------------
-import yfinance as yf
-import streamlit as st
-import numpy as np
-
-st.subheader("📊 Discounted Cash Flow (DCF) Valuation")
+st.subheader("🔍 Debug: Available Financial Rows")
 
 try:
-    ticker_obj = yf.Ticker(ticker)
+    st.write("**Cash Flow Statement Rows:**")
+    st.write(ticker_obj.cashflow)
 
-    cashflow = ticker_obj.cashflow
-    income_stmt = ticker_obj.financials
-    balance_sheet = ticker_obj.balance_sheet
-    info = ticker_obj.info
+    st.write("**Cash Flow Row Index:**")
+    st.write(list(ticker_obj.cashflow.index))
 
-    # Convert all to lowercase column index for consistency
-    cashflow.columns = cashflow.columns.astype(str)
-    income_stmt.columns = income_stmt.columns.astype(str)
-    balance_sheet.columns = balance_sheet.columns.astype(str)
+    st.write("**Income Statement Rows:**")
+    st.write(list(ticker_obj.financials.index))
 
-    # Attempt to get Free Cash Flow (preferred method)
-    if "Total Cash From Operating Activities" in cashflow.index and "Capital Expenditures" in cashflow.index:
-        fcf_series = (
-            cashflow.loc["Total Cash From Operating Activities"] -
-            cashflow.loc["Capital Expenditures"]
-        )
-    # Fallback if direct FCF unavailable — use Net Income + Depreciation - Change in Working Capital - CapEx
-    elif (
-        "Net Income" in income_stmt.index and
-        "Depreciation" in cashflow.index and
-        "Change In Working Capital" in cashflow.index and
-        "Capital Expenditures" in cashflow.index
-    ):
-        net_income = income_stmt.loc["Net Income"]
-        depreciation = cashflow.loc["Depreciation"]
-        working_capital_changes = cashflow.loc["Change In Working Capital"]
-        capex = cashflow.loc["Capital Expenditures"]
-        fcf_series = net_income + depreciation - working_capital_changes - capex
-    else:
+    st.write("**Balance Sheet Rows:**")
+    st.write(list(ticker_obj.balance_sheet.index))
+except Exception as e:
+    st.error(f"Debug failed: {e}")
+
+
+# ------------------- DCF VALUATION -------------------
+st.markdown("### 📊 Discounted Cash Flow (DCF) Valuation")
+
+try:
+    cf = ticker_obj.cashflow
+
+    if cf.empty:
+        st.warning("DCF valuation failed: Cash flow statement is empty.")
+        st.stop()
+
+    # Normalize row labels for robust matching
+    cf.index = [str(i).lower().strip() for i in cf.index]
+
+    # Possible row names for operating cash flow and capex
+    ocf_candidates = [
+        'total cash from operating activities',
+        'net cash provided by operating activities',
+        'net cash from operating activities',
+        'cash from operations'
+    ]
+    capex_candidates = [
+        'capital expenditures',
+        'purchase of property and equipment'
+    ]
+
+    # Attempt to match row names
+    ocf_row = next((row for row in ocf_candidates if row in cf.index), None)
+    capex_row = next((row for row in capex_candidates if row in cf.index), None)
+
+    if not ocf_row or not capex_row:
         st.warning("DCF valuation failed: Required cash flow rows not found.")
         st.stop()
 
-    # Take the most recent 3–5 years of FCF
-    fcf_series = fcf_series.dropna().sort_index(ascending=True)
-    if fcf_series.empty or len(fcf_series) < 2:
-        st.warning("DCF valuation data not sufficient.")
+    # Get values
+    operating_cf = cf.loc[ocf_row]
+    capex = cf.loc[capex_row]
+    fcf = operating_cf + capex  # CapEx is usually negative
+
+    st.write("**Free Cash Flow (FCF) Used in DCF:**")
+    st.write(fcf)
+
+    # -- Example assumptions (adjust these as needed) --
+    forecast_years = 5
+    growth_rate = 0.08
+    discount_rate = 0.10
+    terminal_growth = 0.02
+
+    latest_fcf = fcf.iloc[0]  # Most recent year
+    projections = [(latest_fcf * ((1 + growth_rate) ** i)) for i in range(1, forecast_years + 1)]
+    discounted_projections = [proj / ((1 + discount_rate) ** i) for i, proj in enumerate(projections, 1)]
+
+    terminal_value = (projections[-1] * (1 + terminal_growth)) / (discount_rate - terminal_growth)
+    discounted_terminal_value = terminal_value / ((1 + discount_rate) ** forecast_years)
+
+    intrinsic_value = sum(discounted_projections) + discounted_terminal_value
+
+    # Share count
+    shares_outstanding = ticker_obj.info.get('sharesOutstanding', None)
+    if not shares_outstanding or shares_outstanding == 0:
+        st.warning("DCF valuation failed: Missing share count.")
         st.stop()
 
-    last_fcf = fcf_series[-1]
-    fcf_values = fcf_series.values
-    fcf_growth = np.mean(np.diff(fcf_values) / fcf_values[:-1])
+    intrinsic_per_share = intrinsic_value / shares_outstanding
 
-    # User-defined assumptions
-    forecast_years = st.slider("Years of Projection", 3, 10, 5)
-    discount_rate = st.slider("Discount Rate (%)", 5.0, 15.0, 10.0) / 100
-    growth_rate = st.slider("FCF Growth Rate (%)", 0.0, 20.0, round(fcf_growth * 100, 2)) / 100
-
-    projected_fcfs = [last_fcf * (1 + growth_rate) ** i for i in range(1, forecast_years + 1)]
-    discounted_fcfs = [fcf / (1 + discount_rate) ** i for i, fcf in enumerate(projected_fcfs, 1)]
-
-    terminal_value = projected_fcfs[-1] * (1 + growth_rate) / (discount_rate - growth_rate)
-    discounted_terminal = terminal_value / (1 + discount_rate) ** forecast_years
-
-    total_value = sum(discounted_fcfs) + discounted_terminal
-
-    shares_outstanding = info.get("sharesOutstanding", None)
-    if shares_outstanding:
-        intrinsic_value_per_share = total_value / shares_outstanding
-        current_price = info.get("currentPrice", np.nan)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Intrinsic Value/Share", f"${intrinsic_value_per_share:,.2f}")
-        with col2:
-            st.metric("Current Price", f"${current_price:,.2f}")
-
-        upside = ((intrinsic_value_per_share - current_price) / current_price) * 100
-        st.markdown(f"**Estimated Upside:** {upside:.2f}%")
+    current_price = ticker_obj.info.get('currentPrice', None)
+    st.subheader("💰 Intrinsic Value Estimate")
+    st.write(f"**Intrinsic Value per Share:** ${intrinsic_per_share:,.2f}")
+    if current_price:
+        st.write(f"**Current Price:** ${current_price:,.2f}")
+        delta = intrinsic_per_share - current_price
+        pct = (delta / current_price) * 100
+        st.write(f"**Upside/Downside:** {pct:+.2f}%")
     else:
-        st.warning("Unable to calculate intrinsic value per share due to missing share count.")
+        st.info("Current price not available.")
 
 except Exception as e:
     st.error(f"DCF valuation failed: {e}")
-
-
 
 
 
