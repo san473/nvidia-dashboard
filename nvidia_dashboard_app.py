@@ -902,33 +902,34 @@ st.write("Income statement columns:", income_stmt.columns.tolist())
 
 latest_period = income_stmt.columns[0]
 
-
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
 st.subheader("Earnings Breakdown Waterfall")
 
 try:
+    # Get the latest available quarter
     latest_col = income_stmt.columns[0]
 
-    # Safe row lookup by matching keywords (case-agnostic)
-    def get_row_label(df, candidates):
-        for idx in df.index:
-            if any(k.lower().replace(" ", "") in str(idx).lower().replace(" ", "") for k in candidates):
-                return idx
+    # Normalize index to strings for matching
+    income_stmt.index = income_stmt.index.map(str)
+
+    def find_row(df, keywords):
+        for keyword in keywords:
+            for idx in df.index:
+                if keyword.lower().replace(" ", "") in idx.lower().replace(" ", ""):
+                    return idx
         return None
 
     def get_amount(keywords):
-        label = get_row_label(income_stmt, keywords)
-        if label is not None:
-            try:
-                val = income_stmt.loc[label, latest_col]
-                return float(val) if pd.notna(val) else 0.0
-            except:
-                return 0.0
+        row_label = find_row(income_stmt, keywords)
+        if row_label:
+            val = income_stmt.loc[row_label, latest_col]
+            return float(val) if pd.notna(val) else 0.0
         return 0.0
 
-    data_items = {
+    # Define line items and their keywords
+    items = {
         "Revenue": ["total revenue", "revenue"],
         "Cost of Revenue": ["cost of revenue"],
         "Gross Profit": ["gross profit"],
@@ -938,46 +939,46 @@ try:
         "Net Income": ["net income"]
     }
 
-    values = {label: get_amount(keywords) for label, keywords in data_items.items()}
+    # Get actual values
+    amounts = {k: get_amount(v) for k, v in items.items()}
 
-    # Left box (table)
-    left_table = go.Table(
-        header=dict(values=["<b>Line Item</b>", "<b>Amount (USD)</b>"], fill_color='lightgrey'),
-        cells=dict(values=[
-            list(values.keys()),
-            [f"${v:,.0f}" if v != 0 else "–" for v in values.values()]
-        ])
-    )
+    # Left side box: item + value
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown("#### Key Financials")
+        for label, value in amounts.items():
+            display_value = f"${value:,.0f}" if value != 0 else "–"
+            st.markdown(f"**{label}**: {display_value}")
 
-    # Right chart (waterfall)
-    measures = ["relative"] * len(values)
-    measures[0] = "absolute"  # Revenue is baseline
-    measures[-1] = "total"    # Net income as total
+    # Right side: Waterfall Chart
+    measures = ["relative"] * len(amounts)
+    measures[0] = "absolute"  # Revenue base
+    measures[-1] = "total"    # Net Income is total
 
-    waterfall = go.Waterfall(
-        name="Earnings",
+    waterfall = go.Figure(go.Waterfall(
         orientation="v",
-        x=list(values.keys()),
-        y=list(values.values()),
+        x=list(amounts.keys()),
+        y=list(amounts.values()),
         measure=measures,
+        text=[f"${v:,.0f}" if v != 0 else "–" for v in amounts.values()],
         textposition="outside",
         connector={"line": {"color": "gray"}},
+    ))
+
+    waterfall.update_layout(
+        title="Earnings Waterfall Chart (Latest Quarter)",
+        height=500,
+        margin=dict(l=40, r=40, t=40, b=40),
+        xaxis=dict(tickangle=-45),
+        showlegend=False
     )
 
-    fig = make_subplots(
-        rows=1, cols=2,
-        column_widths=[0.4, 0.6],
-        specs=[[{"type": "table"}, {"type": "xy"}]]
-    )
-
-    fig.add_trace(left_table, row=1, col=1)
-    fig.add_trace(waterfall, row=1, col=2)
-
-    fig.update_layout(title="Earnings Waterfall (Most Recent Quarter)", height=600)
-    st.plotly_chart(fig, use_container_width=True, key="earnings_waterfall_chart")
+    with col2:
+        st.plotly_chart(waterfall, use_container_width=True)
 
 except Exception as e:
     st.warning(f"⚠️ Earnings Waterfall Chart failed: {e}")
+
 
 
 
