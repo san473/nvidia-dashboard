@@ -759,7 +759,8 @@ except Exception as e:
 
 
 
-st.write("Cashflow index labels:", list(cashflow.columns.str.lower()))
+st.write("Cashflow index labels:", [str(col).lower() for col in cashflow.columns])
+
 
 
 def find_capex_row(cashflow_df):
