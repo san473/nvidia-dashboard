@@ -30,7 +30,7 @@ def load_sp500_data():
 ticker = None
 ticker_obj = None
 
-
+ticker_input = st.text_input("Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL").upper()
 
 if ticker_input:
     ticker = ticker_input.upper()
@@ -102,10 +102,10 @@ def fetch_news(ticker):
 st.title("📊 Comprehensive Stock Dashboard")
 
 ticker_input = st.text_input("Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL").upper()
+ticker = ticker_input
 if ticker:
     news_block(ticker)
 
-ticker = ticker_input
 @st.cache_data
 def get_data(ticker):
     stock = yf.Ticker(ticker)
@@ -256,8 +256,6 @@ debt_to_equity = financial_data.get("debtToEquity", None)
 current_ratio = financial_data.get("currentRatio", None)
 
 
-import yfinance as yf
-import pandas as pd
 
 # Load Lighthouse Canton commentary
 @st.cache_data
