@@ -1116,6 +1116,76 @@ try:
 except Exception as e:
     st.error(f"Failed to load revenue trend: {e}")
 
+shareholder_yield_block(ticker)
+import yfinance as yf
+import streamlit as st
+import pandas as pd
+
+def get_yield_data(ticker):
+    ticker_obj = yf.Ticker(ticker)
+    info = ticker_obj.info
+    market_cap = info.get("marketCap")
+    if not market_cap:
+        return None, None
+
+    # Get historical cash flow and balance sheet
+    cf = ticker_obj.quarterly_cashflow
+    bs = ticker_obj.quarterly_balance_sheet
+
+    # Transpose for date handling
+    cf = cf.T
+    bs = bs.T
+
+    # Calculate yields
+    df = pd.DataFrame(index=cf.index)
+
+    # Dividend Yield = Dividends Paid / Market Cap
+    if "Dividends Paid" in cf.columns:
+        df["Dividend Yield (%)"] = -cf["Dividends Paid"] / market_cap * 100  # Negated (cash outflow)
+
+    # Buyback Yield = Repurchase of Stock / Market Cap
+    if "Repurchase of Stock" in cf.columns:
+        df["Buyback Yield (%)"] = -cf["Repurchase of Stock"] / market_cap * 100
+
+    # Debt Paydown Yield = Reduction in Long-Term Debt / Market Cap
+    if "Long Term Debt" in bs.columns:
+        debt_change = bs["Long Term Debt"].diff(periods=-1)  # next - current
+        df["Debt Paydown Yield (%)"] = debt_change / market_cap * 100
+
+    df = df.sort_index()  # Ensure chronological order
+    return df, df.iloc[-1]  # full history, and most recent yields
+
+
+def shareholder_yield_block(ticker):
+    st.markdown("### 📊 Shareholder Yield")
+
+    data, latest = get_yield_data(ticker)
+    if data is None or latest is None:
+        st.warning("Shareholder yield data unavailable.")
+        return
+
+    # Summary line
+    st.markdown(
+        f"**Dividend Yield:** {latest.get('Dividend Yield (%)', 0):.2f}% &nbsp;&nbsp;|&nbsp;&nbsp; "
+        f"**Buyback Yield:** {latest.get('Buyback Yield (%)', 0):.2f}% &nbsp;&nbsp;|&nbsp;&nbsp; "
+        f"**Debt Paydown Yield:** {latest.get('Debt Paydown Yield (%)', 0):.2f}%"
+    )
+
+    # 3 charts in one row
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("**Dividend Yield (%)**")
+        st.line_chart(data["Dividend Yield (%)"])
+
+    with col2:
+        st.markdown("**Buyback Yield (%)**")
+        st.line_chart(data["Buyback Yield (%)"])
+
+    with col3:
+        st.markdown("**Debt Paydown Yield (%)**")
+        st.line_chart(data["Debt Paydown Yield (%)"])
+
 
 # -------------------- FINANCIAL METRICS & KEY RATIOS --------------------
 st.header("📉 Financial Metrics & Key Ratios")
