@@ -571,21 +571,28 @@ try:
 except Exception as e:
     st.error(f"Error finding peers: {e}")
 
-# -------------------- Real-Time News Feed --------------------
-# -------- CONFIG --------
-NEWS_API_KEY = st.secrets["NEWSAPI_KEY"]
+import streamlit as st
+import requests
+from datetime import datetime, timedelta
+import yfinance as yf
+
+# --- NewsAPI key ---
+NEWSAPI_KEY = st.secrets.get("NEWSAPI_KEY")
+if not NEWSAPI_KEY:
+    st.warning("Missing NewsAPI key. Using cached/stubbed response.")
 
 NEWS_API_URL = "https://newsapi.org/v2/everything"
 
-# -------- COMPANY NAME --------
+# --- Get Company Name from Ticker (cached 1 hour) ---
 @st.cache_data(ttl=3600)
 def get_company_name_from_ticker(ticker):
     try:
-        return yf.Ticker(ticker).info.get("longName", ticker)
+        info = yf.Ticker(ticker).info
+        return info.get("longName", ticker)
     except Exception:
         return ticker
 
-# -------- FETCH NEWS --------
+# --- Fetch latest 10 news articles for the company, cached 60s ---
 @st.cache_data(ttl=60)
 def get_news_articles(company_name):
     today = datetime.today()
@@ -595,32 +602,47 @@ def get_news_articles(company_name):
         "from": last_week.strftime("%Y-%m-%d"),
         "sortBy": "relevancy",
         "language": "en",
-        "apiKey": NEWS_API_KEY,
-        "pageSize": 20,
+        "apiKey": NEWSAPI_KEY,
+        "pageSize": 10,  # limit articles to 10 for memory/performance
     }
-    response = requests.get(NEWS_API_URL, params=params)
-    if response.status_code == 200:
-        return response.json().get("articles", [])
-    return []
+    try:
+        response = requests.get(NEWS_API_URL, params=params)
+        if response.status_code == 200:
+            return response.json().get("articles", [])
+        else:
+            st.error(f"News API error: {response.status_code}")
+            return []
+    except Exception as e:
+        st.error(f"Failed to fetch news: {e}")
+        return []
 
-# -------- CATEGORIZE NEWS --------
+# --- Categorize articles into positive, negative, emerging ---
 def categorize_articles(articles):
     positive, negative, emerging = [], [], []
     for article in articles:
-        title = article["title"].lower()
-        description = article.get("description", "").lower()
-
-        text = f"{title} {description}"
+        text = (article.get("title", "") + " " + article.get("description", "")).lower()
         if any(word in text for word in ["beats", "growth", "record", "surge", "upgrade", "strong", "gain", "boost"]):
             positive.append(article)
         elif any(word in text for word in ["misses", "decline", "drop", "downgrade", "loss", "concern", "crisis", "lawsuit"]):
             negative.append(article)
         else:
             emerging.append(article)
-
     return positive, negative, emerging
 
-# -------- MAIN BLOCK --------
+# --- Generate summary text (2-3 lines) for each category ---
+def generate_summary(articles):
+    if not articles:
+        return "No significant news in this category."
+    # Just combine first few headlines/descriptions for summary
+    lines = []
+    for art in articles[:3]:
+        title = art.get("title", "")
+        desc = art.get("description", "")
+        snippet = title if len(title) > 20 else title + " - " + desc
+        lines.append(snippet)
+    return " ".join(lines[:3])  # keep max 3 sentences combined
+
+# --- Main News Block ---
 def news_block(ticker):
     company_name = get_company_name_from_ticker(ticker)
 
@@ -629,35 +651,19 @@ def news_block(ticker):
     articles = get_news_articles(company_name)
 
     if not articles:
-        st.markdown(f"**Summary of Key Headlines**")
         st.warning(f"No recent news found for **{company_name}**.")
         return
 
-    st.markdown("### 🧠 Summary of Key Headlines")
+    positive, negative, emerging = categorize_articles(articles)
 
-    # Categorize articles
-    pos, neg, emerging = categorize_articles(articles)
+    st.markdown("#### 📈 Positive Developments")
+    st.write(generate_summary(positive))
 
-    def render_section(title, icon, items):
-        st.markdown(f"#### {icon} {title}")
-        if not items:
-            st.info(f"No {title.lower()} found.")
-        else:
-            for article in items[:3]:
-                st.markdown(f"- **{article['title']}** ({article['source']['name']})")
+    st.markdown("#### ⚠️ Risks & Negative Sentiment")
+    st.write(generate_summary(negative))
 
-    render_section("Positive Developments", "📈", pos)
-    render_section("Risks & Negative Sentiment", "⚠️", neg)
-    render_section("Emerging Themes", "🧩", emerging)
-
-    # Full headline list
-    st.markdown("### 📰 Full Headlines")
-    if not articles:
-        st.warning("No news articles found.")
-    else:
-        for article in articles:
-            st.markdown(f"**[{article['title']}]({article['url']})**  \n*{article['source']['name']} | {article['publishedAt'][:10]}*  \n{article.get('description', '')}")
-            st.markdown("---")
+    st.markdown("#### 🧩 Emerging Themes")
+    st.write(generate_summary(emerging))
 
 
 # ---------------------- INTERACTIVE VISUALIZATIONS ----------------------
