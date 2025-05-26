@@ -895,36 +895,45 @@ try:
 except Exception as e:
     st.warning(f"⚠️ FCF block failed: {e}")
 
-import altair as alt
+
+
+
 import pandas as pd
+import altair as alt
 
-# Prepare data for chart: Align OCF and FCF by year
-cf_data = pd.DataFrame({
-    "Year": fcf.index.astype(str),
-    "Operating Cash Flow": op_cf.reindex(fcf.index).values / 1e9,  # in billions
-    "Free Cash Flow": fcf.values / 1e9
-}).reset_index(drop=True)
+# Example: op_cf and fcf are Series indexed by year as string or int
+# Ensure indices are strings for consistency
+op_cf.index = op_cf.index.astype(str)
+fcf.index = fcf.index.astype(str)
 
-# Melt dataframe to long format for Altair
-cf_long = cf_data.melt(id_vars=["Year"], value_vars=["Operating Cash Flow", "Free Cash Flow"],
-                       var_name="Cash Flow Type", value_name="Amount (Billion USD)")
+# Create combined DataFrame with outer join on years (to include all years present)
+df = pd.DataFrame({
+    "Operating Cash Flow": op_cf,
+    "Free Cash Flow": fcf
+}).reset_index().rename(columns={"index": "Year"})
 
-# Create bar chart
-cf_chart = alt.Chart(cf_long).mark_bar().encode(
+# Convert Year to string (or keep as is, just consistent)
+df["Year"] = df["Year"].astype(str)
+
+# Fill missing values with 0 (to plot bars for missing years as zero)
+df.fillna(0, inplace=True)
+
+# Melt DataFrame to long format for Altair
+df_long = df.melt(id_vars=["Year"], var_name="Type", value_name="Amount")
+
+# Build the bar chart
+chart = alt.Chart(df_long).mark_bar().encode(
     x=alt.X('Year:O', title='Year'),
-    y=alt.Y('Amount (Billion USD):Q', title='Amount (Billion USD)'),
-    color=alt.Color('Cash Flow Type:N', scale=alt.Scale(range=['#1f77b4', '#ff7f0e'])),
-    column=alt.Column('Cash Flow Type:N', header=alt.Header(labelAngle=0))
+    y=alt.Y('Amount:Q', title='Amount'),
+    color=alt.Color('Type:N', legend=alt.Legend(title="Cash Flow Type")),
+    tooltip=['Year', 'Type', 'Amount']
 ).properties(
-    width=150,
-    height=350,
-    title="Operating Cash Flow and Free Cash Flow Over Time"
-).configure_title(
-    fontSize=16,
-    anchor='start'
+    title="Operating Cash Flow vs Free Cash Flow"
 )
 
-st.altair_chart(cf_chart, use_container_width=True)
+# Show chart only, no tables
+st.altair_chart(chart, use_container_width=True)
+
 
 
 st.write("Income statement rows:", income_stmt.index.tolist())
