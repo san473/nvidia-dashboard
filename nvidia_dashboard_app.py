@@ -14,14 +14,13 @@ import nltk
 nltk.download('vader_lexicon')
 
 
-import pandas as pd
-
-
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 st.cache_data.clear()
 
 # REMOVE cache temporarily to force reload
 # @st.cache_data
+
+
 def load_sp500_data():
     df = pd.read_excel("sp500_companies.xlsx")
     return df
@@ -43,30 +42,19 @@ COLUMN_DISPLAY_NAMES = {
     "weight": "Weight",
 }
 
+
 def display_dataframe_pretty(df, columns):
     return df[columns].rename(columns={col: COLUMN_DISPLAY_NAMES.get(col, col) for col in columns})
+
+
 sp500_df = load_sp500_data()
-
-
-
-
-
-
 
 
 sp500_df = load_sp500_data()
 sp500_df.columns = sp500_df.columns.str.strip().str.lower()
 
 
-
-
-
 NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
-
-
-
-
-
 
 
 def fetch_news(ticker):
@@ -80,63 +68,94 @@ def fetch_news(ticker):
         return []
 
 
-
-
 # ------------------------ HEADER ------------------------
 st.title("📊 Comprehensive Stock Dashboard")
 
 ticker = None
 ticker_obj = None
 
-ticker_input = st.text_input("Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL").upper()
+# Input field for ticker
+ticker_input = st.text_input(
+    "Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL"
+).upper()
 if ticker_input:
     ticker = ticker_input
 
-
+# Attempt to fetch ticker data
 try:
-        ticker_obj = yf.Ticker(ticker)
-        # Try fetching cash flow to validate data availability
-        if ticker_obj.cashflow is None or ticker_obj.cashflow.empty:
-            st.warning("⚠️ Cash flow data not available for this ticker.")
-            ticker_obj = None
-except Exception as e:
-        st.error(f"❌ Failed to load ticker data: {e}")
+    ticker_obj = yf.Ticker(ticker)
+    # Validate cash flow data
+    if ticker_obj.cashflow is None or ticker_obj.cashflow.empty:
+        st.warning("⚠️ Cash flow data not available for this ticker.")
         ticker_obj = None
+except Exception as e:
+    st.error(f"❌ Failed to load ticker data: {e}")
+    ticker_obj = None
 
-        if ticker:
-           news_block(ticker)
-        @st.cache_data
-    def get_data(ticker):
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        hist = stock.history(period="1y")
+# News block function
+def news_block(ticker):
+    st.subheader("📰 Recent News")
+
+    query = f"{ticker} stock"
+    url = (
+        f"https://newsapi.org/v2/everything?"
+        f"q={query}&sortBy=publishedAt&language=en&pageSize=5&apiKey={NEWSAPI_KEY}"
+    )
+
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        articles = response.json().get("articles", [])
+
+        if not articles:
+            st.info("No news articles found.")
+            return
+
+        for article in articles:
+            st.markdown(f"### [{article['title']}]({article['url']})")
+            st.write(article["description"] or "")
+            st.caption(f"Published at: {article['publishedAt'][:10]}")
+            st.markdown("---")
+
+    except Exception as e:
+        st.error(f"❌ Failed to load news data: {e}")
+
+# Show news if ticker is valid
+if ticker:
+    news_block(ticker)
+
+@st.cache_data
+def get_data(ticker):
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    hist = stock.history(period="1y")
     
 
-        return info, hist
+    return info, hist
 
-    def get_financial_ratios(ticker):
-        stock = yf.Ticker(ticker)
-        info = stock.info
+def get_financial_ratios(ticker):
+    stock = yf.Ticker(ticker)
+    info = stock.info
 
-        ratios = {
-            "Market Cap": info.get("marketCap"),
-            "Trailing P/E": info.get("trailingPE"),
-            "Forward P/E": info.get("forwardPE"),
-            "PEG Ratio": info.get("pegRatio"),
-            "Price to Book": info.get("priceToBook"),
-            "Enterprise to Revenue": info.get("enterpriseToRevenue"),
-            "Enterprise to EBITDA": info.get("enterpriseToEbitda"),
-            "Return on Assets (ROA)": info.get("returnOnAssets"),
-            "Return on Equity (ROE)": info.get("returnOnEquity"),
-            "Profit Margin": info.get("profitMargins"),
-            "Gross Margins": info.get("grossMargins"),
-            "Operating Margins": info.get("operatingMargins"),
-            "Current Ratio": info.get("currentRatio"),
-            "Quick Ratio": info.get("quickRatio"),
-            "Debt to Equity": info.get("debtToEquity"),
-        }
+    ratios = {
+        "Market Cap": info.get("marketCap"),
+        "Trailing P/E": info.get("trailingPE"),
+        "Forward P/E": info.get("forwardPE"),
+        "PEG Ratio": info.get("pegRatio"),
+        "Price to Book": info.get("priceToBook"),
+        "Enterprise to Revenue": info.get("enterpriseToRevenue"),
+        "Enterprise to EBITDA": info.get("enterpriseToEbitda"),
+        "Return on Assets (ROA)": info.get("returnOnAssets"),
+        "Return on Equity (ROE)": info.get("returnOnEquity"),
+        "Profit Margin": info.get("profitMargins"),
+        "Gross Margins": info.get("grossMargins"),
+        "Operating Margins": info.get("operatingMargins"),
+        "Current Ratio": info.get("currentRatio"),
+        "Quick Ratio": info.get("quickRatio"),
+        "Debt to Equity": info.get("debtToEquity"),
+    }
 
-        return ratios
+    return ratios
 
 def format_large_number(n):
     if n is None:
