@@ -54,7 +54,10 @@ sp500_df = load_sp500_data()
 sp500_df.columns = sp500_df.columns.str.strip().str.lower()
 
 
-NEWSAPI_KEY = st.secrets["NEWSAPI_KEY"]
+NEWSAPI_KEY = st.secrets.get("NEWSAPI_KEY")
+if not NEWSAPI_KEY:
+    st.warning("Missing NewsAPI key. Using cached/stubbed response.")
+
 
 
 def fetch_news(ticker):
