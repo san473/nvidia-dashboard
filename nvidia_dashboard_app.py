@@ -895,13 +895,15 @@ try:
 except Exception as e:
     st.warning(f"⚠️ FCF block failed: {e}")
 
+st.write("Income Statement Rows:", income_stmt.index.tolist())
 
+
+import altair as alt
+import pandas as pd
 
 def prepare_waterfall_data(income_stmt):
-    # Ensure the most recent column is used
     latest_period = income_stmt.columns[0]
 
-    # Use safe .get() on income_stmt index (rows), not .loc
     def safe_get(label):
         return income_stmt.loc[label, latest_period] if label in income_stmt.index else 0
 
@@ -930,8 +932,36 @@ def prepare_waterfall_data(income_stmt):
         {"label": "Income Tax", "value": -income_tax},
         {"label": "Net Income", "value": net_income}
     ]
+
     return data
 
+
+# Inside Streamlit section
+try:
+    st.subheader("📉 Earnings Waterfall Chart")
+
+    data = prepare_waterfall_data(income_stmt)
+    df = pd.DataFrame(data)
+
+    df["cumulative"] = df["value"].cumsum()
+    df["start"] = df["cumulative"] - df["value"]
+    df["end"] = df["cumulative"]
+    df["color"] = df["value"].apply(lambda x: "#27ae60" if x >= 0 else "#c0392b")
+
+    chart = alt.Chart(df).mark_bar().encode(
+        x=alt.X("label:N", title=""),
+        y=alt.Y("value:Q", title="Amount ($)", scale=alt.Scale(zero=False)),
+        color=alt.Color("color:N", scale=None)
+    ).properties(
+        width=700,
+        height=400,
+        title="📊 Earnings Breakdown Waterfall"
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+
+except Exception as e:
+    st.warning(f"Earnings waterfall chart failed: {e}")
 
 
 
