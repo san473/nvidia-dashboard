@@ -10,6 +10,7 @@ import plotly.express as px
 from datetime import datetime
 from streamlit.runtime.caching import cache_data
 import requests
+import altair as alt
 import nltk
 nltk.download('vader_lexicon')
 
@@ -753,82 +754,68 @@ try:
 except Exception as e:
     st.warning(f"Unable to load financial visualizations: {e}")
 
-import streamlit as st
-import yfinance as yf
-import pandas as pd
 
-st.subheader("Free Cash Flow Breakdown")
+
+
+st.subheader("💰 Free Cash Flow Analysis")
 
 ticker = st.text_input("Enter Ticker Symbol", "AAPL")
 stock = yf.Ticker(ticker)
 
-# -- Get necessary statements
-income_stmt = stock.financials
-cashflow_stmt = stock.cashflow
-balance_sheet = stock.balance_sheet
-
 try:
-    col = cashflow_stmt.columns[0]
+    # Get financials
+    cashflow = stock.cashflow.T
+    financials = stock.financials.T
+    income_stmt = stock.income_stmt.T
+    revenue = income_stmt["Total Revenue"]
+    net_income = income_stmt["Net Income"]
 
-    # Safely get values with fallback if not found
-    def safe_loc(df, row_name):
-        return df.loc[row_name][col] if row_name in df.index else 0
+    # Calculate Free Cash Flow
+    capex = cashflow["Capital Expenditures"]
+    op_cf = cashflow["Total Cash From Operating Activities"]
+    fcf = op_cf + capex
 
-    net_income = income_stmt.loc["Net Income"][col]
-    dep_amort = safe_loc(cashflow_stmt, "Depreciation") + safe_loc(cashflow_stmt, "Amortization")
-    capex = safe_loc(cashflow_stmt, "Capital Expenditures")
-    sbc = safe_loc(cashflow_stmt, "Stock Based Compensation")
-    wc_change = safe_loc(cashflow_stmt, "Change In Working Capital")
+    # Clean data
+    fcf = fcf.dropna()
+    fcf.index = pd.to_datetime(fcf.index).year
+    fcf = fcf.sort_index()
 
-    # Estimate 'Other non-cash' adjustments
-    total_cfo = safe_loc(cashflow_stmt, "Total Cash From Operating Activities")
-    all_adjustments = total_cfo - net_income
-    known_adjustments = dep_amort + sbc + wc_change
-    other_non_cash = all_adjustments - known_adjustments
+    revenue = revenue[fcf.index]
+    net_income = net_income[fcf.index]
 
-    # FCF Calculation
-    fcf = net_income + dep_amort + sbc + wc_change + other_non_cash + capex  # capex is negative
+    # Metrics
+    last_fcf = fcf.iloc[-1]
+    avg_fcf = fcf.tail(3).mean()
+    fcf_margin = (last_fcf / revenue.iloc[-1]) * 100 if revenue.iloc[-1] != 0 else None
+    conversion_rate = (last_fcf / net_income.iloc[-1]) * 100 if net_income.iloc[-1] != 0 else None
 
+    # Metrics display
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("📊 Last Value", f"${last_fcf/1e9:.1f}B")
+    col2.metric("📈 3-Year Avg", f"${avg_fcf/1e9:.1f}B")
+    col3.metric("📎 FCF Margin", f"{fcf_margin:.0f}%" if fcf_margin else "N/A")
+    col4.metric("🔄 Conversion Rate", f"{conversion_rate:.0f}%" if conversion_rate else "N/A")
 
-    # Format for display
-    def fmt(val):
-        suffix = "B" if abs(val) > 1e9 else "m"
-        divisor = 1e9 if abs(val) > 1e9 else 1e6
-        return f"{val/divisor:,.1f}{suffix}"
+    # Bar Chart
+    chart_data = pd.DataFrame({
+        "Year": fcf.index,
+        "Free Cash Flow": fcf.values / 1e9  # in Billions
+    })
 
-    breakdown = {
-        "Net Income": net_income,
-        "Depreciation & Amortization": dep_amort,
-        "Stock-Based Compensation": sbc,
-        "Change in Working Capital": wc_change,
-        "Others": other_non_cash,
-        "Capital Expenditures": capex,
-        "Free Cash Flow": fcf
-    }
-
-    # Display in Streamlit
-    st.markdown("### 📋 FCF Components")
-    st.markdown(
-        "<style>div[data-testid='column'] div[style*='flex-direction: column']{gap: 0.25rem;}</style>", unsafe_allow_html=True
+    chart = alt.Chart(chart_data).mark_bar(color="#7f8c8d").encode(
+        x=alt.X("Year:O", title="Year"),
+        y=alt.Y("Free Cash Flow:Q", title="Free Cash Flow (Billion USD)")
+    ).properties(
+        width=700,
+        height=400,
+        title="🧾 Free Cash Flow Over Time"
     )
 
-    for label, value in breakdown.items():
-        color = "red" if value < 0 and label != "Free Cash Flow" else "black"
-        if label == "Free Cash Flow":
-            st.markdown(f"""
-                <div style='background-color:#f4f4f4;padding:10px 15px;border-radius:8px;border-left: 6px solid green;'>
-                    <strong>{label}:</strong> <span style='color:green;font-size:20px;font-weight:bold;'>${fmt(value)}</span>
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-                <div style='padding:2px 8px;'>
-                    <strong>{label}:</strong> <span style='color:{color}'>${fmt(value)}</span>
-                </div>
-            """, unsafe_allow_html=True)
+    st.altair_chart(chart, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Error calculating FCF: {e}")
+    st.warning(f"Unable to generate FCF chart: {e}")
+
 
 import streamlit as st
 import yfinance as yf
