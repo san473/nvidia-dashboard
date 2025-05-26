@@ -902,10 +902,18 @@ import altair as alt
 import pandas as pd
 
 def prepare_earnings_breakdown(income_stmt):
+    # Get the latest period (column) from the income statement
     latest_period = income_stmt.columns[0]
 
     def safe_get(label):
-        return income_stmt.loc[label, latest_period] if label in income_stmt.index else 0
+        # Use .get on the index to avoid errors if label is missing
+        # income_stmt is a DataFrame with index=labels, columns=periods
+        # Use .loc with try-except or .get? Since index is not dict, safer to check presence
+        if label in income_stmt.index:
+            val = income_stmt.loc[label, latest_period]
+            return val if pd.notna(val) else 0
+        else:
+            return 0
 
     # Earnings line items
     revenue = safe_get("Total Revenue")
@@ -930,7 +938,7 @@ def prepare_earnings_breakdown(income_stmt):
 
     return pd.DataFrame(breakdown)
 
-# === Streamlit Section ===
+# === Streamlit section ===
 try:
     st.subheader("🧾 Earnings Breakdown")
 
@@ -943,7 +951,6 @@ try:
         st.table(earnings_df.set_index("Label").style.format("{:.2f}"))
 
     with col2:
-        # Waterfall chart
         df = earnings_df.copy()
         df["Cumulative"] = df["Amount ($B)"].cumsum()
         df["Start"] = df["Cumulative"] - df["Amount ($B)"]
@@ -951,10 +958,10 @@ try:
         df["Color"] = df["Amount ($B)"].apply(lambda x: "#2ecc71" if x >= 0 else "#e74c3c")
 
         chart = alt.Chart(df).mark_bar().encode(
-            x=alt.X("Label:N", title="", sort=None),
+            x=alt.X("Label:N", title="", sort=None, axis=alt.Axis(labelAngle=-90)),  # Vertical labels
             y=alt.Y("Amount ($B):Q", title="Earnings Flow ($B)", scale=alt.Scale(zero=False)),
             color=alt.Color("Color:N", scale=None, legend=None),
-            tooltip=["Label", "Amount ($B)"]
+            tooltip=[alt.Tooltip("Label:N"), alt.Tooltip("Amount ($B):Q", format=".2f")]
         ).properties(
             width=600,
             height=400,
