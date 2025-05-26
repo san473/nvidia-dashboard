@@ -898,44 +898,38 @@ except Exception as e:
 st.write("Income Statement Rows:", income_stmt.index.tolist())
 
 
-import altair as alt
-import pandas as pd
-import streamlit as st
+st.write("Income statement rows:", income_stmt.index.tolist())
+st.write("Income statement columns:", income_stmt.columns.tolist())
 
-# Assume you already have the yfinance ticker loaded:
-# stock = yf.Ticker(ticker)
-income_stmt = stock.financials.T  # Or stock.income_stmt.T depending on your code
-
-# Show structure to debug if needed
-st.write("Income Statement sample (latest periods):")
-st.write(income_stmt.head())
-
-# Use the most recent fiscal period column (likely 2024-09-30)
 latest_period = income_stmt.columns[0]
 
-# Convert index to lowercase for case-insensitive matching
-income_stmt_lower = income_stmt.copy()
-income_stmt_lower.index = income_stmt_lower.index.str.lower()
+def find_row(df, keywords):
+    index = df.index.str.lower().str.replace(" ", "")
+    for kw in keywords:
+        kw_clean = kw.lower().replace(" ", "")
+        matches = index[index.str.contains(kw_clean)]
+        if len(matches) > 0:
+            return df.index[matches[0]]
+    return None
 
-def safe_get(label):
-    label = label.lower()
-    try:
-        val = income_stmt_lower.loc[label, latest_period]
-        if pd.isna(val):
-            return 0
-        return val
-    except KeyError:
+def get_amount(keywords):
+    row_label = find_row(income_stmt, keywords)
+    if row_label is None:
         return 0
+    val = income_stmt.loc[row_label, latest_period]
+    if pd.isna(val):
+        return 0
+    return val
 
-revenue = safe_get("total revenue")
-cost_of_revenue = safe_get("cost of revenue")
-gross_profit = safe_get("gross profit")
-rd = safe_get("research development")
-sga = safe_get("selling general administrative")
+revenue = get_amount(["total revenue", "revenue"])
+cost_of_revenue = get_amount(["cost of revenue", "cost of sales"])
+gross_profit = get_amount(["gross profit"])
+rd = get_amount(["research development", "r&d"])
+sga = get_amount(["selling general administrative", "sga", "selling general & administrative"])
 operating_expenses = rd + sga
-operating_income = safe_get("operating income")
-other_expenses = safe_get("other income expense net")
-net_income = safe_get("net income")
+operating_income = get_amount(["operating income", "income from operations"])
+other_expenses = get_amount(["other income expense net", "other expenses", "other income/(expense)"])
+net_income = get_amount(["net income", "net income applicable to common shares"])
 
 earnings = [
     {"Label": "Total Revenue", "Amount": revenue / 1e9},
@@ -971,7 +965,6 @@ with col2:
         title="Earnings Waterfall"
     )
     st.altair_chart(chart, use_container_width=True)
-
 
 
 
