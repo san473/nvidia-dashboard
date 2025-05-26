@@ -760,35 +760,6 @@ except Exception as e:
 
 
 
-def find_capex_row(cashflow_df):
-    index_lower = [row.lower() for row in cashflow_df.index]
-    possible_patterns = [
-        "capital expenditures",
-        "capital expenditure",
-        "purchase of property and equipment",
-        "purchase of property plant and equipment",
-        "purchase of property, plant and equipment",
-        "purchase of ppe",
-        "purchase property and equipment",
-        "capex"
-    ]
-    for pattern in possible_patterns:
-        for i, row_lower in enumerate(index_lower):
-            if pattern in row_lower:
-                return cashflow_df.index[i]
-    return None
-
-def find_capex_row(cashflow_df):
-    capex_keywords = ['capital expenditures', 'capex', 'purchase of property', 'investment in property']
-    for row_label in cashflow_df.columns:
-        if any(keyword in row_label.lower() for keyword in capex_keywords):
-            return row_label
-    return None
-
-
-
-st.subheader("💰 Free Cash Flow Analysis")
-
 import yfinance as yf
 import pandas as pd
 import streamlit as st
@@ -799,11 +770,11 @@ def find_capex_row(cashflow_df):
     capex_keywords = [
         "Capital Expenditures", "CapitalExpenditures", "Capital expenditure", 
         "Purchase of property and equipment", "Purchase Of Property Plant And Equipment",
-        "capital expenditure", "capital expenditures"
+        "capital expenditure", "capital expenditures", "purchase of ppe"
     ]
     for possible in capex_keywords:
         for row in cashflow_df.index:
-            if possible.lower() in row.lower():
+            if isinstance(row, str) and possible.lower() in row.lower():
                 return row
     return None
 
@@ -817,25 +788,30 @@ try:
     cashflow = stock.cashflow.T
     financials = stock.financials.T
     income_stmt = stock.income_stmt.T
-    revenue = income_stmt["Total Revenue"]
-    net_income = income_stmt["Net Income"]
 
-    # Dynamically find CapEx row
+    if cashflow.empty or income_stmt.empty:
+        st.warning("Not enough financial data available for this ticker.")
+        st.stop()
+
+    # Dynamically extract relevant rows
     capex_row = find_capex_row(cashflow)
-    if capex_row is None:
-        st.warning("Unable to generate FCF chart: Capital Expenditures row not found")
+    if capex_row is None or "Total Cash From Operating Activities" not in cashflow.columns:
+        st.warning("Unable to find required rows for CapEx or Operating Cash Flow.")
         st.stop()
 
     # Calculate Free Cash Flow
     capex = cashflow[capex_row]
     op_cf = cashflow["Total Cash From Operating Activities"]
-    fcf = op_cf + capex  # capex is usually negative
+    fcf = op_cf + capex  # CapEx is usually negative
 
     # Clean data
     fcf = fcf.dropna()
     fcf.index = pd.to_datetime(fcf.index).year
     fcf = fcf.sort_index()
 
+    # Align revenue & net income
+    revenue = income_stmt["Total Revenue"]
+    net_income = income_stmt["Net Income"]
     revenue = revenue[fcf.index]
     net_income = net_income[fcf.index]
 
@@ -871,6 +847,7 @@ try:
 
 except Exception as e:
     st.warning(f"Unable to generate FCF chart: {e}")
+
 
 
 
