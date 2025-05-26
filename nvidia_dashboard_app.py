@@ -785,11 +785,27 @@ def find_capex_row(cashflow_df):
             return row_label
     return None
 
+
+
 st.subheader("💰 Free Cash Flow Analysis")
-import streamlit as st
+
 import yfinance as yf
 import pandas as pd
+import streamlit as st
 import altair as alt
+
+def find_capex_row(cashflow_df):
+    """Find the correct CapEx row in a case-insensitive and flexible way."""
+    capex_keywords = [
+        "Capital Expenditures", "CapitalExpenditures", "Capital expenditure", 
+        "Purchase of property and equipment", "Purchase Of Property Plant And Equipment",
+        "capital expenditure", "capital expenditures"
+    ]
+    for possible in capex_keywords:
+        for row in cashflow_df.index:
+            if possible.lower() in row.lower():
+                return row
+    return None
 
 st.subheader("💰 Free Cash Flow Analysis")
 
@@ -804,40 +820,24 @@ try:
     revenue = income_stmt["Total Revenue"]
     net_income = income_stmt["Net Income"]
 
-    # Find CapEx row dynamically
+    # Dynamically find CapEx row
     capex_row = find_capex_row(cashflow)
-
     if capex_row is None:
         st.warning("Unable to generate FCF chart: Capital Expenditures row not found")
         st.stop()
 
-    capex = cashflow[capex_row]
-
-    # Try alternative names for Operating Cash Flow if needed
-    op_cf = cashflow.get("Total Cash From Operating Activities") or cashflow.get("Operating Cash Flow")
-    if op_cf is None:
-        st.warning("Unable to generate FCF chart: Operating cash flow row not found")
-        st.stop()
-
     # Calculate Free Cash Flow
-    fcf = op_cf + capex
+    capex = cashflow[capex_row]
+    op_cf = cashflow["Total Cash From Operating Activities"]
+    fcf = op_cf + capex  # capex is usually negative
 
-    # Clean and align index
+    # Clean data
     fcf = fcf.dropna()
-    fcf.index = pd.to_datetime(fcf.index)
-    fcf.index = fcf.index.year
+    fcf.index = pd.to_datetime(fcf.index).year
     fcf = fcf.sort_index()
 
-    # Align other metrics to FCF index
-    revenue = revenue[revenue.index.isin(fcf.index)]
-    net_income = net_income[net_income.index.isin(fcf.index)]
-
-    # Ensure index alignment
-    revenue.index = pd.to_datetime(revenue.index).year
-    net_income.index = pd.to_datetime(net_income.index).year
-
-    revenue = revenue.loc[fcf.index]
-    net_income = net_income.loc[fcf.index]
+    revenue = revenue[fcf.index]
+    net_income = net_income[fcf.index]
 
     # Metrics
     last_fcf = fcf.iloc[-1]
@@ -849,12 +849,12 @@ try:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📊 Last Value", f"${last_fcf/1e9:.1f}B")
     col2.metric("📈 3-Year Avg", f"${avg_fcf/1e9:.1f}B")
-    col3.metric("📎 FCF Margin", f"{fcf_margin:.0f}%" if fcf_margin is not None else "N/A")
-    col4.metric("🔄 Conversion Rate", f"{conversion_rate:.0f}%" if conversion_rate is not None else "N/A")
+    col3.metric("📎 FCF Margin", f"{fcf_margin:.0f}%" if fcf_margin else "N/A")
+    col4.metric("🔄 Conversion Rate", f"{conversion_rate:.0f}%" if conversion_rate else "N/A")
 
     # Bar Chart
     chart_data = pd.DataFrame({
-        "Year": fcf.index.astype(str),
+        "Year": fcf.index,
         "Free Cash Flow": fcf.values / 1e9  # in Billions
     })
 
