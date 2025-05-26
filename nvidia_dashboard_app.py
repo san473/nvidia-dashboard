@@ -757,12 +757,8 @@ except Exception as e:
 
 
 
-st.subheader("💰 Free Cash Flow Analysis")
 
-import yfinance as yf
-import pandas as pd
-import altair as alt
-import streamlit as st
+
 
 def find_capex_row(cashflow_df):
     index_lower = [row.lower() for row in cashflow_df.index]
@@ -781,6 +777,19 @@ def find_capex_row(cashflow_df):
             if pattern in row_lower:
                 return cashflow_df.index[i]
     return None
+
+def find_capex_row(cashflow_df):
+    capex_keywords = ['capital expenditures', 'capex', 'purchase of property', 'investment in property']
+    for row_label in cashflow_df.columns:
+        if any(keyword in row_label.lower() for keyword in capex_keywords):
+            return row_label
+    return None
+
+st.subheader("💰 Free Cash Flow Analysis")
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import altair as alt
 
 st.subheader("💰 Free Cash Flow Analysis")
 
@@ -813,13 +822,22 @@ try:
     # Calculate Free Cash Flow
     fcf = op_cf + capex
 
-    # Clean data
+    # Clean and align index
     fcf = fcf.dropna()
-    fcf.index = pd.to_datetime(fcf.index).year
+    fcf.index = pd.to_datetime(fcf.index)
+    fcf.index = fcf.index.year
     fcf = fcf.sort_index()
 
-    revenue = revenue[fcf.index]
-    net_income = net_income[fcf.index]
+    # Align other metrics to FCF index
+    revenue = revenue[revenue.index.isin(fcf.index)]
+    net_income = net_income[net_income.index.isin(fcf.index)]
+
+    # Ensure index alignment
+    revenue.index = pd.to_datetime(revenue.index).year
+    net_income.index = pd.to_datetime(net_income.index).year
+
+    revenue = revenue.loc[fcf.index]
+    net_income = net_income.loc[fcf.index]
 
     # Metrics
     last_fcf = fcf.iloc[-1]
@@ -831,12 +849,12 @@ try:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📊 Last Value", f"${last_fcf/1e9:.1f}B")
     col2.metric("📈 3-Year Avg", f"${avg_fcf/1e9:.1f}B")
-    col3.metric("📎 FCF Margin", f"{fcf_margin:.0f}%" if fcf_margin else "N/A")
-    col4.metric("🔄 Conversion Rate", f"{conversion_rate:.0f}%" if conversion_rate else "N/A")
+    col3.metric("📎 FCF Margin", f"{fcf_margin:.0f}%" if fcf_margin is not None else "N/A")
+    col4.metric("🔄 Conversion Rate", f"{conversion_rate:.0f}%" if conversion_rate is not None else "N/A")
 
     # Bar Chart
     chart_data = pd.DataFrame({
-        "Year": fcf.index,
+        "Year": fcf.index.astype(str),
         "Free Cash Flow": fcf.values / 1e9  # in Billions
     })
 
@@ -853,6 +871,8 @@ try:
 
 except Exception as e:
     st.warning(f"Unable to generate FCF chart: {e}")
+
+
 
 
 
