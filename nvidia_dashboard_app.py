@@ -1135,13 +1135,17 @@ def get_shareholder_yield_data(ticker):
     if cf.empty or bs.empty:
         return None, None
 
-    # Transpose for easier handling, columns become dates
-    cf = cf.T
-    bs = bs.T
+# Transpose for easier handling, columns become dates
+cf = cf.T
+bs = bs.T
 
-    # Market cap may change over time - approximate using ticker.history() on quarterly dates
-    hist = ticker_obj.history(period="1y", interval="1d")
-    hist = hist.resample('Q').last()  # quarterly close price
+# Remove timezone info from cf.index to avoid timezone mismatch errors
+cf.index = cf.index.tz_localize(None)
+
+# Market cap may change over time - approximate using ticker.history() on quarterly dates
+hist = ticker_obj.history(period="1y", interval="1d")
+hist = hist.resample('Q').last()  # quarterly close price
+
 
     # Use close price * shares outstanding as proxy for market cap per quarter
     try:
