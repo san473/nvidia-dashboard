@@ -1119,70 +1119,107 @@ except Exception as e:
 import yfinance as yf
 import streamlit as st
 import pandas as pd
+import numpy as np
 
-def get_yield_data(ticker):
+shareholder_yield_block(ticker)
+def get_shareholder_yield_data(ticker):
     ticker_obj = yf.Ticker(ticker)
     info = ticker_obj.info
-    market_cap = info.get("marketCap")
+    market_cap = info.get("marketCap", None)
     if not market_cap:
         return None, None
 
     cf = ticker_obj.quarterly_cashflow
     bs = ticker_obj.quarterly_balance_sheet
+
     if cf.empty or bs.empty:
         return None, None
 
+    # Transpose for easier handling, columns become dates
     cf = cf.T
     bs = bs.T
+
+    # Market cap may change over time - approximate using ticker.history() on quarterly dates
+    hist = ticker_obj.history(period="1y", interval="1d")
+    hist = hist.resample('Q').last()  # quarterly close price
+
+    # Use close price * shares outstanding as proxy for market cap per quarter
+    try:
+        shares_outstanding = ticker_obj.info.get("sharesOutstanding", None)
+    except:
+        shares_outstanding = None
+
+    if shares_outstanding is None:
+        # fallback to constant market cap
+        mcap_series = pd.Series(market_cap, index=cf.index)
+    else:
+        # Estimate market cap per quarter = close_price * shares_outstanding (shares can vary but simplified here)
+        # Align hist with cf index
+        mcap_series = hist['Close'].reindex(cf.index, method='ffill') * shares_outstanding
+
     df = pd.DataFrame(index=cf.index)
 
+    # Dividend Yield = Dividends Paid / Market Cap
     if "Dividends Paid" in cf.columns:
-        df["Dividend Yield (%)"] = -cf["Dividends Paid"] / market_cap * 100
+        df["Dividend Yield (%)"] = -cf["Dividends Paid"] / mcap_series * 100
 
-    if "Repurchase Of Stock" in cf.columns:
-        df["Buyback Yield (%)"] = -cf["Repurchase Of Stock"] / market_cap * 100
+    # Buyback Yield = Repurchase Of Stock / Market Cap
+    # Column name varies, try alternatives
+    buyback_col = None
+    for col_candidate in ["Repurchase Of Stock", "Repurchase of Stock", "Stock Repurchased"]:
+        if col_candidate in cf.columns:
+            buyback_col = col_candidate
+            break
+    if buyback_col:
+        df["Buyback Yield (%)"] = -cf[buyback_col] / mcap_series * 100
+    else:
+        df["Buyback Yield (%)"] = 0.0
 
+    # Debt Paydown Yield = net reduction in Long Term Debt / Market Cap
     if "Long Term Debt" in bs.columns:
-        debt_change = bs["Long Term Debt"].diff(periods=-1)
-        df["Debt Paydown Yield (%)"] = debt_change / market_cap * 100
+        debt_change = bs["Long Term Debt"].diff(-1)  # current - next quarter
+        df["Debt Paydown Yield (%)"] = debt_change / mcap_series * 100
+    else:
+        df["Debt Paydown Yield (%)"] = 0.0
 
     df = df.sort_index()
-    return df, df.iloc[-1]
+    latest = df.iloc[-1]
+    return df, latest
+
 
 def shareholder_yield_block(ticker):
-    st.markdown("### 💸 Shareholder Yield")
+    st.markdown("### 💸 Shareholder Yield Breakdown")
 
-    data, latest = get_yield_data(ticker)
+    data, latest = get_shareholder_yield_data(ticker)
     if data is None or latest is None:
-        st.warning("Shareholder yield data unavailable.")
+        st.warning("Shareholder yield data unavailable for this ticker.")
         return
 
+    # Summary line
     st.markdown(
         f"**Dividend Yield:** {latest.get('Dividend Yield (%)', 0):.2f}% &nbsp;&nbsp;|&nbsp;&nbsp; "
         f"**Buyback Yield:** {latest.get('Buyback Yield (%)', 0):.2f}% &nbsp;&nbsp;|&nbsp;&nbsp; "
         f"**Debt Paydown Yield:** {latest.get('Debt Paydown Yield (%)', 0):.2f}%"
     )
 
+    # 3 charts side by side
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown("**Dividend Yield (%)**")
-        if "Dividend Yield (%)" in data:
-            st.line_chart(data["Dividend Yield (%)"])
+        st.line_chart(data["Dividend Yield (%)"].fillna(0))
 
     with col2:
         st.markdown("**Buyback Yield (%)**")
-        if "Buyback Yield (%)" in data:
-            st.line_chart(data["Buyback Yield (%)"])
+        st.line_chart(data["Buyback Yield (%)"].fillna(0))
 
     with col3:
         st.markdown("**Debt Paydown Yield (%)**")
-        if "Debt Paydown Yield (%)" in data:
-            st.line_chart(data["Debt Paydown Yield (%)"])
+        st.line_chart(data["Debt Paydown Yield (%)"].fillna(0))
 
 
-# ✅ Now call it AFTER the function is defined
-shareholder_yield_block(ticker)
+
+
 
 
 
