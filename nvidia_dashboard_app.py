@@ -256,42 +256,55 @@ debt_to_equity = financial_data.get("debtToEquity", None)
 current_ratio = financial_data.get("currentRatio", None)
 
 
-# Load Lighthouse Canton Data
+import yfinance as yf
+import pandas as pd
+
+# Load Lighthouse Canton commentary
 @st.cache_data
-def load_lighthouse_data():
-    df = pd.read_excel("CIO Stocks.xlsx")  # Make sure this file is in the app folder
-    df["Ticker"] = df["Ticker"].str.upper().str.strip()
+def load_lighthouse_commentary():
+    df = pd.read_excel("CIO Stocks.xlsx")
+    df.columns = df.columns.str.strip().str.lower()
     return df
 
-lighthouse_df = load_lighthouse_data()
+cio_df = load_lighthouse_commentary()
+ticker_upper = ticker.upper()
 
-# Get user ticker input
-ticker = st.text_input("Enter Stock Ticker (e.g., MSFT)").upper().strip()
+# Match current ticker
+matched = cio_df[cio_df["ticker"].str.upper().str.strip() == ticker_upper]
 
-if ticker:
-    if ticker in lighthouse_df["Ticker"].values:
-        stock_info = lighthouse_df[lighthouse_df["Ticker"] == ticker].iloc[0]
-        target_price = stock_info["Target Price"]
-        lighthouse_view = stock_info["Lighthouse Canton View"]
+st.subheader("🧭 Lighthouse Canton View")
 
-        # Get current price from yfinance
-        try:
-            stock = yf.Ticker(ticker)
-            live_price = stock.history(period="1d")["Close"].iloc[-1]
-            price_diff_pct = ((target_price - live_price) / live_price) * 100
-            direction = "Upside" if price_diff_pct >= 0 else "Downside"
+if not matched.empty:
+    view = matched["lighthouse canton view"].values[0]
+    target_price = matched["target price"].values[0]
 
-            # Show Lighthouse Canton View
-            st.subheader("💡 Lighthouse Canton View")
-            st.markdown(f"**🎯 Target Price:** ${target_price:.2f}")
-            st.markdown(f"**📈 Current Price:** ${live_price:.2f}")
-            st.markdown(f"**🔼 {direction} Potential:** {price_diff_pct:.2f}%")
-            st.markdown(f"**📝 Commentary:** {lighthouse_view}")
-        except Exception as e:
-            st.error(f"⚠️ Could not fetch current price: {e}")
+    # Get current market price from yfinance
+    try:
+        ticker_data = yf.Ticker(ticker)
+        current_price = ticker_data.info.get("regularMarketPrice", None)
+    except Exception:
+        current_price = None
+
+    # Compute upside/downside
+    if pd.notna(target_price) and current_price:
+        upside_pct = ((target_price - current_price) / current_price) * 100
+        direction = "Upside" if upside_pct >= 0 else "Downside"
+        color = "green" if upside_pct >= 0 else "red"
     else:
-        st.subheader("💡 Lighthouse Canton View")
-        st.info("This stock is not part of Lighthouse Canton's current scope of analysis.")
+        upside_pct = None
+
+    # Display content
+    st.markdown(f"**📌 View:** {view}")
+    st.markdown(f"**🎯 Target Price:** ${target_price:,.2f}")
+    
+    if current_price:
+        st.markdown(f"**💵 Current Price:** ${current_price:,.2f}")
+        st.markdown(f"**📈 {direction} Potential:** :{color}[{upside_pct:.2f}%]")
+    else:
+        st.markdown("⚠️ Could not fetch current price.")
+else:
+    st.info("This stock is not present in the Lighthouse Canton coverage.")
+
 
 # ========== Investment Thesis Summary ==========
 thesis_points = []
