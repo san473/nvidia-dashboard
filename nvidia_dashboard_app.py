@@ -762,13 +762,12 @@ except Exception as e:
 st.write("Cashflow index labels:", [str(col).lower() for col in cashflow.columns])
 
 
-
 def find_capex_row(cashflow_df):
     """Find the correct CapEx row in a case-insensitive and flexible way."""
     capex_keywords = [
-        "Capital Expenditures", "CapitalExpenditures", "Capital expenditure", 
-        "Purchase of property and equipment", "Purchase Of Property Plant And Equipment",
-        "capital expenditure", "capital expenditures", "purchase of ppe"
+        "capital expenditures", "capital expenditure", "capex",
+        "purchase of property and equipment", "purchase of property plant and equipment",
+        "purchase of ppe"
     ]
     for possible in capex_keywords:
         for row in cashflow_df.index:
@@ -782,13 +781,16 @@ st.subheader("💰 Free Cash Flow Analysis")
 ticker = st.text_input("Enter Ticker Symbol", "AAPL")
 stock = yf.Ticker(ticker)
 
+
 def find_column_label(df, keywords):
     """Search column names for relevant keywords (case insensitive)."""
     for col in df.columns:
+        col_lower = str(col).lower()
         for keyword in keywords:
-            if keyword in col.lower():
+            if keyword.lower() in col_lower:
                 return col
     return None
+
 
 try:
     cashflow = stock.cashflow.T
@@ -798,9 +800,21 @@ try:
         st.warning("Missing financial data.")
         st.stop()
 
-    # Use column names (not index!) for cashflow
-    capex_keywords = ["capital expenditures", "capex", "purchase of property", "purchase of ppe"]
-    opcf_keywords = ["total cash from operating activities", "net cash provided by operating activities"]
+    # Debug prints to inspect columns and keywords
+    st.write("Cashflow columns found:", cashflow.columns.tolist())
+
+    capex_keywords = [
+        "capital expenditure", "capital expenditures", "capex",
+        "purchase of property", "purchase of ppe"
+    ]
+    opcf_keywords = [
+        "operating cash flow", 
+        "total cash from operating activities", 
+        "net cash provided by operating activities"
+    ]
+
+    st.write("Trying to find CapEx with keywords:", capex_keywords)
+    st.write("Trying to find OpCF with keywords:", opcf_keywords)
 
     capex_col = find_column_label(cashflow, capex_keywords)
     opcf_col = find_column_label(cashflow, opcf_keywords)
