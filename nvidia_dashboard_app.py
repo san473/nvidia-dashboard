@@ -895,6 +895,36 @@ try:
 except Exception as e:
     st.warning(f"⚠️ FCF block failed: {e}")
 
+import altair as alt
+import pandas as pd
+
+# Prepare data for chart: Align OCF and FCF by year
+cf_data = pd.DataFrame({
+    "Year": fcf.index.astype(str),
+    "Operating Cash Flow": op_cf.reindex(fcf.index).values / 1e9,  # in billions
+    "Free Cash Flow": fcf.values / 1e9
+}).reset_index(drop=True)
+
+# Melt dataframe to long format for Altair
+cf_long = cf_data.melt(id_vars=["Year"], value_vars=["Operating Cash Flow", "Free Cash Flow"],
+                       var_name="Cash Flow Type", value_name="Amount (Billion USD)")
+
+# Create bar chart
+cf_chart = alt.Chart(cf_long).mark_bar().encode(
+    x=alt.X('Year:O', title='Year'),
+    y=alt.Y('Amount (Billion USD):Q', title='Amount (Billion USD)'),
+    color=alt.Color('Cash Flow Type:N', scale=alt.Scale(range=['#1f77b4', '#ff7f0e'])),
+    column=alt.Column('Cash Flow Type:N', header=alt.Header(labelAngle=0))
+).properties(
+    width=150,
+    height=350,
+    title="Operating Cash Flow and Free Cash Flow Over Time"
+).configure_title(
+    fontSize=16,
+    anchor='start'
+)
+
+st.altair_chart(cf_chart, use_container_width=True)
 
 
 st.write("Income statement rows:", income_stmt.index.tolist())
