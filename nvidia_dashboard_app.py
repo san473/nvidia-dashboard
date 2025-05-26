@@ -770,20 +770,25 @@ balance_sheet = stock.balance_sheet
 try:
     col = cashflow_stmt.columns[0]
 
-    # Pull values (most recent year)
+    # Safely get values with fallback if not found
+    def safe_loc(df, row_name):
+        return df.loc[row_name][col] if row_name in df.index else 0
+
     net_income = income_stmt.loc["Net Income"][col]
-    dep_amort = cashflow_stmt.loc.get("Depreciation", 0) + cashflow_stmt.loc.get("Amortization", 0)
-    capex = cashflow_stmt.loc["Capital Expenditures"][col]
-    sbc = cashflow_stmt.loc.get("Stock Based Compensation", 0)
-    wc_change = cashflow_stmt.loc.get("Change In Working Capital", 0)
+    dep_amort = safe_loc(cashflow_stmt, "Depreciation") + safe_loc(cashflow_stmt, "Amortization")
+    capex = safe_loc(cashflow_stmt, "Capital Expenditures")
+    sbc = safe_loc(cashflow_stmt, "Stock Based Compensation")
+    wc_change = safe_loc(cashflow_stmt, "Change In Working Capital")
 
     # Estimate 'Other non-cash' adjustments
-    all_adjustments = cashflow_stmt.loc.get("Total Cash From Operating Activities", 0) - net_income
+    total_cfo = safe_loc(cashflow_stmt, "Total Cash From Operating Activities")
+    all_adjustments = total_cfo - net_income
     known_adjustments = dep_amort + sbc + wc_change
     other_non_cash = all_adjustments - known_adjustments
 
     # FCF Calculation
     fcf = net_income + dep_amort + sbc + wc_change + other_non_cash + capex  # capex is negative
+
 
     # Format for display
     def fmt(val):
