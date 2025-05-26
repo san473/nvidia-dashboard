@@ -1122,6 +1122,9 @@ import pandas as pd
 import numpy as np
 
 
+import yfinance as yf
+import pandas as pd
+
 def get_shareholder_yield_data(ticker):
     ticker_obj = yf.Ticker(ticker)
     info = ticker_obj.info
@@ -1131,58 +1134,48 @@ def get_shareholder_yield_data(ticker):
 
     cf = ticker_obj.quarterly_cashflow
     bs = ticker_obj.quarterly_balance_sheet
-
     if cf.empty or bs.empty:
         return None, None
 
-    # Transpose for easier handling, columns become dates
+    # Transpose dataframes
     cf = cf.T
     bs = bs.T
 
-    # Remove timezone info from cf.index to avoid timezone mismatch errors
+    # Remove timezone info from cf and bs index to avoid timezone mismatch errors
     cf.index = cf.index.tz_localize(None)
+    bs.index = bs.index.tz_localize(None)
 
-    # Remove timezone info from hist.index for the same reason
-    hist.index = hist.index.tz_localize(None)
-
-    # Then reindex safely
-    mcap_series = hist['Close'].reindex(cf.index, method='ffill') * shares_outstanding
-
-
-    # Market cap may change over time - approximate using ticker.history() on quarterly dates
-    hist = ticker_obj.history(period="1y", interval="1d")
-    if hist.empty:
-    # If history data not available, return None
-    return None, None
-
-    # Remove timezone info from hist index to avoid mismatch errors
-    hist.index = hist.index.tz_localize(None)
+    # Get historical prices, remove timezone info safely
+    try:
+        hist = ticker_obj.history(period="1y", interval="1d")
+        hist.index = hist.index.tz_localize(None)
+    except Exception as e:
+        return None, None
 
     hist = hist.resample('Q').last()  # quarterly close price
 
-
-    # Use close price * shares outstanding as proxy for market cap per quarter
     try:
         shares_outstanding = ticker_obj.info.get("sharesOutstanding", None)
-    except:
+    except Exception:
         shares_outstanding = None
 
     if shares_outstanding is None:
         # fallback to constant market cap
         mcap_series = pd.Series(market_cap, index=cf.index)
     else:
-        # Estimate market cap per quarter = close_price * shares_outstanding (shares can vary but simplified here)
-        # Align hist with cf index
+        # Align hist with cf index, forward fill missing
         mcap_series = hist['Close'].reindex(cf.index, method='ffill') * shares_outstanding
 
+    # Build the shareholder yield dataframe
     df = pd.DataFrame(index=cf.index)
 
-    # Dividend Yield = Dividends Paid / Market Cap
+    # Dividend Yield
     if "Dividends Paid" in cf.columns:
         df["Dividend Yield (%)"] = -cf["Dividends Paid"] / mcap_series * 100
+    else:
+        df["Dividend Yield (%)"] = 0.0
 
-    # Buyback Yield = Repurchase Of Stock / Market Cap
-    # Column name varies, try alternatives
+    # Buyback Yield
     buyback_col = None
     for col_candidate in ["Repurchase Of Stock", "Repurchase of Stock", "Stock Repurchased"]:
         if col_candidate in cf.columns:
@@ -1193,9 +1186,9 @@ def get_shareholder_yield_data(ticker):
     else:
         df["Buyback Yield (%)"] = 0.0
 
-    # Debt Paydown Yield = net reduction in Long Term Debt / Market Cap
+    # Debt Paydown Yield
     if "Long Term Debt" in bs.columns:
-        debt_change = bs["Long Term Debt"].diff(-1)  # current - next quarter
+        debt_change = bs["Long Term Debt"].diff(-1)
         df["Debt Paydown Yield (%)"] = debt_change / mcap_series * 100
     else:
         df["Debt Paydown Yield (%)"] = 0.0
