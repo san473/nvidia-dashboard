@@ -106,7 +106,7 @@ except Exception as e:
         if ticker:
            news_block(ticker)
         @st.cache_data
-        def get_data(ticker):
+    def get_data(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
         hist = stock.history(period="1y")
@@ -114,29 +114,29 @@ except Exception as e:
 
         return info, hist
 
-        def get_financial_ratios(ticker):
+    def get_financial_ratios(ticker):
         stock = yf.Ticker(ticker)
         info = stock.info
 
-    ratios = {
-        "Market Cap": info.get("marketCap"),
-        "Trailing P/E": info.get("trailingPE"),
-        "Forward P/E": info.get("forwardPE"),
-        "PEG Ratio": info.get("pegRatio"),
-        "Price to Book": info.get("priceToBook"),
-        "Enterprise to Revenue": info.get("enterpriseToRevenue"),
-        "Enterprise to EBITDA": info.get("enterpriseToEbitda"),
-        "Return on Assets (ROA)": info.get("returnOnAssets"),
-        "Return on Equity (ROE)": info.get("returnOnEquity"),
-        "Profit Margin": info.get("profitMargins"),
-        "Gross Margins": info.get("grossMargins"),
-        "Operating Margins": info.get("operatingMargins"),
-        "Current Ratio": info.get("currentRatio"),
-        "Quick Ratio": info.get("quickRatio"),
-        "Debt to Equity": info.get("debtToEquity"),
-    }
+        ratios = {
+            "Market Cap": info.get("marketCap"),
+            "Trailing P/E": info.get("trailingPE"),
+            "Forward P/E": info.get("forwardPE"),
+            "PEG Ratio": info.get("pegRatio"),
+            "Price to Book": info.get("priceToBook"),
+            "Enterprise to Revenue": info.get("enterpriseToRevenue"),
+            "Enterprise to EBITDA": info.get("enterpriseToEbitda"),
+            "Return on Assets (ROA)": info.get("returnOnAssets"),
+            "Return on Equity (ROE)": info.get("returnOnEquity"),
+            "Profit Margin": info.get("profitMargins"),
+            "Gross Margins": info.get("grossMargins"),
+            "Operating Margins": info.get("operatingMargins"),
+            "Current Ratio": info.get("currentRatio"),
+            "Quick Ratio": info.get("quickRatio"),
+            "Debt to Equity": info.get("debtToEquity"),
+        }
 
-    return ratios
+        return ratios
 
 def format_large_number(n):
     if n is None:
