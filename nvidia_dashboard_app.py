@@ -799,7 +799,6 @@ try:
         st.warning("Missing financial data.")
         st.stop()
 
-    # Flexible column matching
     capex_keywords = ["capital expenditures", "capex", "purchase of property", "capital expenditure"]
     opcf_keywords = ["operating cash flow", "total cash from operating activities", "net cash provided by operating activities"]
 
@@ -813,14 +812,13 @@ try:
 
     capex = cashflow[capex_col]
     op_cf = cashflow[opcf_col]
-    fcf = op_cf + capex  # CapEx is usually negative
+    fcf = op_cf + capex  # CapEx is negative
 
-    # Clean FCF
     fcf = fcf.dropna()
     fcf.index = pd.to_datetime(fcf.index).year
     fcf = fcf.sort_index()
 
-    # Revenue and Net Income lookup
+    # Revenue and Net Income
     revenue = None
     net_income = None
     for r in ["Total Revenue", "Revenue"]:
@@ -836,11 +834,17 @@ try:
         st.warning("Unable to retrieve revenue or net income.")
         st.stop()
 
-    # Align all three data series
-    revenue = revenue.reindex(fcf.index).dropna()
-    net_income = net_income.reindex(fcf.index).dropna()
+    revenue = revenue.dropna()
+    revenue.index = pd.to_datetime(revenue.index).year
+    net_income = net_income.dropna()
+    net_income.index = pd.to_datetime(net_income.index).year
 
+    # Align all three
     common_index = fcf.index.intersection(revenue.index).intersection(net_income.index)
+    if len(common_index) == 0:
+        st.warning("⚠️ No overlapping years found for FCF, Revenue, and Net Income.")
+        st.stop()
+
     fcf = fcf.reindex(common_index)
     revenue = revenue.reindex(common_index)
     net_income = net_income.reindex(common_index)
@@ -853,24 +857,25 @@ try:
     fcf_margin = (last_fcf / last_revenue) * 100 if last_revenue != 0 else None
     conversion_rate = (last_fcf / last_net_income) * 100 if last_net_income != 0 else None
 
-    # Optional debug block
-    st.write("Debug Info:", {
-        "FCF Years": fcf.index.tolist(),
-        "Revenue Years": revenue.index.tolist(),
-        "Net Income Years": net_income.index.tolist(),
-        "Last FCF": last_fcf,
-        "Last Revenue": last_revenue,
-        "Last Net Income": last_net_income
-    })
+    # Optional Debug (set to False to hide)
+    if True:
+        st.write("🔧 Debug Info", {
+            "FCF Years": fcf.index.tolist(),
+            "Revenue Years": revenue.index.tolist(),
+            "Net Income Years": net_income.index.tolist(),
+            "Last FCF": last_fcf,
+            "Last Revenue": last_revenue,
+            "Last Net Income": last_net_income
+        })
 
-    # Display metrics
+    # Display
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📊 Last FCF", f"${last_fcf/1e9:.1f}B")
     col2.metric("📈 3-Year Avg", f"${fcf.tail(3).mean()/1e9:.1f}B")
     col3.metric("📎 FCF Margin", f"{fcf_margin:.0f}%" if fcf_margin is not None else "N/A")
     col4.metric("🔄 Conversion Rate", f"{conversion_rate:.0f}%" if conversion_rate is not None else "N/A")
 
-    # Bar chart
+    # Chart
     chart_data = pd.DataFrame({
         "Year": fcf.index,
         "Free Cash Flow": fcf.values / 1e9
@@ -889,6 +894,7 @@ try:
 
 except Exception as e:
     st.warning(f"⚠️ FCF block failed: {e}")
+
 
 
 
