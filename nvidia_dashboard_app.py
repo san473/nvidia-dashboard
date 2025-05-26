@@ -759,11 +759,8 @@ except Exception as e:
 
 
 
+st.write("Cashflow index labels:", list(cashflow.columns.str.lower()))
 
-import yfinance as yf
-import pandas as pd
-import streamlit as st
-import altair as alt
 
 def find_capex_row(cashflow_df):
     """Find the correct CapEx row in a case-insensitive and flexible way."""
@@ -778,109 +775,91 @@ def find_capex_row(cashflow_df):
                 return row
     return None
 
+
 st.subheader("💰 Free Cash Flow Analysis")
 
 ticker = st.text_input("Enter Ticker Symbol", "AAPL")
 stock = yf.Ticker(ticker)
 
-def find_row_label(df, keywords):
-    """Find row in a DataFrame index that matches any of the keywords."""
-    for label in df.index:
+def find_column_label(df, keywords):
+    """Search column names for relevant keywords (case insensitive)."""
+    for col in df.columns:
         for keyword in keywords:
-            if keyword in label.lower():
-                return label
+            if keyword in col.lower():
+                return col
     return None
 
 try:
-    # Load data
     cashflow = stock.cashflow.T
     income_stmt = stock.income_stmt.T
 
     if cashflow.empty or income_stmt.empty:
-        st.warning("Financial data is not available for this ticker.")
+        st.warning("Missing financial data.")
         st.stop()
 
-    # Try identifying CapEx and Operating Cash Flow rows
-    capex_keywords = [
-        "capital expenditures", "capex", "purchase of property",
-        "purchase of ppe", "investment in property"
-    ]
-    opcf_keywords = [
-        "total cash from operating activities", 
-        "net cash provided by operating activities"
-    ]
+    # Use column names (not index!) for cashflow
+    capex_keywords = ["capital expenditures", "capex", "purchase of property", "purchase of ppe"]
+    opcf_keywords = ["total cash from operating activities", "net cash provided by operating activities"]
 
-    capex_row = find_row_label(cashflow.T, capex_keywords)
-    op_cf_row = find_row_label(cashflow.T, opcf_keywords)
+    capex_col = find_column_label(cashflow, capex_keywords)
+    opcf_col = find_column_label(cashflow, opcf_keywords)
 
-    if not capex_row or not op_cf_row:
-        st.warning("Unable to find required rows for CapEx or Operating Cash Flow.")
+    if not capex_col or not opcf_col:
+        st.write("Cashflow Columns:", cashflow.columns.tolist())  # TEMP DEBUG
+        st.warning("❌ Unable to find required CapEx or Operating Cash Flow columns.")
         st.stop()
 
-    capex = cashflow[capex_row]
-    op_cf = cashflow[op_cf_row]
-    fcf = op_cf + capex  # CapEx is usually negative
+    capex = cashflow[capex_col]
+    op_cf = cashflow[opcf_col]
+    fcf = op_cf + capex  # CapEx is negative
 
-    # Drop NaNs
+    # Clean FCF
     fcf = fcf.dropna()
-    if fcf.empty:
-        st.warning("No valid Free Cash Flow data available.")
-        st.stop()
-
     fcf.index = pd.to_datetime(fcf.index).year
     fcf = fcf.sort_index()
 
-    # Try getting revenue and net income with fallbacks
+    # Try revenue and net income
     revenue = None
     net_income = None
-
-    for col in ["Total Revenue", "Revenue"]:
-        if col in income_stmt.columns:
-            revenue = income_stmt[col]
+    for r in ["Total Revenue", "Revenue"]:
+        if r in income_stmt.columns:
+            revenue = income_stmt[r]
             break
-    for col in ["Net Income", "Net Income Applicable to Common Shares"]:
-        if col in income_stmt.columns:
-            net_income = income_stmt[col]
+    for n in ["Net Income", "Net Income Applicable to Common Shares"]:
+        if n in income_stmt.columns:
+            net_income = income_stmt[n]
             break
 
     if revenue is None or net_income is None:
         st.warning("Unable to retrieve revenue or net income.")
         st.stop()
 
-    # Reindex to match FCF years
-    revenue = revenue.reindex(fcf.index).fillna(method='ffill')
-    net_income = net_income.reindex(fcf.index).fillna(method='ffill')
+    # Align all data
+    revenue = revenue.reindex(fcf.index)
+    net_income = net_income.reindex(fcf.index)
 
     # Metrics
     last_fcf = fcf.iloc[-1]
     avg_fcf = fcf.tail(3).mean()
+    fcf_margin = (last_fcf / revenue.iloc[-1]) * 100 if revenue.iloc[-1] != 0 else None
+    conversion_rate = (last_fcf / net_income.iloc[-1]) * 100 if net_income.iloc[-1] != 0 else None
 
-    try:
-        fcf_margin = (last_fcf / revenue.iloc[-1]) * 100 if revenue.iloc[-1] != 0 else None
-    except ZeroDivisionError:
-        fcf_margin = None
-
-    try:
-        conversion_rate = (last_fcf / net_income.iloc[-1]) * 100 if net_income.iloc[-1] != 0 else None
-    except ZeroDivisionError:
-        conversion_rate = None
-
-    # Display metrics
+    # Display
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("📊 Last Value", f"${last_fcf/1e9:.1f}B")
+    col1.metric("📊 Last FCF", f"${last_fcf/1e9:.1f}B")
     col2.metric("📈 3-Year Avg", f"${avg_fcf/1e9:.1f}B")
     col3.metric("📎 FCF Margin", f"{fcf_margin:.0f}%" if fcf_margin else "N/A")
     col4.metric("🔄 Conversion Rate", f"{conversion_rate:.0f}%" if conversion_rate else "N/A")
 
-    # Bar Chart
+    # Bar chart
     chart_data = pd.DataFrame({
         "Year": fcf.index,
-        "Free Cash Flow": fcf.values / 1e9  # in Billions
+        "Free Cash Flow": fcf.values / 1e9
     })
 
     chart = alt.Chart(chart_data).mark_bar(color="#7f8c8d").encode(
-        x=alt.X("Year:O", title="Year"),
-        y=alt.Y("Free Cash Flow:Q", title="Free Cash Flow (Billion USD)")
+        x=alt.X("Year:O"),
+        y=alt.Y("Free Cash Flow:Q")
     ).properties(
         width=700,
         height=400,
@@ -890,7 +869,7 @@ try:
     st.altair_chart(chart, use_container_width=True)
 
 except Exception as e:
-    st.warning(f"Unable to generate FCF chart: {e}")
+    st.warning(f"FCF block failed: {e}")
 
 
 
