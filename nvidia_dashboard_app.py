@@ -1180,6 +1180,7 @@ def shareholder_yield_block(ticker):
         if "Debt Paydown Yield (%)" in data:
             st.line_chart(data["Debt Paydown Yield (%)"])
 
+
 # ✅ Now call it AFTER the function is defined
 shareholder_yield_block(ticker)
 
