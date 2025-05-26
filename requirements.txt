@@ -6,4 +6,5 @@ scikit-learn
 beautifulsoup4
 plotly
 openpyxl
+nltk
 
