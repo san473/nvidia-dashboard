@@ -776,21 +776,20 @@ def find_capex_row(cashflow_df):
     return None
 
 
+
+
 st.subheader("💰 Free Cash Flow Analysis")
 
 ticker = st.text_input("Enter Ticker Symbol", "AAPL")
 stock = yf.Ticker(ticker)
 
-
 def find_column_label(df, keywords):
     """Search column names for relevant keywords (case insensitive)."""
     for col in df.columns:
-        col_lower = str(col).lower()
         for keyword in keywords:
-            if keyword.lower() in col_lower:
+            if keyword in col.lower():
                 return col
     return None
-
 
 try:
     cashflow = stock.cashflow.T
@@ -800,40 +799,28 @@ try:
         st.warning("Missing financial data.")
         st.stop()
 
-    # Debug prints to inspect columns and keywords
-    st.write("Cashflow columns found:", cashflow.columns.tolist())
-
-    capex_keywords = [
-        "capital expenditure", "capital expenditures", "capex",
-        "purchase of property", "purchase of ppe"
-    ]
-    opcf_keywords = [
-        "operating cash flow", 
-        "total cash from operating activities", 
-        "net cash provided by operating activities"
-    ]
-
-    st.write("Trying to find CapEx with keywords:", capex_keywords)
-    st.write("Trying to find OpCF with keywords:", opcf_keywords)
+    # Flexible column matching
+    capex_keywords = ["capital expenditures", "capex", "purchase of property", "capital expenditure"]
+    opcf_keywords = ["operating cash flow", "total cash from operating activities", "net cash provided by operating activities"]
 
     capex_col = find_column_label(cashflow, capex_keywords)
     opcf_col = find_column_label(cashflow, opcf_keywords)
 
     if not capex_col or not opcf_col:
-        st.write("Cashflow Columns:", cashflow.columns.tolist())  # TEMP DEBUG
+        st.write("Cashflow Columns:", list(cashflow.columns))  # TEMP DEBUG
         st.warning("❌ Unable to find required CapEx or Operating Cash Flow columns.")
         st.stop()
 
     capex = cashflow[capex_col]
     op_cf = cashflow[opcf_col]
-    fcf = op_cf + capex  # CapEx is negative
+    fcf = op_cf + capex  # CapEx is usually negative
 
     # Clean FCF
     fcf = fcf.dropna()
     fcf.index = pd.to_datetime(fcf.index).year
     fcf = fcf.sort_index()
 
-    # Try revenue and net income
+    # Revenue and Net Income lookup
     revenue = None
     net_income = None
     for r in ["Total Revenue", "Revenue"]:
@@ -849,22 +836,39 @@ try:
         st.warning("Unable to retrieve revenue or net income.")
         st.stop()
 
-    # Align all data
-    revenue = revenue.reindex(fcf.index)
-    net_income = net_income.reindex(fcf.index)
+    # Align all three data series
+    revenue = revenue.reindex(fcf.index).dropna()
+    net_income = net_income.reindex(fcf.index).dropna()
+
+    common_index = fcf.index.intersection(revenue.index).intersection(net_income.index)
+    fcf = fcf.reindex(common_index)
+    revenue = revenue.reindex(common_index)
+    net_income = net_income.reindex(common_index)
 
     # Metrics
     last_fcf = fcf.iloc[-1]
-    avg_fcf = fcf.tail(3).mean()
-    fcf_margin = (last_fcf / revenue.iloc[-1]) * 100 if revenue.iloc[-1] != 0 else None
-    conversion_rate = (last_fcf / net_income.iloc[-1]) * 100 if net_income.iloc[-1] != 0 else None
+    last_revenue = revenue.iloc[-1]
+    last_net_income = net_income.iloc[-1]
 
-    # Display
+    fcf_margin = (last_fcf / last_revenue) * 100 if last_revenue != 0 else None
+    conversion_rate = (last_fcf / last_net_income) * 100 if last_net_income != 0 else None
+
+    # Optional debug block
+    st.write("Debug Info:", {
+        "FCF Years": fcf.index.tolist(),
+        "Revenue Years": revenue.index.tolist(),
+        "Net Income Years": net_income.index.tolist(),
+        "Last FCF": last_fcf,
+        "Last Revenue": last_revenue,
+        "Last Net Income": last_net_income
+    })
+
+    # Display metrics
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📊 Last FCF", f"${last_fcf/1e9:.1f}B")
-    col2.metric("📈 3-Year Avg", f"${avg_fcf/1e9:.1f}B")
-    col3.metric("📎 FCF Margin", f"{fcf_margin:.0f}%" if fcf_margin else "N/A")
-    col4.metric("🔄 Conversion Rate", f"{conversion_rate:.0f}%" if conversion_rate else "N/A")
+    col2.metric("📈 3-Year Avg", f"${fcf.tail(3).mean()/1e9:.1f}B")
+    col3.metric("📎 FCF Margin", f"{fcf_margin:.0f}%" if fcf_margin is not None else "N/A")
+    col4.metric("🔄 Conversion Rate", f"{conversion_rate:.0f}%" if conversion_rate is not None else "N/A")
 
     # Bar chart
     chart_data = pd.DataFrame({
@@ -884,7 +888,7 @@ try:
     st.altair_chart(chart, use_container_width=True)
 
 except Exception as e:
-    st.warning(f"FCF block failed: {e}")
+    st.warning(f"⚠️ FCF block failed: {e}")
 
 
 
