@@ -190,7 +190,7 @@ with st.expander("🌍 Geographic & Business Overview"):
 import yfinance as yf
 import streamlit as st
 
-ticker = ticker_input  # Assuming ticker_input is already defined
+
 ticker_obj = yf.Ticker(ticker)
 info = ticker_obj.info
 
