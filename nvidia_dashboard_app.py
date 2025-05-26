@@ -99,7 +99,7 @@ try:
         if ticker_obj.cashflow is None or ticker_obj.cashflow.empty:
             st.warning("⚠️ Cash flow data not available for this ticker.")
             ticker_obj = None
-    except Exception as e:
+except Exception as e:
         st.error(f"❌ Failed to load ticker data: {e}")
         ticker_obj = None
 
