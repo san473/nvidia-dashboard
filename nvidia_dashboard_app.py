@@ -572,7 +572,8 @@ except Exception as e:
 
 # -------------------- Real-Time News Feed --------------------
 # -------- CONFIG --------
-NEWS_API_KEY = st.secrets["news_api_key"]
+NEWS_API_KEY = st.secrets["NEWSAPI_KEY"]
+
 NEWS_API_URL = "https://newsapi.org/v2/everything"
 
 # -------- COMPANY NAME --------
@@ -751,6 +752,157 @@ try:
 
 except Exception as e:
     st.warning(f"Unable to load financial visualizations: {e}")
+
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+
+st.subheader("Free Cash Flow Breakdown")
+
+ticker = st.text_input("Enter Ticker Symbol", "AAPL")
+stock = yf.Ticker(ticker)
+
+# -- Get necessary statements
+income_stmt = stock.financials
+cashflow_stmt = stock.cashflow
+balance_sheet = stock.balance_sheet
+
+try:
+    col = cashflow_stmt.columns[0]
+
+    # Pull values (most recent year)
+    net_income = income_stmt.loc["Net Income"][col]
+    dep_amort = cashflow_stmt.loc.get("Depreciation", 0) + cashflow_stmt.loc.get("Amortization", 0)
+    capex = cashflow_stmt.loc["Capital Expenditures"][col]
+    sbc = cashflow_stmt.loc.get("Stock Based Compensation", 0)
+    wc_change = cashflow_stmt.loc.get("Change In Working Capital", 0)
+
+    # Estimate 'Other non-cash' adjustments
+    all_adjustments = cashflow_stmt.loc.get("Total Cash From Operating Activities", 0) - net_income
+    known_adjustments = dep_amort + sbc + wc_change
+    other_non_cash = all_adjustments - known_adjustments
+
+    # FCF Calculation
+    fcf = net_income + dep_amort + sbc + wc_change + other_non_cash + capex  # capex is negative
+
+    # Format for display
+    def fmt(val):
+        suffix = "B" if abs(val) > 1e9 else "m"
+        divisor = 1e9 if abs(val) > 1e9 else 1e6
+        return f"{val/divisor:,.1f}{suffix}"
+
+    breakdown = {
+        "Net Income": net_income,
+        "Depreciation & Amortization": dep_amort,
+        "Stock-Based Compensation": sbc,
+        "Change in Working Capital": wc_change,
+        "Others": other_non_cash,
+        "Capital Expenditures": capex,
+        "Free Cash Flow": fcf
+    }
+
+    # Display in Streamlit
+    st.markdown("### 📋 FCF Components")
+    st.markdown(
+        "<style>div[data-testid='column'] div[style*='flex-direction: column']{gap: 0.25rem;}</style>", unsafe_allow_html=True
+    )
+
+    for label, value in breakdown.items():
+        color = "red" if value < 0 and label != "Free Cash Flow" else "black"
+        if label == "Free Cash Flow":
+            st.markdown(f"""
+                <div style='background-color:#f4f4f4;padding:10px 15px;border-radius:8px;border-left: 6px solid green;'>
+                    <strong>{label}:</strong> <span style='color:green;font-size:20px;font-weight:bold;'>${fmt(value)}</span>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+                <div style='padding:2px 8px;'>
+                    <strong>{label}:</strong> <span style='color:{color}'>${fmt(value)}</span>
+                </div>
+            """, unsafe_allow_html=True)
+
+except Exception as e:
+    st.error(f"Error calculating FCF: {e}")
+
+import streamlit as st
+import yfinance as yf
+import plotly.graph_objects as go
+
+def get_income_statement(ticker):
+    stock = yf.Ticker(ticker)
+    try:
+        income_stmt = stock.financials
+        return income_stmt
+    except:
+        return None
+
+def prepare_waterfall_data(income_stmt):
+    # Extract key items from the latest year
+    latest_col = income_stmt.columns[0]
+
+    total_revenue = income_stmt.loc["Total Revenue"][latest_col]
+    cost_of_revenue = income_stmt.loc.get("Cost Of Revenue", 0)
+    gross_profit = total_revenue - cost_of_revenue if cost_of_revenue else income_stmt.loc["Gross Profit"][latest_col]
+    ebitda = income_stmt.loc.get("EBITDA", None)
+    operating_income = income_stmt.loc["Operating Income"][latest_col]
+    net_income = income_stmt.loc["Net Income"][latest_col]
+
+    # Estimate EBITDA if missing
+    if ebitda is None or pd.isna(ebitda[latest_col]):
+        depreciation = income_stmt.loc.get("Depreciation", 0)
+        amortization = income_stmt.loc.get("Amortization", 0)
+        ebitda = operating_income + depreciation + amortization
+
+    values = [
+        ("Revenue", total_revenue, "absolute"),
+        ("- Cost of Revenue", -cost_of_revenue, "relative"),
+        ("= Gross Profit", gross_profit, "total"),
+        ("- SG&A, R&D, etc.", operating_income - gross_profit, "relative"),
+        ("= Operating Income (EBIT)", operating_income, "total"),
+        ("- Interest/Other", net_income - operating_income, "relative"),
+        ("= Net Income", net_income, "total")
+    ]
+
+    return values
+
+def plot_waterfall_chart(data):
+    labels = [x[0] for x in data]
+    values = [x[1] for x in data]
+    measures = [x[2] for x in data]
+
+    fig = go.Figure(go.Waterfall(
+        name = "Earnings Flow",
+        orientation = "v",
+        measure = measures,
+        x = labels,
+        textposition = "outside",
+        text = [f"${v/1e6:,.1f}M" for v in values],
+        y = values,
+        connector = {"line":{"color":"rgb(63, 63, 63)"}}
+    ))
+
+    fig.update_layout(
+        title="Earnings Waterfall: Revenue to Net Income",
+        waterfallgroupgap = 0.3,
+        showlegend = False,
+        height=500
+    )
+    return fig
+
+# 🎯 Streamlit Block
+st.subheader("Earnings Waterfall: Revenue to Net Income")
+
+ticker = st.text_input("Enter Ticker", "AAPL")
+income_stmt = get_income_statement(ticker)
+
+if income_stmt is not None:
+    data = prepare_waterfall_data(income_stmt)
+    fig = plot_waterfall_chart(data)
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.error("Unable to fetch financials.")
+
 
 # -------- Revenue Trends --------
 
