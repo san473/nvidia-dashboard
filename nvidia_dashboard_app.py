@@ -759,6 +759,31 @@ except Exception as e:
 
 st.subheader("💰 Free Cash Flow Analysis")
 
+import yfinance as yf
+import pandas as pd
+import altair as alt
+import streamlit as st
+
+def find_capex_row(cashflow_df):
+    index_lower = [row.lower() for row in cashflow_df.index]
+    possible_patterns = [
+        "capital expenditures",
+        "capital expenditure",
+        "purchase of property and equipment",
+        "purchase of property plant and equipment",
+        "purchase of property, plant and equipment",
+        "purchase of ppe",
+        "purchase property and equipment",
+        "capex"
+    ]
+    for pattern in possible_patterns:
+        for i, row_lower in enumerate(index_lower):
+            if pattern in row_lower:
+                return cashflow_df.index[i]
+    return None
+
+st.subheader("💰 Free Cash Flow Analysis")
+
 ticker = st.text_input("Enter Ticker Symbol", "AAPL")
 stock = yf.Ticker(ticker)
 
@@ -770,9 +795,22 @@ try:
     revenue = income_stmt["Total Revenue"]
     net_income = income_stmt["Net Income"]
 
+    # Find CapEx row dynamically
+    capex_row = find_capex_row(cashflow)
+
+    if capex_row is None:
+        st.warning("Unable to generate FCF chart: Capital Expenditures row not found")
+        st.stop()
+
+    capex = cashflow[capex_row]
+
+    # Try alternative names for Operating Cash Flow if needed
+    op_cf = cashflow.get("Total Cash From Operating Activities") or cashflow.get("Operating Cash Flow")
+    if op_cf is None:
+        st.warning("Unable to generate FCF chart: Operating cash flow row not found")
+        st.stop()
+
     # Calculate Free Cash Flow
-    capex = cashflow["Capital Expenditures"]
-    op_cf = cashflow["Total Cash From Operating Activities"]
     fcf = op_cf + capex
 
     # Clean data
@@ -815,6 +853,7 @@ try:
 
 except Exception as e:
     st.warning(f"Unable to generate FCF chart: {e}")
+
 
 
 import streamlit as st
