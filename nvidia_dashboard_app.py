@@ -104,19 +104,19 @@ except Exception as e:
         ticker_obj = None
 
         if ticker:
-    news_block(ticker)
-@st.cache_data
-def get_data(ticker):
-    stock = yf.Ticker(ticker)
-    info = stock.info
-    hist = stock.history(period="1y")
+           news_block(ticker)
+        @st.cache_data
+        def get_data(ticker):
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        hist = stock.history(period="1y")
     
 
-    return info, hist
+        return info, hist
 
-def get_financial_ratios(ticker):
-    stock = yf.Ticker(ticker)
-    info = stock.info
+        def get_financial_ratios(ticker):
+        stock = yf.Ticker(ticker)
+        info = stock.info
 
     ratios = {
         "Market Cap": info.get("marketCap"),
