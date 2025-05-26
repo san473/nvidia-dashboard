@@ -783,45 +783,89 @@ st.subheader("💰 Free Cash Flow Analysis")
 ticker = st.text_input("Enter Ticker Symbol", "AAPL")
 stock = yf.Ticker(ticker)
 
+def find_row_label(df, keywords):
+    """Find row in a DataFrame index that matches any of the keywords."""
+    for label in df.index:
+        for keyword in keywords:
+            if keyword in label.lower():
+                return label
+    return None
+
 try:
-    # Get financials
+    # Load data
     cashflow = stock.cashflow.T
-    financials = stock.financials.T
     income_stmt = stock.income_stmt.T
 
     if cashflow.empty or income_stmt.empty:
-        st.warning("Not enough financial data available for this ticker.")
+        st.warning("Financial data is not available for this ticker.")
         st.stop()
 
-    # Dynamically extract relevant rows
-    capex_row = find_capex_row(cashflow)
-    if capex_row is None or "Total Cash From Operating Activities" not in cashflow.columns:
+    # Try identifying CapEx and Operating Cash Flow rows
+    capex_keywords = [
+        "capital expenditures", "capex", "purchase of property",
+        "purchase of ppe", "investment in property"
+    ]
+    opcf_keywords = [
+        "total cash from operating activities", 
+        "net cash provided by operating activities"
+    ]
+
+    capex_row = find_row_label(cashflow.T, capex_keywords)
+    op_cf_row = find_row_label(cashflow.T, opcf_keywords)
+
+    if not capex_row or not op_cf_row:
         st.warning("Unable to find required rows for CapEx or Operating Cash Flow.")
         st.stop()
 
-    # Calculate Free Cash Flow
     capex = cashflow[capex_row]
-    op_cf = cashflow["Total Cash From Operating Activities"]
+    op_cf = cashflow[op_cf_row]
     fcf = op_cf + capex  # CapEx is usually negative
 
-    # Clean data
+    # Drop NaNs
     fcf = fcf.dropna()
+    if fcf.empty:
+        st.warning("No valid Free Cash Flow data available.")
+        st.stop()
+
     fcf.index = pd.to_datetime(fcf.index).year
     fcf = fcf.sort_index()
 
-    # Align revenue & net income
-    revenue = income_stmt["Total Revenue"]
-    net_income = income_stmt["Net Income"]
-    revenue = revenue[fcf.index]
-    net_income = net_income[fcf.index]
+    # Try getting revenue and net income with fallbacks
+    revenue = None
+    net_income = None
+
+    for col in ["Total Revenue", "Revenue"]:
+        if col in income_stmt.columns:
+            revenue = income_stmt[col]
+            break
+    for col in ["Net Income", "Net Income Applicable to Common Shares"]:
+        if col in income_stmt.columns:
+            net_income = income_stmt[col]
+            break
+
+    if revenue is None or net_income is None:
+        st.warning("Unable to retrieve revenue or net income.")
+        st.stop()
+
+    # Reindex to match FCF years
+    revenue = revenue.reindex(fcf.index).fillna(method='ffill')
+    net_income = net_income.reindex(fcf.index).fillna(method='ffill')
 
     # Metrics
     last_fcf = fcf.iloc[-1]
     avg_fcf = fcf.tail(3).mean()
-    fcf_margin = (last_fcf / revenue.iloc[-1]) * 100 if revenue.iloc[-1] != 0 else None
-    conversion_rate = (last_fcf / net_income.iloc[-1]) * 100 if net_income.iloc[-1] != 0 else None
 
-    # Metrics display
+    try:
+        fcf_margin = (last_fcf / revenue.iloc[-1]) * 100 if revenue.iloc[-1] != 0 else None
+    except ZeroDivisionError:
+        fcf_margin = None
+
+    try:
+        conversion_rate = (last_fcf / net_income.iloc[-1]) * 100 if net_income.iloc[-1] != 0 else None
+    except ZeroDivisionError:
+        conversion_rate = None
+
+    # Display metrics
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📊 Last Value", f"${last_fcf/1e9:.1f}B")
     col2.metric("📈 3-Year Avg", f"${avg_fcf/1e9:.1f}B")
