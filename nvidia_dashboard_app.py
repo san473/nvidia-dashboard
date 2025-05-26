@@ -903,83 +903,80 @@ st.write("Income statement columns:", income_stmt.columns.tolist())
 latest_period = income_stmt.columns[0]
 
 
+# Earnings Waterfall Chart
+import plotly.graph_objects as go
+
 st.subheader("📊 Earnings Waterfall Chart")
 
-ticker = st.text_input("Enter Ticker Symbol", "AAPL")
-stock = yf.Ticker(ticker)
-
 try:
-    # Fetch income statement and transpose (rows = line items, columns = dates)
-    income_stmt = stock.financials.T  # Using 'financials' since 'income_stmt' may differ, adjust if needed
+    income_stmt = get_income_statement(ticker)
 
-    if income_stmt.empty:
-        st.warning("Income statement data is missing.")
-        st.stop()
+    # Function to safely extract values from the DataFrame
+    def get_amount(df, row_name):
+        try:
+            return df.loc[row_name].dropna().values[0]
+        except:
+            return 0
 
-    # Use the latest date column (usually last)
-    latest_date_col = income_stmt.columns[-1]
+    # Use available clean row names directly from your income_stmt.index
+    row_map = {
+        "Revenue": "Total Revenue",
+        "Cost of Revenue": "Cost Of Revenue",
+        "Gross Profit": "Gross Profit",
+        "Operating Expenses": "Operating Expense",
+        "Operating Income": "Operating Income",
+        "Other Expenses": "Other Income Expense",
+        "Net Income": "Net Income"
+    }
 
-    # Helper to get value for a line item or 0 if missing
-    def get_value(row_name):
-        if row_name in income_stmt.index:
-            val = income_stmt.at[row_name, latest_date_col]
-            return val if pd.notna(val) else 0
-        return 0
+    values = {k: get_amount(income_stmt, v) for k, v in row_map.items()}
 
-    # Extract amounts
-    revenue = get_value("Total Revenue")
-    cost_of_revenue = get_value("Cost Of Revenue")
-    gross_profit = get_value("Gross Profit")
-    operating_expenses = get_value("Operating Expense")
-    operating_income = get_value("Operating Income")
-    other_expenses = get_value("Other Income Expense")
-    net_income = get_value("Net Income")
-
-    # Prepare DataFrame for display & waterfall
-    data = pd.DataFrame({
-        "Line Item": ["Revenue", "Cost Of Revenue", "Gross Profit", "Operating Expenses", "Operating Income", "Other Expenses", "Net Income"],
-        "Amount": [revenue, -cost_of_revenue, gross_profit, -operating_expenses, operating_income, -other_expenses, net_income]
+    # Prepare data for box display
+    st.markdown("### Key Income Statement Figures (Most Recent)")
+    fig_data = pd.DataFrame({
+        "Line Item": list(values.keys()),
+        "Amount (in millions)": [f"${v/1e6:,.1f}" for v in values.values()]
     })
+    left_col, right_col = st.columns([1, 2])
 
-    # Display table in a box on left
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("### Earnings Breakdown")
-        st.dataframe(data.style.format({"Amount": "${:,.0f}"}))
+    with left_col:
+        st.dataframe(fig_data, use_container_width=True)
 
-    # Waterfall chart on right
-    with col2:
-        st.markdown("### Earnings Waterfall")
+    # Waterfall values setup
+    measure = ["absolute", "relative", "total", "relative", "relative", "relative", "total"]
+    labels = list(values.keys())
+    raw_vals = list(values.values())
 
-        # Calculate cumulative amounts for waterfall steps
-        data["Cumulative"] = data["Amount"].cumsum()
+    # Adjust for plotly waterfall steps: revenue - cost = gross, - expenses = operating, etc.
+    steps = [
+        raw_vals[0],                      # Revenue
+        -raw_vals[1],                     # Cost of Revenue
+        raw_vals[2],                      # Gross Profit
+        -raw_vals[3],                     # Operating Expenses
+        -raw_vals[5],                     # Other Expenses
+        raw_vals[6],                      # Net Income
+    ]
 
-        # Create base for waterfall bars (start points)
-        data["Base"] = data["Cumulative"] - data["Amount"]
+    with right_col:
+        fig = go.Figure(go.Waterfall(
+            orientation="v",
+            measure=["absolute", "relative", "total", "relative", "relative", "total"],
+            x=["Revenue", "Cost of Revenue", "Gross Profit", "Operating Expenses", "Other Expenses", "Net Income"],
+            text=[f"${v/1e6:,.1f}M" for v in steps],
+            textposition="outside",
+            y=steps,
+            connector={"line": {"color": "rgb(63, 63, 63)"}},
+        ))
 
-        # Bar colors: green for positive, red for negative
-        data["Color"] = data["Amount"].apply(lambda x: "#2ca02c" if x >= 0 else "#d62728")
-
-        chart = alt.Chart(data).mark_bar().encode(
-            x=alt.X("Line Item:N", sort=None, axis=alt.Axis(labelAngle=-90)),
-            y=alt.Y("Amount:Q"),
-            color=alt.Color("Color:N", scale=None, legend=None),
-            tooltip=[alt.Tooltip("Line Item"), alt.Tooltip("Amount", format="$,.0f")]
+        fig.update_layout(
+            title="Earnings Waterfall Breakdown",
+            waterfallgroupgap=0.5,
+            height=500,
         )
-
-        # Add invisible bars as base to simulate waterfall steps
-        base = alt.Chart(data).mark_bar(opacity=0).encode(
-            x=alt.X("Line Item:N", sort=None),
-            y=alt.Y("Base:Q")
-        )
-
-        waterfall = base + chart
-        waterfall = waterfall.properties(width=500, height=400, title=f"Earnings Waterfall for {ticker.upper()} ({latest_date_col.date()})")
-
-        st.altair_chart(waterfall, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
-    st.warning(f"Waterfall chart failed: {e}")
+    st.warning(f"⚠️ Earnings Waterfall Chart failed: {e}")
 
 
 
