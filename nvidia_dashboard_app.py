@@ -1116,6 +1116,60 @@ try:
 except Exception as e:
     st.error(f"Failed to load revenue trend: {e}")
 
+import matplotlib.pyplot as plt
+
+def shareholder_yield_block(ticker):
+    st.markdown("### 💸 Shareholder Yield Breakdown")
+
+    try:
+        ticker_obj = yf.Ticker(ticker)
+        financials = ticker_obj.financials
+        cashflow = ticker_obj.cashflow
+        shares = ticker_obj.get_shares_full(start="2019-01-01")
+
+        if cashflow is None or financials is None or shares is None:
+            st.warning("Insufficient financial data available for shareholder yield.")
+            return
+
+        years = [col.year for col in cashflow.columns[::-1]]
+
+        # Dividend Yield = Dividends Paid / Market Cap
+        dividends = -cashflow.loc["Dividends Paid"][::-1]
+        market_cap = ticker_obj.info.get("marketCap", None)
+        dividend_yield = (dividends / market_cap) * 100 if market_cap else None
+
+        # Buyback Yield = Stock Repurchased / Market Cap
+        buybacks = -cashflow.loc.get("Repurchase Of Stock", pd.Series([0]*len(years)))[::-1]
+        buyback_yield = (buybacks / market_cap) * 100 if market_cap else None
+
+        # Debt Paydown Yield = Net Debt Reduction / Market Cap
+        debt_issued = cashflow.loc.get("Issuance Of Debt", pd.Series([0]*len(years)))[::-1]
+        debt_repaid = -cashflow.loc.get("Repayment Of Debt", pd.Series([0]*len(years)))[::-1]
+        net_debt_reduction = debt_repaid - debt_issued
+        debt_yield = (net_debt_reduction / market_cap) * 100 if market_cap else None
+
+        # Plot the 3 line charts side by side
+        fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+        fig.tight_layout(pad=4.0)
+
+        axs[0].plot(years, dividend_yield, marker='o', color='green')
+        axs[0].set_title("Dividend Yield (%)")
+        axs[0].set_ylim(bottom=0)
+
+        axs[1].plot(years, buyback_yield, marker='o', color='blue')
+        axs[1].set_title("Buyback Yield (%)")
+        axs[1].set_ylim(bottom=0)
+
+        axs[2].plot(years, debt_yield, marker='o', color='orange')
+        axs[2].set_title("Debt Paydown Yield (%)")
+        axs[2].set_ylim(bottom=0)
+
+        st.pyplot(fig)
+
+    except Exception as e:
+        st.error(f"Error generating shareholder yield section: {e}")
+
+
 shareholder_yield_block(ticker)
 import yfinance as yf
 import streamlit as st
@@ -1128,36 +1182,35 @@ def get_yield_data(ticker):
     if not market_cap:
         return None, None
 
-    # Get historical cash flow and balance sheet
     cf = ticker_obj.quarterly_cashflow
     bs = ticker_obj.quarterly_balance_sheet
+    if cf.empty or bs.empty:
+        return None, None
 
-    # Transpose for date handling
     cf = cf.T
     bs = bs.T
-
-    # Calculate yields
     df = pd.DataFrame(index=cf.index)
 
-    # Dividend Yield = Dividends Paid / Market Cap
+    # Dividend Yield
     if "Dividends Paid" in cf.columns:
-        df["Dividend Yield (%)"] = -cf["Dividends Paid"] / market_cap * 100  # Negated (cash outflow)
+        df["Dividend Yield (%)"] = -cf["Dividends Paid"] / market_cap * 100
 
-    # Buyback Yield = Repurchase of Stock / Market Cap
-    if "Repurchase of Stock" in cf.columns:
-        df["Buyback Yield (%)"] = -cf["Repurchase of Stock"] / market_cap * 100
+    # Buyback Yield
+    if "Repurchase Of Stock" in cf.columns:
+        df["Buyback Yield (%)"] = -cf["Repurchase Of Stock"] / market_cap * 100
 
-    # Debt Paydown Yield = Reduction in Long-Term Debt / Market Cap
+    # Debt Paydown Yield
     if "Long Term Debt" in bs.columns:
-        debt_change = bs["Long Term Debt"].diff(periods=-1)  # next - current
+        debt_change = bs["Long Term Debt"].diff(periods=-1)
         df["Debt Paydown Yield (%)"] = debt_change / market_cap * 100
 
-    df = df.sort_index()  # Ensure chronological order
-    return df, df.iloc[-1]  # full history, and most recent yields
+    df = df.sort_index()
+    return df, df.iloc[-1]
+
 
 
 def shareholder_yield_block(ticker):
-    st.markdown("### 📊 Shareholder Yield")
+    st.markdown("### 💸 Shareholder Yield")
 
     data, latest = get_yield_data(ticker)
     if data is None or latest is None:
@@ -1171,20 +1224,23 @@ def shareholder_yield_block(ticker):
         f"**Debt Paydown Yield:** {latest.get('Debt Paydown Yield (%)', 0):.2f}%"
     )
 
-    # 3 charts in one row
+    # 3 Charts in a row
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown("**Dividend Yield (%)**")
-        st.line_chart(data["Dividend Yield (%)"])
+        if "Dividend Yield (%)" in data:
+            st.line_chart(data["Dividend Yield (%)"])
 
     with col2:
         st.markdown("**Buyback Yield (%)**")
-        st.line_chart(data["Buyback Yield (%)"])
+        if "Buyback Yield (%)" in data:
+            st.line_chart(data["Buyback Yield (%)"])
 
     with col3:
         st.markdown("**Debt Paydown Yield (%)**")
-        st.line_chart(data["Debt Paydown Yield (%)"])
+        if "Debt Paydown Yield (%)" in data:
+            st.line_chart(data["Debt Paydown Yield (%)"])
 
 
 # -------------------- FINANCIAL METRICS & KEY RATIOS --------------------
