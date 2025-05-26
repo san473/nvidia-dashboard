@@ -900,78 +900,78 @@ st.write("Income Statement Rows:", income_stmt.index.tolist())
 
 import altair as alt
 import pandas as pd
+import streamlit as st
 
-def prepare_earnings_breakdown(income_stmt):
-    # Get the latest period (column) from the income statement
-    latest_period = income_stmt.columns[0]
+# Assume you already have the yfinance ticker loaded:
+# stock = yf.Ticker(ticker)
+income_stmt = stock.financials.T  # Or stock.income_stmt.T depending on your code
 
-    def safe_get(label):
-        # Use .get on the index to avoid errors if label is missing
-        # income_stmt is a DataFrame with index=labels, columns=periods
-        # Use .loc with try-except or .get? Since index is not dict, safer to check presence
-        if label in income_stmt.index:
-            val = income_stmt.loc[label, latest_period]
-            return val if pd.notna(val) else 0
-        else:
+# Show structure to debug if needed
+st.write("Income Statement sample (latest periods):")
+st.write(income_stmt.head())
+
+# Use the most recent fiscal period column (likely 2024-09-30)
+latest_period = income_stmt.columns[0]
+
+# Convert index to lowercase for case-insensitive matching
+income_stmt_lower = income_stmt.copy()
+income_stmt_lower.index = income_stmt_lower.index.str.lower()
+
+def safe_get(label):
+    label = label.lower()
+    try:
+        val = income_stmt_lower.loc[label, latest_period]
+        if pd.isna(val):
             return 0
+        return val
+    except KeyError:
+        return 0
 
-    # Earnings line items
-    revenue = safe_get("Total Revenue")
-    cost_of_revenue = safe_get("Cost Of Revenue")
-    gross_profit = safe_get("Gross Profit")
-    rd = safe_get("Research Development")
-    sga = safe_get("Selling General Administrative")
-    operating_expenses = rd + sga
-    operating_income = safe_get("Operating Income")
-    other_expenses = safe_get("Other Income Expense Net")
-    net_income = safe_get("Net Income")
+revenue = safe_get("total revenue")
+cost_of_revenue = safe_get("cost of revenue")
+gross_profit = safe_get("gross profit")
+rd = safe_get("research development")
+sga = safe_get("selling general administrative")
+operating_expenses = rd + sga
+operating_income = safe_get("operating income")
+other_expenses = safe_get("other income expense net")
+net_income = safe_get("net income")
 
-    breakdown = [
-        {"Label": "Total Revenue", "Amount ($B)": revenue / 1e9},
-        {"Label": "Cost of Revenue", "Amount ($B)": -cost_of_revenue / 1e9},
-        {"Label": "Gross Profit", "Amount ($B)": gross_profit / 1e9},
-        {"Label": "Operating Expenses (R&D + SG&A)", "Amount ($B)": -operating_expenses / 1e9},
-        {"Label": "Operating Income", "Amount ($B)": operating_income / 1e9},
-        {"Label": "Other Expenses", "Amount ($B)": -other_expenses / 1e9},
-        {"Label": "Net Income", "Amount ($B)": net_income / 1e9},
-    ]
+earnings = [
+    {"Label": "Total Revenue", "Amount": revenue / 1e9},
+    {"Label": "Cost of Revenue", "Amount": -cost_of_revenue / 1e9},
+    {"Label": "Gross Profit", "Amount": gross_profit / 1e9},
+    {"Label": "Operating Expenses (R&D + SG&A)", "Amount": -operating_expenses / 1e9},
+    {"Label": "Operating Income", "Amount": operating_income / 1e9},
+    {"Label": "Other Expenses", "Amount": -other_expenses / 1e9},
+    {"Label": "Net Income", "Amount": net_income / 1e9},
+]
 
-    return pd.DataFrame(breakdown)
+earnings_df = pd.DataFrame(earnings)
 
-# === Streamlit section ===
-try:
-    st.subheader("🧾 Earnings Breakdown")
+col1, col2 = st.columns([1, 2])
 
-    earnings_df = prepare_earnings_breakdown(income_stmt)
+with col1:
+    st.write("### Income Statement Summary")
+    st.table(earnings_df.set_index("Label").style.format("{:.2f}"))
 
-    col1, col2 = st.columns([1, 2])
+with col2:
+    chart = alt.Chart(earnings_df).mark_bar().encode(
+        x=alt.X("Label:N", axis=alt.Axis(labelAngle=-90)),
+        y=alt.Y("Amount:Q", title="Amount ($B)"),
+        color=alt.condition(
+            alt.datum.Amount > 0,
+            alt.value("#2ecc71"),
+            alt.value("#e74c3c")
+        ),
+        tooltip=[alt.Tooltip("Label:N"), alt.Tooltip("Amount:Q", format=".2f")]
+    ).properties(
+        width=600,
+        height=400,
+        title="Earnings Waterfall"
+    )
+    st.altair_chart(chart, use_container_width=True)
 
-    with col1:
-        st.markdown("### 🧮 Income Statement Summary")
-        st.table(earnings_df.set_index("Label").style.format("{:.2f}"))
-
-    with col2:
-        df = earnings_df.copy()
-        df["Cumulative"] = df["Amount ($B)"].cumsum()
-        df["Start"] = df["Cumulative"] - df["Amount ($B)"]
-        df["End"] = df["Cumulative"]
-        df["Color"] = df["Amount ($B)"].apply(lambda x: "#2ecc71" if x >= 0 else "#e74c3c")
-
-        chart = alt.Chart(df).mark_bar().encode(
-            x=alt.X("Label:N", title="", sort=None, axis=alt.Axis(labelAngle=-90)),  # Vertical labels
-            y=alt.Y("Amount ($B):Q", title="Earnings Flow ($B)", scale=alt.Scale(zero=False)),
-            color=alt.Color("Color:N", scale=None, legend=None),
-            tooltip=[alt.Tooltip("Label:N"), alt.Tooltip("Amount ($B):Q", format=".2f")]
-        ).properties(
-            width=600,
-            height=400,
-            title="📉 Waterfall: Earnings Flow"
-        )
-
-        st.altair_chart(chart, use_container_width=True)
-
-except Exception as e:
-    st.warning(f"Earnings breakdown failed: {e}")
 
 
 
