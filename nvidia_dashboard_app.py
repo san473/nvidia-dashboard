@@ -26,23 +26,7 @@ def load_sp500_data():
     df = pd.read_excel("sp500_companies.xlsx")
     return df
 
-# Ticker input and validation
-ticker = None
-ticker_obj = None
 
-ticker_input = st.text_input("Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL").upper()
-
-if ticker_input:
-    ticker = ticker_input.upper()
-    try:
-        ticker_obj = yf.Ticker(ticker)
-        # Try fetching cash flow to validate data availability
-        if ticker_obj.cashflow is None or ticker_obj.cashflow.empty:
-            st.warning("⚠️ Cash flow data not available for this ticker.")
-            ticker_obj = None
-    except Exception as e:
-        st.error(f"❌ Failed to load ticker data: {e}")
-        ticker_obj = None
 COLUMN_DISPLAY_NAMES = {
     "symbol": "Symbol",
     "exchange": "Exchange",
@@ -101,11 +85,26 @@ def fetch_news(ticker):
 # ------------------------ HEADER ------------------------
 st.title("📊 Comprehensive Stock Dashboard")
 
-ticker_input = st.text_input("Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL").upper()
-ticker = ticker_input
-if ticker:
-    news_block(ticker)
+ticker = None
+ticker_obj = None
 
+ticker_input = st.text_input("Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL").upper()
+if ticker_input:
+    ticker = ticker_input
+
+
+try:
+        ticker_obj = yf.Ticker(ticker)
+        # Try fetching cash flow to validate data availability
+        if ticker_obj.cashflow is None or ticker_obj.cashflow.empty:
+            st.warning("⚠️ Cash flow data not available for this ticker.")
+            ticker_obj = None
+    except Exception as e:
+        st.error(f"❌ Failed to load ticker data: {e}")
+        ticker_obj = None
+
+        if ticker:
+    news_block(ticker)
 @st.cache_data
 def get_data(ticker):
     stock = yf.Ticker(ticker)
