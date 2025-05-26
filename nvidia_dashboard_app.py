@@ -1121,7 +1121,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-shareholder_yield_block(ticker)
+
 def get_shareholder_yield_data(ticker):
     ticker_obj = yf.Ticker(ticker)
     info = ticker_obj.info
@@ -1218,7 +1218,7 @@ def shareholder_yield_block(ticker):
         st.line_chart(data["Debt Paydown Yield (%)"].fillna(0))
 
 
-
+shareholder_yield_block(ticker)
 
 
 
