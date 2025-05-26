@@ -72,6 +72,75 @@ def fetch_news(ticker):
         return []
 
 
+
+@st.cache_data(ttl=60)
+def get_company_name(ticker):
+    try:
+        return yf.Ticker(ticker).info.get("longName", ticker)
+    except Exception:
+        return ticker
+
+@st.cache_data(ttl=60)
+def fetch_news(company_name):
+    today = datetime.today()
+    last_week = today - timedelta(days=7)
+    params = {
+        "q": company_name,
+        "from": last_week.strftime("%Y-%m-%d"),
+        "sortBy": "relevancy",
+        "language": "en",
+        "apiKey": NEWSAPI_KEY,
+        "pageSize": 10,  # limit to latest 10 articles
+    }
+    response = requests.get("https://newsapi.org/v2/everything", params=params)
+    if response.status_code == 200:
+        return response.json().get("articles", [])
+    return []
+
+def categorize_news(articles):
+    positive, negative, emerging = [], [], []
+    positive_keywords = ["beats", "growth", "record", "surge", "upgrade", "strong", "gain", "boost"]
+    negative_keywords = ["misses", "decline", "drop", "downgrade", "loss", "concern", "crisis", "lawsuit"]
+
+    for article in articles:
+        text = (article.get("title", "") + " " + article.get("description", "")).lower()
+        if any(word in text for word in positive_keywords):
+            positive.append(article)
+        elif any(word in text for word in negative_keywords):
+            negative.append(article)
+        else:
+            emerging.append(article)
+    return positive, negative, emerging
+
+def summarize_section(articles, max_lines=3):
+    # Generate a simple summary by extracting key points (titles combined)
+    if not articles:
+        return "No significant news found."
+    lines = [f"- {art['title']}" for art in articles[:max_lines]]
+    return "\n".join(lines)
+
+def news_summary_block(ticker):
+    company_name = get_company_name(ticker)
+    articles = fetch_news(company_name)
+
+    st.markdown(f"### 🧠 News Summary for {company_name}")
+
+    if not articles:
+        st.warning("No recent news found.")
+        return
+
+    pos, neg, emerg = categorize_news(articles)
+
+    st.markdown("#### 📈 Positive Developments")
+    st.markdown(summarize_section(pos))
+
+    st.markdown("#### ⚠️ Risks & Negative Sentiment")
+    st.markdown(summarize_section(neg))
+
+    st.markdown("#### 🧩 Emerging Themes")
+    st.markdown(summarize_section(emerg))
+
+
 # ------------------------ HEADER ------------------------
 st.title("📊 Comprehensive Stock Dashboard")
 
