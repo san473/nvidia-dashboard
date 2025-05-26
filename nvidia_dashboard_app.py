@@ -1151,6 +1151,13 @@ def get_shareholder_yield_data(ticker):
 
     # Market cap may change over time - approximate using ticker.history() on quarterly dates
     hist = ticker_obj.history(period="1y", interval="1d")
+    if hist.empty:
+    # If history data not available, return None
+    return None, None
+
+    # Remove timezone info from hist index to avoid mismatch errors
+    hist.index = hist.index.tz_localize(None)
+
     hist = hist.resample('Q').last()  # quarterly close price
 
 
