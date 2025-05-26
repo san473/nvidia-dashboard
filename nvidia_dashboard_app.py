@@ -903,80 +903,76 @@ st.write("Income statement columns:", income_stmt.columns.tolist())
 latest_period = income_stmt.columns[0]
 
 
-# Earnings Waterfall Chart
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-st.subheader("📊 Earnings Waterfall Chart")
+st.subheader("Earnings Breakdown Waterfall")
 
 try:
-    income_stmt = get_income_statement(ticker)
+    # Use the already available income_stmt
+    latest_col = income_stmt.columns[0]  # Most recent quarter
 
-    # Function to safely extract values from the DataFrame
-    def get_amount(df, row_name):
+    def get_amount(row_name):
         try:
-            return df.loc[row_name].dropna().values[0]
+            return float(income_stmt.loc[row_name][latest_col])
         except:
-            return 0
+            return 0.0
 
-    # Use available clean row names directly from your income_stmt.index
-    row_map = {
+    line_items = {
         "Revenue": "Total Revenue",
         "Cost of Revenue": "Cost Of Revenue",
         "Gross Profit": "Gross Profit",
         "Operating Expenses": "Operating Expense",
         "Operating Income": "Operating Income",
-        "Other Expenses": "Other Income Expense",
+        "Other Expenses": "Other Non Operating Income Expenses",
         "Net Income": "Net Income"
     }
 
-    values = {k: get_amount(income_stmt, v) for k, v in row_map.items()}
+    amounts = {label: get_amount(row) for label, row in line_items.items()}
+    waterfall_data = []
+    cumulative = 0
+    for i, (label, value) in enumerate(amounts.items()):
+        if i == 0:  # Revenue
+            waterfall_data.append(dict(name=label, y=value, measure="relative"))
+            cumulative += value
+        elif label == "Net Income":
+            final = cumulative + value
+            waterfall_data.append(dict(name=label, y=final, measure="total"))
+        else:
+            waterfall_data.append(dict(name=label, y=value, measure="relative"))
+            cumulative += value
 
-    # Prepare data for box display
-    st.markdown("### Key Income Statement Figures (Most Recent)")
-    fig_data = pd.DataFrame({
-        "Line Item": list(values.keys()),
-        "Amount (in millions)": [f"${v/1e6:,.1f}" for v in values.values()]
-    })
-    left_col, right_col = st.columns([1, 2])
+    # Create subplot with chart on right and table on left
+    fig = make_subplots(rows=1, cols=2, column_widths=[0.4, 0.6],
+                        specs=[[{"type": "table"}, {"type": "waterfall"}]])
 
-    with left_col:
-        st.dataframe(fig_data, use_container_width=True)
+    # Table of values
+    fig.add_trace(
+        go.Table(
+            header=dict(values=["Line Item", "Amount (USD)"]),
+            cells=dict(values=[list(amounts.keys()), [f"${v:,.0f}" for v in amounts.values()]])
+        ),
+        row=1, col=1
+    )
 
-    # Waterfall values setup
-    measure = ["absolute", "relative", "total", "relative", "relative", "relative", "total"]
-    labels = list(values.keys())
-    raw_vals = list(values.values())
-
-    # Adjust for plotly waterfall steps: revenue - cost = gross, - expenses = operating, etc.
-    steps = [
-        raw_vals[0],                      # Revenue
-        -raw_vals[1],                     # Cost of Revenue
-        raw_vals[2],                      # Gross Profit
-        -raw_vals[3],                     # Operating Expenses
-        -raw_vals[5],                     # Other Expenses
-        raw_vals[6],                      # Net Income
-    ]
-
-    with right_col:
-        fig = go.Figure(go.Waterfall(
+    # Waterfall chart
+    fig.add_trace(
+        go.Waterfall(
             orientation="v",
-            measure=["absolute", "relative", "total", "relative", "relative", "total"],
-            x=["Revenue", "Cost of Revenue", "Gross Profit", "Operating Expenses", "Other Expenses", "Net Income"],
-            text=[f"${v/1e6:,.1f}M" for v in steps],
-            textposition="outside",
-            y=steps,
-            connector={"line": {"color": "rgb(63, 63, 63)"}},
-        ))
+            measure=[d["measure"] for d in waterfall_data],
+            x=list(line_items.keys()),
+            y=[d["y"] for d in waterfall_data],
+            connector={"line": {"color": "gray"}},
+        ),
+        row=1, col=2
+    )
 
-        fig.update_layout(
-            title="Earnings Waterfall Breakdown",
-            waterfallgroupgap=0.5,
-            height=500,
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(title="Earnings Waterfall Chart", height=600)
+    st.plotly_chart(fig, use_container_width=True, key="earnings_waterfall_chart")
 
 except Exception as e:
     st.warning(f"⚠️ Earnings Waterfall Chart failed: {e}")
+
 
 
 
