@@ -897,87 +897,45 @@ except Exception as e:
 
 
 
-
-
-
-
-import streamlit as st
-import yfinance as yf
-import plotly.graph_objects as go
-
-def get_income_statement(ticker):
-    stock = yf.Ticker(ticker)
-    try:
-        income_stmt = stock.financials
-        return income_stmt
-    except:
-        return None
-
 def prepare_waterfall_data(income_stmt):
-    # Extract key items from the latest year
-    latest_col = income_stmt.columns[0]
+    # Ensure the most recent column is used
+    latest_period = income_stmt.columns[0]
 
-    total_revenue = income_stmt.loc["Total Revenue"][latest_col]
-    cost_of_revenue = income_stmt.loc.get("Cost Of Revenue", 0)
-    gross_profit = total_revenue - cost_of_revenue if cost_of_revenue else income_stmt.loc["Gross Profit"][latest_col]
-    ebitda = income_stmt.loc.get("EBITDA", None)
-    operating_income = income_stmt.loc["Operating Income"][latest_col]
-    net_income = income_stmt.loc["Net Income"][latest_col]
+    # Use safe .get() on income_stmt index (rows), not .loc
+    def safe_get(label):
+        return income_stmt.loc[label, latest_period] if label in income_stmt.index else 0
 
-    # Estimate EBITDA if missing
-    if ebitda is None or pd.isna(ebitda[latest_col]):
-        depreciation = income_stmt.loc.get("Depreciation", 0)
-        amortization = income_stmt.loc.get("Amortization", 0)
-        ebitda = operating_income + depreciation + amortization
+    revenue = safe_get("Total Revenue")
+    cost_of_revenue = safe_get("Cost Of Revenue")
+    gross_profit = safe_get("Gross Profit")
+    rd = safe_get("Research Development")
+    sga = safe_get("Selling General Administrative")
+    operating_income = safe_get("Operating Income")
+    interest_expense = safe_get("Interest Expense")
+    other_income = safe_get("Other Income Expense Net")
+    income_before_tax = safe_get("Income Before Tax")
+    income_tax = safe_get("Income Tax Expense")
+    net_income = safe_get("Net Income")
 
-    values = [
-        ("Revenue", total_revenue, "absolute"),
-        ("- Cost of Revenue", -cost_of_revenue, "relative"),
-        ("= Gross Profit", gross_profit, "total"),
-        ("- SG&A, R&D, etc.", operating_income - gross_profit, "relative"),
-        ("= Operating Income (EBIT)", operating_income, "total"),
-        ("- Interest/Other", net_income - operating_income, "relative"),
-        ("= Net Income", net_income, "total")
+    data = [
+        {"label": "Total Revenue", "value": revenue},
+        {"label": "Cost of Revenue", "value": -cost_of_revenue},
+        {"label": "Gross Profit", "value": gross_profit},
+        {"label": "R&D", "value": -rd},
+        {"label": "SG&A", "value": -sga},
+        {"label": "Operating Income", "value": operating_income},
+        {"label": "Interest Expense", "value": -interest_expense},
+        {"label": "Other Income", "value": other_income},
+        {"label": "Income Before Tax", "value": income_before_tax},
+        {"label": "Income Tax", "value": -income_tax},
+        {"label": "Net Income", "value": net_income}
     ]
+    return data
 
-    return values
 
-def plot_waterfall_chart(data):
-    labels = [x[0] for x in data]
-    values = [x[1] for x in data]
-    measures = [x[2] for x in data]
 
-    fig = go.Figure(go.Waterfall(
-        name = "Earnings Flow",
-        orientation = "v",
-        measure = measures,
-        x = labels,
-        textposition = "outside",
-        text = [f"${v/1e6:,.1f}M" for v in values],
-        y = values,
-        connector = {"line":{"color":"rgb(63, 63, 63)"}}
-    ))
 
-    fig.update_layout(
-        title="Earnings Waterfall: Revenue to Net Income",
-        waterfallgroupgap = 0.3,
-        showlegend = False,
-        height=500
-    )
-    return fig
 
-# 🎯 Streamlit Block
-st.subheader("Earnings Waterfall: Revenue to Net Income")
-
-ticker = st.text_input("Enter Ticker", "AAPL")
-income_stmt = get_income_statement(ticker)
-
-if income_stmt is not None:
-    data = prepare_waterfall_data(income_stmt)
-    fig = plot_waterfall_chart(data)
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.error("Unable to fetch financials.")
 
 
 # -------- Revenue Trends --------
