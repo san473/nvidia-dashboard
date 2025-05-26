@@ -901,68 +901,70 @@ st.write("Income Statement Rows:", income_stmt.index.tolist())
 import altair as alt
 import pandas as pd
 
-def prepare_waterfall_data(income_stmt):
+def prepare_earnings_breakdown(income_stmt):
     latest_period = income_stmt.columns[0]
 
     def safe_get(label):
         return income_stmt.loc[label, latest_period] if label in income_stmt.index else 0
 
+    # Earnings line items
     revenue = safe_get("Total Revenue")
     cost_of_revenue = safe_get("Cost Of Revenue")
     gross_profit = safe_get("Gross Profit")
     rd = safe_get("Research Development")
     sga = safe_get("Selling General Administrative")
+    operating_expenses = rd + sga
     operating_income = safe_get("Operating Income")
-    interest_expense = safe_get("Interest Expense")
-    other_income = safe_get("Other Income Expense Net")
-    income_before_tax = safe_get("Income Before Tax")
-    income_tax = safe_get("Income Tax Expense")
+    other_expenses = safe_get("Other Income Expense Net")
     net_income = safe_get("Net Income")
 
-    data = [
-        {"label": "Total Revenue", "value": revenue},
-        {"label": "Cost of Revenue", "value": -cost_of_revenue},
-        {"label": "Gross Profit", "value": gross_profit},
-        {"label": "R&D", "value": -rd},
-        {"label": "SG&A", "value": -sga},
-        {"label": "Operating Income", "value": operating_income},
-        {"label": "Interest Expense", "value": -interest_expense},
-        {"label": "Other Income", "value": other_income},
-        {"label": "Income Before Tax", "value": income_before_tax},
-        {"label": "Income Tax", "value": -income_tax},
-        {"label": "Net Income", "value": net_income}
+    breakdown = [
+        {"Label": "Total Revenue", "Amount ($B)": revenue / 1e9},
+        {"Label": "Cost of Revenue", "Amount ($B)": -cost_of_revenue / 1e9},
+        {"Label": "Gross Profit", "Amount ($B)": gross_profit / 1e9},
+        {"Label": "Operating Expenses (R&D + SG&A)", "Amount ($B)": -operating_expenses / 1e9},
+        {"Label": "Operating Income", "Amount ($B)": operating_income / 1e9},
+        {"Label": "Other Expenses", "Amount ($B)": -other_expenses / 1e9},
+        {"Label": "Net Income", "Amount ($B)": net_income / 1e9},
     ]
 
-    return data
+    return pd.DataFrame(breakdown)
 
-
-# Inside Streamlit section
+# === Streamlit Section ===
 try:
-    st.subheader("📉 Earnings Waterfall Chart")
+    st.subheader("🧾 Earnings Breakdown")
 
-    data = prepare_waterfall_data(income_stmt)
-    df = pd.DataFrame(data)
+    earnings_df = prepare_earnings_breakdown(income_stmt)
 
-    df["cumulative"] = df["value"].cumsum()
-    df["start"] = df["cumulative"] - df["value"]
-    df["end"] = df["cumulative"]
-    df["color"] = df["value"].apply(lambda x: "#27ae60" if x >= 0 else "#c0392b")
+    col1, col2 = st.columns([1, 2])
 
-    chart = alt.Chart(df).mark_bar().encode(
-        x=alt.X("label:N", title=""),
-        y=alt.Y("value:Q", title="Amount ($)", scale=alt.Scale(zero=False)),
-        color=alt.Color("color:N", scale=None)
-    ).properties(
-        width=700,
-        height=400,
-        title="📊 Earnings Breakdown Waterfall"
-    )
+    with col1:
+        st.markdown("### 🧮 Income Statement Summary")
+        st.table(earnings_df.set_index("Label").style.format("{:.2f}"))
 
-    st.altair_chart(chart, use_container_width=True)
+    with col2:
+        # Waterfall chart
+        df = earnings_df.copy()
+        df["Cumulative"] = df["Amount ($B)"].cumsum()
+        df["Start"] = df["Cumulative"] - df["Amount ($B)"]
+        df["End"] = df["Cumulative"]
+        df["Color"] = df["Amount ($B)"].apply(lambda x: "#2ecc71" if x >= 0 else "#e74c3c")
+
+        chart = alt.Chart(df).mark_bar().encode(
+            x=alt.X("Label:N", title="", sort=None),
+            y=alt.Y("Amount ($B):Q", title="Earnings Flow ($B)", scale=alt.Scale(zero=False)),
+            color=alt.Color("Color:N", scale=None, legend=None),
+            tooltip=["Label", "Amount ($B)"]
+        ).properties(
+            width=600,
+            height=400,
+            title="📉 Waterfall: Earnings Flow"
+        )
+
+        st.altair_chart(chart, use_container_width=True)
 
 except Exception as e:
-    st.warning(f"Earnings waterfall chart failed: {e}")
-
+    st.warning(f"Earnings breakdown failed: {e}")
 
 
 
