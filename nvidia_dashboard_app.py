@@ -895,7 +895,6 @@ try:
 except Exception as e:
     st.warning(f"⚠️ FCF block failed: {e}")
 
-st.write("Income Statement Rows:", income_stmt.index.tolist())
 
 
 st.write("Income statement rows:", income_stmt.index.tolist())
@@ -903,70 +902,84 @@ st.write("Income statement columns:", income_stmt.columns.tolist())
 
 latest_period = income_stmt.columns[0]
 
-def find_row(df, keywords):
-    index = df.index.str.lower().str.replace(" ", "")
-    for kw in keywords:
-        kw_clean = kw.lower().replace(" ", "")
-        matches = index[index.str.contains(kw_clean)]
-        if len(matches) > 0:
-            return df.index[matches[0]]
-    return None
 
-def get_amount(keywords):
-    row_label = find_row(income_stmt, keywords)
-    if row_label is None:
+st.subheader("📊 Earnings Waterfall Chart")
+
+ticker = st.text_input("Enter Ticker Symbol", "AAPL")
+stock = yf.Ticker(ticker)
+
+try:
+    # Fetch income statement and transpose (rows = line items, columns = dates)
+    income_stmt = stock.financials.T  # Using 'financials' since 'income_stmt' may differ, adjust if needed
+
+    if income_stmt.empty:
+        st.warning("Income statement data is missing.")
+        st.stop()
+
+    # Use the latest date column (usually last)
+    latest_date_col = income_stmt.columns[-1]
+
+    # Helper to get value for a line item or 0 if missing
+    def get_value(row_name):
+        if row_name in income_stmt.index:
+            val = income_stmt.at[row_name, latest_date_col]
+            return val if pd.notna(val) else 0
         return 0
-    val = income_stmt.loc[row_label, latest_period]
-    if pd.isna(val):
-        return 0
-    return val
 
-revenue = get_amount(["total revenue", "revenue"])
-cost_of_revenue = get_amount(["cost of revenue", "cost of sales"])
-gross_profit = get_amount(["gross profit"])
-rd = get_amount(["research development", "r&d"])
-sga = get_amount(["selling general administrative", "sga", "selling general & administrative"])
-operating_expenses = rd + sga
-operating_income = get_amount(["operating income", "income from operations"])
-other_expenses = get_amount(["other income expense net", "other expenses", "other income/(expense)"])
-net_income = get_amount(["net income", "net income applicable to common shares"])
+    # Extract amounts
+    revenue = get_value("Total Revenue")
+    cost_of_revenue = get_value("Cost Of Revenue")
+    gross_profit = get_value("Gross Profit")
+    operating_expenses = get_value("Operating Expense")
+    operating_income = get_value("Operating Income")
+    other_expenses = get_value("Other Income Expense")
+    net_income = get_value("Net Income")
 
-earnings = [
-    {"Label": "Total Revenue", "Amount": revenue / 1e9},
-    {"Label": "Cost of Revenue", "Amount": -cost_of_revenue / 1e9},
-    {"Label": "Gross Profit", "Amount": gross_profit / 1e9},
-    {"Label": "Operating Expenses (R&D + SG&A)", "Amount": -operating_expenses / 1e9},
-    {"Label": "Operating Income", "Amount": operating_income / 1e9},
-    {"Label": "Other Expenses", "Amount": -other_expenses / 1e9},
-    {"Label": "Net Income", "Amount": net_income / 1e9},
-]
+    # Prepare DataFrame for display & waterfall
+    data = pd.DataFrame({
+        "Line Item": ["Revenue", "Cost Of Revenue", "Gross Profit", "Operating Expenses", "Operating Income", "Other Expenses", "Net Income"],
+        "Amount": [revenue, -cost_of_revenue, gross_profit, -operating_expenses, operating_income, -other_expenses, net_income]
+    })
 
-earnings_df = pd.DataFrame(earnings)
+    # Display table in a box on left
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown("### Earnings Breakdown")
+        st.dataframe(data.style.format({"Amount": "${:,.0f}"}))
 
-col1, col2 = st.columns([1, 2])
+    # Waterfall chart on right
+    with col2:
+        st.markdown("### Earnings Waterfall")
 
-with col1:
-    st.write("### Income Statement Summary")
-    st.table(earnings_df.set_index("Label").style.format("{:.2f}"))
+        # Calculate cumulative amounts for waterfall steps
+        data["Cumulative"] = data["Amount"].cumsum()
 
-with col2:
-    chart = alt.Chart(earnings_df).mark_bar().encode(
-        x=alt.X("Label:N", axis=alt.Axis(labelAngle=-90)),
-        y=alt.Y("Amount:Q", title="Amount ($B)"),
-        color=alt.condition(
-            alt.datum.Amount > 0,
-            alt.value("#2ecc71"),
-            alt.value("#e74c3c")
-        ),
-        tooltip=[alt.Tooltip("Label:N"), alt.Tooltip("Amount:Q", format=".2f")]
-    ).properties(
-        width=600,
-        height=400,
-        title="Earnings Waterfall"
-    )
-    st.altair_chart(chart, use_container_width=True)
+        # Create base for waterfall bars (start points)
+        data["Base"] = data["Cumulative"] - data["Amount"]
 
+        # Bar colors: green for positive, red for negative
+        data["Color"] = data["Amount"].apply(lambda x: "#2ca02c" if x >= 0 else "#d62728")
 
+        chart = alt.Chart(data).mark_bar().encode(
+            x=alt.X("Line Item:N", sort=None, axis=alt.Axis(labelAngle=-90)),
+            y=alt.Y("Amount:Q"),
+            color=alt.Color("Color:N", scale=None, legend=None),
+            tooltip=[alt.Tooltip("Line Item"), alt.Tooltip("Amount", format="$,.0f")]
+        )
+
+        # Add invisible bars as base to simulate waterfall steps
+        base = alt.Chart(data).mark_bar(opacity=0).encode(
+            x=alt.X("Line Item:N", sort=None),
+            y=alt.Y("Base:Q")
+        )
+
+        waterfall = base + chart
+        waterfall = waterfall.properties(width=500, height=400, title=f"Earnings Waterfall for {ticker.upper()} ({latest_date_col.date()})")
+
+        st.altair_chart(waterfall, use_container_width=True)
+
+except Exception as e:
+    st.warning(f"Waterfall chart failed: {e}")
 
 
 
