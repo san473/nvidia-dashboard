@@ -10,6 +10,9 @@ import plotly.express as px
 from datetime import datetime
 from streamlit.runtime.caching import cache_data
 import requests
+import nltk
+nltk.download('vader_lexicon')
+
 
 import pandas as pd
 
@@ -27,7 +30,7 @@ def load_sp500_data():
 ticker = None
 ticker_obj = None
 
-ticker_input = st.text_input("Enter Ticker Symbol")
+
 
 if ticker_input:
     ticker = ticker_input.upper()
@@ -99,6 +102,8 @@ def fetch_news(ticker):
 st.title("📊 Comprehensive Stock Dashboard")
 
 ticker_input = st.text_input("Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL").upper()
+if ticker:
+    news_block(ticker)
 
 ticker = ticker_input
 @st.cache_data
@@ -249,6 +254,44 @@ earnings_growth = financial_data.get("earningsQuarterlyGrowth", None)
 profit_margin = financial_data.get("profitMargins", None)
 debt_to_equity = financial_data.get("debtToEquity", None)
 current_ratio = financial_data.get("currentRatio", None)
+
+
+# Load Lighthouse Canton Data
+@st.cache_data
+def load_lighthouse_data():
+    df = pd.read_excel("CIO Stocks.xlsx")  # Make sure this file is in the app folder
+    df["Ticker"] = df["Ticker"].str.upper().str.strip()
+    return df
+
+lighthouse_df = load_lighthouse_data()
+
+# Get user ticker input
+ticker = st.text_input("Enter Stock Ticker (e.g., MSFT)").upper().strip()
+
+if ticker:
+    if ticker in lighthouse_df["Ticker"].values:
+        stock_info = lighthouse_df[lighthouse_df["Ticker"] == ticker].iloc[0]
+        target_price = stock_info["Target Price"]
+        lighthouse_view = stock_info["Lighthouse Canton View"]
+
+        # Get current price from yfinance
+        try:
+            stock = yf.Ticker(ticker)
+            live_price = stock.history(period="1d")["Close"].iloc[-1]
+            price_diff_pct = ((target_price - live_price) / live_price) * 100
+            direction = "Upside" if price_diff_pct >= 0 else "Downside"
+
+            # Show Lighthouse Canton View
+            st.subheader("💡 Lighthouse Canton View")
+            st.markdown(f"**🎯 Target Price:** ${target_price:.2f}")
+            st.markdown(f"**📈 Current Price:** ${live_price:.2f}")
+            st.markdown(f"**🔼 {direction} Potential:** {price_diff_pct:.2f}%")
+            st.markdown(f"**📝 Commentary:** {lighthouse_view}")
+        except Exception as e:
+            st.error(f"⚠️ Could not fetch current price: {e}")
+    else:
+        st.subheader("💡 Lighthouse Canton View")
+        st.info("This stock is not part of Lighthouse Canton's current scope of analysis.")
 
 # ========== Investment Thesis Summary ==========
 thesis_points = []
@@ -496,71 +539,91 @@ except Exception as e:
     st.error(f"Error finding peers: {e}")
 
 # -------------------- Real-Time News Feed --------------------
-st.header("🧠 Market News Summary")
+# -------- CONFIG --------
+NEWS_API_KEY = st.secrets["news_api_key"]
+NEWS_API_URL = "https://newsapi.org/v2/everything"
 
+# -------- COMPANY NAME --------
+@st.cache_data(ttl=3600)
+def get_company_name_from_ticker(ticker):
+    try:
+        return yf.Ticker(ticker).info.get("longName", ticker)
+    except Exception:
+        return ticker
+
+# -------- FETCH NEWS --------
 @st.cache_data(ttl=60)
-def fetch_news_articles(ticker, long_name, api_key):
-    # Try long name first, then fallback to ticker
-    queries = [long_name, ticker] if long_name else [ticker]
+def get_news_articles(company_name):
+    today = datetime.today()
+    last_week = today - timedelta(days=7)
+    params = {
+        "q": company_name,
+        "from": last_week.strftime("%Y-%m-%d"),
+        "sortBy": "relevancy",
+        "language": "en",
+        "apiKey": NEWS_API_KEY,
+        "pageSize": 20,
+    }
+    response = requests.get(NEWS_API_URL, params=params)
+    if response.status_code == 200:
+        return response.json().get("articles", [])
+    return []
 
-    for query in queries:
-        url = f"https://newsapi.org/v2/everything?q={query}&apiKey={api_key}&sortBy=publishedAt&language=en&pageSize=5"
-        try:
-            response = requests.get(url)
-            data = response.json()
-            articles = data.get("articles", [])
-            if articles:
-                return articles, query, url, data
-        except Exception as e:
-            continue  # Try the next query
+# -------- CATEGORIZE NEWS --------
+def categorize_articles(articles):
+    positive, negative, emerging = [], [], []
+    for article in articles:
+        title = article["title"].lower()
+        description = article.get("description", "").lower()
 
-    # No valid articles found
-    return [], queries[0], url, {"error": "No articles from any source"}
+        text = f"{title} {description}"
+        if any(word in text for word in ["beats", "growth", "record", "surge", "upgrade", "strong", "gain", "boost"]):
+            positive.append(article)
+        elif any(word in text for word in ["misses", "decline", "drop", "downgrade", "loss", "concern", "crisis", "lawsuit"]):
+            negative.append(article)
+        else:
+            emerging.append(article)
 
-def simple_logical_summary(query_term, articles):
+    return positive, negative, emerging
+
+# -------- MAIN BLOCK --------
+def news_block(ticker):
+    company_name = get_company_name_from_ticker(ticker)
+
+    st.markdown("### 🧠 Market News Summary")
+
+    articles = get_news_articles(company_name)
+
     if not articles:
-        return f"No recent news found for {query_term}."
+        st.markdown(f"**Summary of Key Headlines**")
+        st.warning(f"No recent news found for **{company_name}**.")
+        return
 
-    titles = [a['title'] for a in articles if a.get('title')]
-    highlights = "\n".join([f"- {title}" for title in titles[:5]])
-
-    return f"""
-### ✅ Key Headlines for {query_term}
-{highlights}
-
-Note: Headlines are extracted directly from NewsAPI for real-time updates.
-"""
-
-# --- Load your NewsAPI key ---
-NEWSAPI_KEY = st.secrets.get("NEWSAPI_KEY", None)
-
-if not NEWSAPI_KEY:
-    st.warning("⚠️ NEWSAPI_KEY not found in Streamlit secrets.")
-else:
-    # Get company name and fallback to ticker if needed
-    long_name = info.get("longName", "")
-    articles, used_query, api_url, debug_response = fetch_news_articles(ticker, long_name, NEWSAPI_KEY)
-
-    # Summary
-    summary = simple_logical_summary(used_query, articles)
     st.markdown("### 🧠 Summary of Key Headlines")
-    st.markdown(summary)
 
-    # Full Articles
-    st.subheader("📰 Full Headlines")
-    if articles:
-        for article in articles:
-            st.markdown(f"- [{article['title']}]({article['url']}) — `{article['source']['name']}`")
-    else:
+    # Categorize articles
+    pos, neg, emerging = categorize_articles(articles)
+
+    def render_section(title, icon, items):
+        st.markdown(f"#### {icon} {title}")
+        if not items:
+            st.info(f"No {title.lower()} found.")
+        else:
+            for article in items[:3]:
+                st.markdown(f"- **{article['title']}** ({article['source']['name']})")
+
+    render_section("Positive Developments", "📈", pos)
+    render_section("Risks & Negative Sentiment", "⚠️", neg)
+    render_section("Emerging Themes", "🧩", emerging)
+
+    # Full headline list
+    st.markdown("### 📰 Full Headlines")
+    if not articles:
         st.warning("No news articles found.")
-
-    # Debug info
-    with st.expander("🔍 API Debug Info"):
-        st.write("🧠 Search Term Used:", used_query)
-        st.write("🧠 API URL Used:", api_url)
-        st.write("🧠 Raw Response:", debug_response)
-
-
+    else:
+        for article in articles:
+            st.markdown(f"**[{article['title']}]({article['url']})**  \n*{article['source']['name']} | {article['publishedAt'][:10]}*  \n{article.get('description', '')}")
+            st.markdown("---")
 
 
 # ---------------------- INTERACTIVE VISUALIZATIONS ----------------------
