@@ -1545,35 +1545,49 @@ else:
     st.warning("⚠️ No profitability or leverage data available.")
 
 
-with st.container():
-    earnings_call_section(ticker)
+import streamlit as st
+import yfinance as yf
+import datetime
 
-def earnings_call_section(ticker):
-    st.markdown("## 🎧 Earnings Call Overview")
-
+def earnings_call_section(ticker: str):
+    st.markdown("## 📞 Earnings Call Summary")
+    
     try:
         yf_ticker = yf.Ticker(ticker)
-        cal = yf_ticker.calendar
-        earnings_date = cal.loc['Earnings Date'][0].strftime('%B %d, %Y') if 'Earnings Date' in cal.index else "N/A"
-        st.markdown(f"**Most Recent Earnings Call Date:** {earnings_date}")
-    except:
-        st.markdown("**Most Recent Earnings Call Date:** N/A")
+        
+        # Fetch earnings calendar or earnings call dates
+        earnings_dates = yf_ticker.calendar
+        
+        # Get the next earnings date or last earnings date
+        if 'Earnings Date' in earnings_dates.index:
+            earnings_date = earnings_dates.loc['Earnings Date'][0]
+            if isinstance(earnings_date, datetime.datetime):
+                earnings_date_str = earnings_date.strftime('%Y-%m-%d')
+            else:
+                earnings_date_str = str(earnings_date)
+        else:
+            earnings_date_str = "Date not available"
+        
+        st.write(f"**Earnings Date:** {earnings_date_str}")
+        
+        # Placeholder for audio URL (yfinance does not provide audio links)
+        audio_url = None
+        
+        if audio_url:
+            st.audio(audio_url)
+        else:
+            st.info("Audio for the latest earnings call is not available.")
+        
+        # Placeholder for earnings call summary
+        st.markdown("""
+        ### Summary
+        This section will contain a concise summary of the latest earnings call.
+        You can integrate a text summarization model or API here to generate insights dynamically.
+        """)
+        
+    except Exception as e:
+        st.error(f"Failed to load earnings call section: {e}")
 
-    # EarningsCast audio player embed
-    audio_url = f"https://www.earningscast.com/companies/{ticker.lower()}"
-    st.markdown("### 🔊 Listen to the Earnings Call")
-    st.components.v1.iframe(audio_url, height=200)
-
-    # Summary (can be AI-powered later)
-    st.markdown("### 🧠 Summary Highlights")
-    st.info(
-        "• Revenue exceeded expectations due to strong Data Center demand.\n"
-        "• CEO highlighted accelerating AI adoption as a key driver.\n"
-        "• Gross margin improved 150bps YoY.\n"
-        "• Guidance points to continued double-digit growth."
-    )
-
-    # Optional: Link to transcript (e.g., Motley Fool)
-    transcript_url = f"https://www.fool.com/earnings/call-transcripts/{ticker.lower()}/"
-    st.markdown(f"📄 [Read full transcript on Motley Fool]({transcript_url})")
-
+# Usage in the main app code:
+with st.container():
+    earnings_call_section(ticker)
