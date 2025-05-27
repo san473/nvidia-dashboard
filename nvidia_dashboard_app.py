@@ -685,12 +685,8 @@ except Exception as e:
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-git add nvidia_dashboard_app.py
-git commit -m "Fix ROE/ROIC fallback logic and restore margin/return progress bars"
-git push origin main
 
-
-    with st.container():
+with st.container():
     st.markdown("## 📈 Profitability Overview")
 
     try:
@@ -800,7 +796,6 @@ git push origin main
 
     except Exception as e:
         st.error(f"Error loading profitability section: {e}")
-
 
 
 import streamlit as st
