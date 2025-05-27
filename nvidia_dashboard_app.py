@@ -1363,141 +1363,125 @@ def solvency_overview_section(ticker: str):
 with st.container():
     solvency_overview_section(ticker)    
 
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-import numpy as np
-
-def solvency_overview_section(ticker: str):
-    st.markdown("## 🏦 Solvency Overview")
 
     try:
         yf_ticker = yf.Ticker(ticker)
+
+        # Fetch financial statements, fill NaNs with 0
         balance_sheet = yf_ticker.balance_sheet.fillna(0)
         income_stmt = yf_ticker.financials.fillna(0)
+        cashflow_stmt = yf_ticker.cashflow.fillna(0)
 
-        # Normalize index to lowercase to avoid key errors
+        # Show raw data for debugging (comment out later)
+        st.write("Balance Sheet:", balance_sheet)
+        st.write("Income Statement:", income_stmt)
+        st.write("Cashflow Statement:", cashflow_stmt)
+
+        # Lowercase index for consistent key access
         balance_sheet.index = balance_sheet.index.str.lower()
         income_stmt.index = income_stmt.index.str.lower()
+        cashflow_stmt.index = cashflow_stmt.index.str.lower()
 
-        # We want the last 4 periods (columns) if available
-        # Columns are timestamps in descending order, so take first 4
-        periods = balance_sheet.columns[:4]
+        # Helper to safely get first column or None
+        def safe_get(df, key):
+            if key in df.index:
+                return df.loc[key].iloc[0]
+            return None
 
-        # Helper function to safely get row values or zeros
-        def safe_row(key):
-            if key in balance_sheet.index:
-                return balance_sheet.loc[key, periods]
-            else:
-                return pd.Series([0]*len(periods), index=periods)
-
-        def safe_income_row(key):
-            if key in income_stmt.index:
-                return income_stmt.loc[key, periods]
-            else:
-                return pd.Series([0]*len(periods), index=periods)
-
-        # Extract balance sheet items over last 4 periods
-        total_assets = safe_row("total assets")
-        total_equity_keys = [
-            "total stockholder equity",
-            "stockholders equity",
-            "common stock equity",
-            "total equity gross minority interest"
-        ]
-        total_equity = pd.Series([0]*len(periods), index=periods)
-        for key in total_equity_keys:
-            if key in balance_sheet.index:
-                total_equity = balance_sheet.loc[key, periods]
+        total_assets = safe_get(balance_sheet, "total assets")
+        total_equity = None
+        for key in ["total stockholder equity", "stockholders equity", "common stock equity", "total equity gross minority interest"]:
+            total_equity = safe_get(balance_sheet, key)
+            if total_equity is not None:
                 break
 
-        total_debt = pd.Series([0]*len(periods), index=periods)
+        total_debt = 0
         for key in ["short long term debt", "long term debt"]:
-            if key in balance_sheet.index:
-                total_debt += balance_sheet.loc[key, periods]
+            val = safe_get(balance_sheet, key)
+            if val is not None:
+                total_debt += val
 
-        cash = safe_row("cash")
-        current_assets = safe_row("total current assets")
-        current_liabilities = safe_row("total current liabilities")
-        inventory = safe_row("inventory")
+        cash = safe_get(balance_sheet, "cash") or 0
+        current_assets = safe_get(balance_sheet, "total current assets") or 0
+        current_liabilities = safe_get(balance_sheet, "total current liabilities") or 0
+        inventory = safe_get(balance_sheet, "inventory") or 0
 
-        ebit = safe_income_row("ebit")
-        interest_expense = safe_income_row("interest expense").abs()
+        ebit = safe_get(income_stmt, "ebit")
+        interest_expense = safe_get(income_stmt, "interest expense")
 
-        # Calculations for each period (vectorized)
+        retained_earnings = safe_get(balance_sheet, "retained earnings") or 0
+        working_capital = current_assets - current_liabilities if current_assets and current_liabilities else 0
+
+        # Calculate ratios safely with fallback to None
+        def safe_div(num, denom):
+            try:
+                return num / denom if denom != 0 else None
+            except:
+                return None
+
         net_debt = total_debt - cash
-        net_debt_equity = net_debt / total_equity.replace(0, np.nan)
-        debt_asset_ratio = total_debt / total_assets.replace(0, np.nan)
-        interest_coverage = ebit / interest_expense.replace(0, np.nan)
-        cash_ratio = cash / current_liabilities.replace(0, np.nan)
-        quick_ratio = (current_assets - inventory) / current_liabilities.replace(0, np.nan)
-        current_ratio = current_assets / current_liabilities.replace(0, np.nan)
+        net_debt_equity = safe_div(net_debt, total_equity)
+        debt_asset_ratio = safe_div(total_debt, total_assets)
+        interest_coverage = safe_div(ebit, abs(interest_expense)) if ebit is not None and interest_expense is not None else None
+        cash_ratio = safe_div(cash, current_liabilities)
+        quick_ratio = safe_div(current_assets - inventory, current_liabilities)
+        current_ratio = safe_div(current_assets, current_liabilities)
 
-        # Altman Z-score approximation using last period only
-        # Use latest values (most recent column)
-        working_capital = current_assets.iloc[0] - current_liabilities.iloc[0]
-        retained_earnings = safe_row("retained earnings").iloc[0]
+        # Altman Z-Score approximate formula
         try:
-            z_score = (1.2 * (working_capital / total_assets.iloc[0]) +
-                       1.4 * (retained_earnings / total_assets.iloc[0]) +
-                       3.3 * (ebit.iloc[0] / total_assets.iloc[0]) +
-                       0.6 * (total_equity.iloc[0] / total_debt.iloc[0]) +
-                       1.0 * (yf_ticker.info.get('totalRevenue', 0) / total_assets.iloc[0]))
+            total_revenue = yf_ticker.info.get('totalRevenue', None)
+            z_score = (
+                1.2 * safe_div(working_capital, total_assets) +
+                1.4 * safe_div(retained_earnings, total_assets) +
+                3.3 * safe_div(ebit, total_assets) +
+                0.6 * safe_div(total_equity, total_debt) +
+                1.0 * safe_div(total_revenue, total_assets)
+            )
         except Exception:
             z_score = None
 
-        # Prepare dict for display (last period values)
+        # Display all metrics
         metrics = {
-            "Net Debt/Equity": net_debt_equity.iloc[0],
-            "Debt/Assets": debt_asset_ratio.iloc[0],
-            "Interest Coverage": interest_coverage.iloc[0],
-            "Cash Ratio": cash_ratio.iloc[0],
-            "Quick Ratio": quick_ratio.iloc[0],
-            "Current Ratio": current_ratio.iloc[0],
-            "Altman Z-Score": z_score
-        }
-
-        # Display metrics with progress bars
-        cols = st.columns(4)
-        for idx, (label, value) in enumerate(metrics.items()):
-            with cols[idx % 4]:
-                if value is not None and not pd.isna(value):
-                    st.metric(label, f"{value:.2f}")
-                    # Cap progress bar between 0 and 1, scale large values down
-                    bar_val = max(min(value / 10, 1.0), 0.01)
-                    st.progress(bar_val)
-                else:
-                    st.metric(label, "N/A")
-                    st.progress(0.01)
-
-        st.markdown("---")
-
-        # Now plot line charts for ratios over last 4 periods
-        chart_data = pd.DataFrame({
             "Net Debt/Equity": net_debt_equity,
             "Debt/Assets": debt_asset_ratio,
             "Interest Coverage": interest_coverage,
             "Cash Ratio": cash_ratio,
             "Quick Ratio": quick_ratio,
             "Current Ratio": current_ratio,
-        }).transpose()
+            "Altman Z-Score": z_score
+        }
 
-        # Transpose so columns = periods, rows = metrics
+        cols = st.columns(4)
+        for idx, (label, value) in enumerate(metrics.items()):
+            with cols[idx % 4]:
+                if value is not None:
+                    st.metric(label, f"{value:.2f}")
+                    st.progress(min(max(value / 10, 0.01), 1.0))
+                else:
+                    st.metric(label, "N/A")
+                    st.progress(0.01)
 
-        # Convert index (period timestamps) to strings for better x-axis labels
-        x_labels = [str(period.date()) for period in periods]
+        # Plot each ratio as a mini line chart (just current value repeated for demo)
+        st.markdown("### Ratio Visualizations")
+        fig, axs = plt.subplots(2, 4, figsize=(16, 6))
+        axs = axs.flatten()
 
-        # Plot each ratio separately with Streamlit line_chart inside columns for nice layout
-        st.markdown("### Solvency Ratios Over Last 4 Periods")
-        for label in chart_data.index:
-            st.markdown(f"**{label}**")
-            y_values = chart_data.loc[label].fillna(0)
-            df_plot = pd.DataFrame({label: y_values.values}, index=x_labels)
-            st.line_chart(df_plot)
+        for i, (label, value) in enumerate(metrics.items()):
+            axs[i].plot([value]*5, marker='o')
+            axs[i].set_title(label)
+            axs[i].set_ylim(bottom=0)
+            axs[i].grid(True)
+
+        # Hide any unused subplots
+        for j in range(len(metrics), len(axs)):
+            axs[j].axis('off')
+
+        st.pyplot(fig)
 
     except Exception as e:
         st.error(f"Failed to load solvency overview: {e}")
-
+        import traceback
+        st.text(traceback.format_exc())
 
 
 
