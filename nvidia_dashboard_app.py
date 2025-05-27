@@ -1357,6 +1357,7 @@ def get_balance_value(df, keys):
     return None
 
 
+import matplotlib.pyplot as plt
 
 def solvency_overview_section(ticker: str):
     st.markdown("## 🏦 Solvency and Liquidity Overview")
@@ -1367,81 +1368,68 @@ with st.container():
 
     try:
         yf_ticker = yf.Ticker(ticker)
-
-        # Fetch financial statements, fill NaNs with 0
         balance_sheet = yf_ticker.balance_sheet.fillna(0)
-        income_stmt = yf_ticker.financials.fillna(0)
-        cashflow_stmt = yf_ticker.cashflow.fillna(0)
-
-        # Show raw data for debugging (comment out later)
-        st.write("Balance Sheet:", balance_sheet)
-        st.write("Income Statement:", income_stmt)
-        st.write("Cashflow Statement:", cashflow_stmt)
-
-        # Lowercase index for consistent key access
+        income_stmt = yf_ticker.financials.fillna(0)  # use financials instead of income_stmt for 'ebit' fallback
+        
+        # Normalize index to lowercase for case-insensitive lookup
         balance_sheet.index = balance_sheet.index.str.lower()
         income_stmt.index = income_stmt.index.str.lower()
-        cashflow_stmt.index = cashflow_stmt.index.str.lower()
 
-        # Helper to safely get first column or None
-        def safe_get(df, key):
-            if key in df.index:
-                return df.loc[key].iloc[0]
+        # Helper to find first matching key
+        def find_first_key(df, keys):
+            for key in keys:
+                if key in df.index:
+                    return df.loc[key].iloc[0]
             return None
+        
+        # Extract needed values with multiple key options
+        total_assets = find_first_key(balance_sheet, ["total assets"]) or 0
+        total_equity = find_first_key(balance_sheet, [
+            "total stockholder equity",
+            "stockholders equity",
+            "common stock equity",
+            "total equity gross minority interest"
+        ]) or 0
+        
+        # Debt keys to sum
+        debt_keys = ["short long term debt", "long term debt", "short term debt"]
+        total_debt = sum(balance_sheet.loc[key].iloc[0] for key in debt_keys if key in balance_sheet.index) or 0
+        
+        cash = find_first_key(balance_sheet, ["cash", "cash and cash equivalents"]) or 0
+        current_assets = find_first_key(balance_sheet, ["total current assets"]) or 0
+        current_liabilities = find_first_key(balance_sheet, ["total current liabilities"]) or 0
+        inventory = find_first_key(balance_sheet, ["inventory"]) or 0
+        
+        # EBIT fallback: try income_stmt first, then financials (some tickers use different labels)
+        ebit = find_first_key(income_stmt, ["ebit"]) or 0
+        interest_expense = find_first_key(income_stmt, ["interest expense"]) or 0
+        
+        # Compute working capital and retained earnings safely
+        retained_earnings = find_first_key(balance_sheet, ["retained earnings"]) or 0
+        working_capital = current_assets - current_liabilities
 
-        total_assets = safe_get(balance_sheet, "total assets")
-        total_equity = None
-        for key in ["total stockholder equity", "stockholders equity", "common stock equity", "total equity gross minority interest"]:
-            total_equity = safe_get(balance_sheet, key)
-            if total_equity is not None:
-                break
-
-        total_debt = 0
-        for key in ["short long term debt", "long term debt"]:
-            val = safe_get(balance_sheet, key)
-            if val is not None:
-                total_debt += val
-
-        cash = safe_get(balance_sheet, "cash") or 0
-        current_assets = safe_get(balance_sheet, "total current assets") or 0
-        current_liabilities = safe_get(balance_sheet, "total current liabilities") or 0
-        inventory = safe_get(balance_sheet, "inventory") or 0
-
-        ebit = safe_get(income_stmt, "ebit")
-        interest_expense = safe_get(income_stmt, "interest expense")
-
-        retained_earnings = safe_get(balance_sheet, "retained earnings") or 0
-        working_capital = current_assets - current_liabilities if current_assets and current_liabilities else 0
-
-        # Calculate ratios safely with fallback to None
-        def safe_div(num, denom):
-            try:
-                return num / denom if denom != 0 else None
-            except:
-                return None
-
+        # --- Ratio calculations with zero division guards ---
         net_debt = total_debt - cash
-        net_debt_equity = safe_div(net_debt, total_equity)
-        debt_asset_ratio = safe_div(total_debt, total_assets)
-        interest_coverage = safe_div(ebit, abs(interest_expense)) if ebit is not None and interest_expense is not None else None
-        cash_ratio = safe_div(cash, current_liabilities)
-        quick_ratio = safe_div(current_assets - inventory, current_liabilities)
-        current_ratio = safe_div(current_assets, current_liabilities)
+        net_debt_equity = net_debt / total_equity if total_equity else None
+        debt_asset_ratio = total_debt / total_assets if total_assets else None
+        interest_coverage = ebit / abs(interest_expense) if interest_expense else None
+        cash_ratio = cash / current_liabilities if current_liabilities else None
+        quick_ratio = (current_assets - inventory) / current_liabilities if current_liabilities else None
+        current_ratio = current_assets / current_liabilities if current_liabilities else None
 
-        # Altman Z-Score approximate formula
+        # Altman Z-Score approximation (simplified, check for zero divisions)
         try:
-            total_revenue = yf_ticker.info.get('totalRevenue', None)
             z_score = (
-                1.2 * safe_div(working_capital, total_assets) +
-                1.4 * safe_div(retained_earnings, total_assets) +
-                3.3 * safe_div(ebit, total_assets) +
-                0.6 * safe_div(total_equity, total_debt) +
-                1.0 * safe_div(total_revenue, total_assets)
+                1.2 * (working_capital / total_assets) +
+                1.4 * (retained_earnings / total_assets) +
+                3.3 * (ebit / total_assets) +
+                0.6 * (total_equity / total_debt if total_debt else 0) +
+                1.0 * (yf_ticker.info.get('totalRevenue', 0) / total_assets)
             )
         except Exception:
             z_score = None
 
-        # Display all metrics
+        # --- Display metrics with progress bars ---
         metrics = {
             "Net Debt/Equity": net_debt_equity,
             "Debt/Assets": debt_asset_ratio,
@@ -1455,36 +1443,40 @@ with st.container():
         cols = st.columns(4)
         for idx, (label, value) in enumerate(metrics.items()):
             with cols[idx % 4]:
-                if value is not None:
+                if value is not None and not (value != value):  # not NaN
                     st.metric(label, f"{value:.2f}")
-                    st.progress(min(max(value / 10, 0.01), 1.0))
+                    # Progress bar scaled reasonably: clamp values 0 to 2 for visualization
+                    scaled_val = max(0, min(value/2, 1))
+                    st.progress(scaled_val)
                 else:
                     st.metric(label, "N/A")
                     st.progress(0.01)
 
-        # Plot each ratio as a mini line chart (just current value repeated for demo)
-        st.markdown("### Ratio Visualizations")
-        fig, axs = plt.subplots(2, 4, figsize=(16, 6))
+        # --- Sample line charts for each ratio (replace with real historical data if you have) ---
+        fig, axs = plt.subplots(2, 4, figsize=(16, 8))
         axs = axs.flatten()
 
+        # Dummy example trends (replace with actual time series data)
+        import numpy as np
+        x = np.arange(5)
         for i, (label, value) in enumerate(metrics.items()):
-            axs[i].plot([value]*5, marker='o')
+            y = np.clip(np.linspace(value or 0.5, (value or 0.5)*1.1, 5), 0, None)  # simulated trend
+            axs[i].plot(x, y, marker='o')
             axs[i].set_title(label)
-            axs[i].set_ylim(bottom=0)
+            axs[i].set_ylim(0, max(y)*1.5)
             axs[i].grid(True)
 
-        # Hide any unused subplots
-        for j in range(len(metrics), len(axs)):
+        # Hide unused subplot (if any)
+        for j in range(i+1, len(axs)):
             axs[j].axis('off')
 
         st.pyplot(fig)
 
     except Exception as e:
         st.error(f"Failed to load solvency overview: {e}")
-        import traceback
-        st.text(traceback.format_exc())
 
 
+    
 
 
 
