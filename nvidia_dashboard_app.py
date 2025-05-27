@@ -495,69 +495,111 @@ else:
 
 
 
-# ------------------- DCF VALUATION -------------------
-# Discounted Cash Flow (DCF) Valuation
+# ------------------- DCF Valuation (Forecast Table) -------------------
 with st.container():
-    st.markdown("### 📊 Discounted Cash Flow (DCF) Valuation")
+    st.markdown("### 📊 Discounted Cash Flow (DCF) Valuation Model")
 
     try:
-        cashflow = ticker.financials
-        cashflow_data = cashflow.fillna(0)
+        yf_ticker = yf.Ticker(ticker)
+        info = yf_ticker.info
+        financials = yf_ticker.financials.fillna(0)
+        cashflow = yf_ticker.cashflow.fillna(0)
+        income_stmt = yf_ticker.income_stmt.fillna(0)
 
-        # Try multiple likely row names for FCF
-        possible_fcf_labels = ['free cash flow', 'total free cash flow', 'freecashflow']
-        fcf_row = next(
-            (row for row in cashflow_data.index if any(label in row.lower() for label in possible_fcf_labels)),
-            None
-        )
+        # Normalize index names for consistency
+        cashflow.index = cashflow.index.str.lower()
+        financials.index = financials.index.str.lower()
+        income_stmt.index = income_stmt.index.str.lower()
 
-        if not fcf_row:
-            st.warning("⚠️ Could not locate 'Free Cash Flow' in the financial data.")
+        # Extract trailing revenue and net income
+        revenues = financials.loc["total revenue"] if "total revenue" in financials.index else None
+        net_incomes = income_stmt.loc["net income"] if "net income" in income_stmt.index else None
+        fcf_row = next((r for r in cashflow.index if "free cash flow" in r), None)
+
+        if revenues is None or net_incomes is None:
+            st.warning("Missing revenue or net income data.")
         else:
-            free_cash_flows = cashflow_data.loc[fcf_row].dropna()
-            fcf_values = free_cash_flows.values
+            # Use most recent year as base
+            base_revenue = revenues.iloc[0]
+            base_net_income = net_incomes.iloc[0]
+            net_margin = base_net_income / base_revenue if base_revenue != 0 else 0
 
-            if len(fcf_values) == 0:
-                st.warning("⚠️ No free cash flow data available to perform DCF.")
+            if fcf_row:
+                base_fcfe = cashflow.loc[fcf_row].iloc[0]
             else:
-                avg_fcf = np.mean(fcf_values)
-
-                # Original Toggle Interface (Restored)
-                with st.expander("⚙️ Adjust DCF Assumptions"):
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        forecast_years = st.slider("Forecast Years", 3, 10, 5)
-                    with col2:
-                        growth_rate = st.slider("FCF Growth Rate (%)", 0, 20, 8)
-                    with col3:
-                        discount_rate = st.slider("Discount Rate (%)", 5, 15, 10)
-
-                # Project FCFs
-                projected_fcfs = [avg_fcf * ((1 + growth_rate / 100) ** i) for i in range(1, forecast_years + 1)]
-                discounted_fcfs = [fcf / ((1 + discount_rate / 100) ** i) for i, fcf in enumerate(projected_fcfs, 1)]
-                terminal_value = (projected_fcfs[-1] * (1 + growth_rate / 100)) / (discount_rate / 100)
-                discounted_terminal = terminal_value / ((1 + discount_rate / 100) ** forecast_years)
-
-                intrinsic_value = sum(discounted_fcfs) + discounted_terminal
-
-                shares_outstanding = ticker.info.get("sharesOutstanding", None)
-                if shares_outstanding:
-                    intrinsic_per_share = intrinsic_value / shares_outstanding
-                    current_price = ticker.info.get("currentPrice", 0)
-                    delta = intrinsic_per_share - current_price
-                    pct = delta / current_price * 100 if current_price else 0
-
-                    st.metric(
-                        label="📈 Intrinsic Value per Share",
-                        value=f"${intrinsic_per_share:,.2f}",
-                        delta=f"{pct:+.2f}%" if current_price else "N/A"
-                    )
+                op_row = next((r for r in cashflow.index if "operating cash flow" in r), None)
+                capex_row = next((r for r in cashflow.index if "capital expenditure" in r), None)
+                debt_row = next((r for r in cashflow.index if "repayment of debt" in r or "net debt repayment" in r), None)
+                if op_row and capex_row:
+                    base_fcfe = cashflow.loc[op_row].iloc[0] - cashflow.loc[capex_row].iloc[0]
                 else:
-                    st.write(f"💰 **Intrinsic Value:** ${intrinsic_value:,.2f}")
-                    st.info("Note: Shares outstanding not available to compute per-share value.")
+                    st.warning("Unable to calculate FCFE from available cash flow data.")
+                    base_fcfe = 0
+
+            # --- Inputs
+            with st.expander("⚙️ Adjust Forecast Assumptions", expanded=True):
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    forecast_years = st.slider("Forecast Years", 3, 10, 5)
+                with col2:
+                    revenue_growth = st.slider("Annual Revenue Growth (%)", 0.0, 20.0, 8.0)
+                with col3:
+                    discount_rate = st.slider("Discount Rate (%)", 5.0, 15.0, 10.0)
+                terminal_growth = st.slider("Terminal Growth Rate (%)", 0.0, 5.0, 2.0)
+
+            # --- Forecast
+            forecast = []
+            revenue = base_revenue
+            for year in range(1, forecast_years + 1):
+                revenue *= (1 + revenue_growth / 100)
+                net_income = revenue * net_margin
+                fcfe = base_fcfe * (1 + revenue_growth / 100) ** year  # grow FCFE with revenue
+                pv_fcfe = fcfe / ((1 + discount_rate / 100) ** year)
+
+                forecast.append({
+                    "Year": f"Year {year}",
+                    "Revenue": revenue,
+                    "Revenue Growth %": revenue_growth,
+                    "Net Margin %": net_margin * 100,
+                    "Net Income": net_income,
+                    "FCFE": fcfe,
+                    "Discount Rate %": discount_rate,
+                    "Present Value": pv_fcfe
+                })
+
+            # --- Terminal Value
+            terminal_fcfe = forecast[-1]["FCFE"] * (1 + terminal_growth / 100)
+            terminal_value = terminal_fcfe / (discount_rate / 100 - terminal_growth / 100)
+            discounted_terminal = terminal_value / ((1 + discount_rate / 100) ** forecast_years)
+
+            forecast.append({
+                "Year": "Terminal",
+                "Revenue": np.nan,
+                "Revenue Growth %": terminal_growth,
+                "Net Margin %": np.nan,
+                "Net Income": np.nan,
+                "FCFE": terminal_fcfe,
+                "Discount Rate %": discount_rate,
+                "Present Value": discounted_terminal
+            })
+
+            df_forecast = pd.DataFrame(forecast)
+            df_forecast.set_index("Year", inplace=True)
+            df_forecast_display = df_forecast.T.style.format("{:,.0f}", subset=(slice(None), slice(None)))
+            st.dataframe(df_forecast_display, use_container_width=True)
+
+            intrinsic_value = df_forecast["Present Value"].sum()
+            shares_out = info.get("sharesOutstanding", None)
+            if shares_out:
+                intrinsic_per_share = intrinsic_value / shares_out
+                current_price = info.get("currentPrice", 0)
+                pct_diff = (intrinsic_per_share - current_price) / current_price * 100 if current_price else 0
+                st.metric("📈 Intrinsic Value per Share", f"${intrinsic_per_share:,.2f}", f"{pct_diff:+.2f}%")
+            else:
+                st.write(f"💰 Total Present Value of FCFE: ${intrinsic_value:,.0f}")
 
     except Exception as e:
-        st.error(f"Error in DCF calculation: {str(e)}")
+        st.error(f"Error in DCF block: {e}")
 
 
 
@@ -639,6 +681,74 @@ try:
 
 except Exception as e:
     st.error(f"Error finding peers: {e}")
+
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+
+with st.container():
+    st.markdown("## 📈 Profitability Overview")
+
+    try:
+        yf_ticker = yf.Ticker(ticker)
+        info = yf_ticker.info
+        income_stmt = yf_ticker.income_stmt.fillna(0)
+        balance_sheet = yf_ticker.balance_sheet.fillna(0)
+
+        income_stmt.index = income_stmt.index.str.lower()
+        balance_sheet.index = balance_sheet.index.str.lower()
+
+        # --- Margins ---
+        st.markdown("### 🧮 Margin Profile")
+        col1, col2, col3 = st.columns(3)
+
+        revenue = income_stmt.loc["total revenue"].iloc[0] if "total revenue" in income_stmt.index else None
+        gross_profit = income_stmt.loc["gross profit"].iloc[0] if "gross profit" in income_stmt.index else None
+        operating_income = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
+        net_income = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
+
+        if revenue:
+            gross_margin = gross_profit / revenue if gross_profit else None
+            op_margin = operating_income / revenue if operating_income else None
+            net_margin = net_income / revenue if net_income else None
+
+            for col, label, value in zip(
+                [col1, col2, col3],
+                ["Gross Margin", "Operating Margin", "Net Margin"],
+                [gross_margin, op_margin, net_margin]
+            ):
+                with col:
+                    st.metric(label, f"{value*100:.2f}%" if value else "N/A")
+                    st.progress(min(max(value, 0), 1) if value else 0)
+
+        # --- Return Ratios ---
+        st.markdown("### 🧾 Return on Capital Measures")
+        col1, col2, col3, col4 = st.columns(4)
+
+        total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
+        total_equity = balance_sheet.loc["total stockholder equity"].iloc[0] if "total stockholder equity" in balance_sheet.index else None
+        total_debt = balance_sheet.loc["short long term debt"].iloc[0] if "short long term debt" in balance_sheet.index else 0
+        long_term_debt = balance_sheet.loc["long term debt"].iloc[0] if "long term debt" in balance_sheet.index else 0
+        ebit = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else operating_income
+
+        roe = net_income / total_equity if total_equity else None
+        roa = net_income / total_assets if total_assets else None
+        roic = ebit / (total_equity + total_debt) if ebit and (total_equity + total_debt) else None
+        roce = ebit / (total_equity + long_term_debt) if ebit and (total_equity + long_term_debt) else None
+
+        for col, label, value in zip(
+            [col1, col2, col3, col4],
+            ["ROE", "ROA", "ROIC", "ROCE"],
+            [roe, roa, roic, roce]
+        ):
+            with col:
+                st.metric(label, f"{value*100:.2f}%" if value else "N/A")
+                st.progress(min(max(value, 0), 1) if value else 0)
+
+    except Exception as e:
+        st.error(f"Error loading profitability data: {e}")
+
+
 
 import streamlit as st
 import requests
@@ -1331,229 +1441,3 @@ else:
 
 
 
-# -------------------- KPI DASHBOARD --------------------
-st.subheader("📌 Key Performance Indicators (KPIs)")
-
-stock = yf.Ticker(ticker)
-info = stock.info
-cashflow = stock.cashflow
-financials = stock.financials
-
-# Safely compute FCF
-def get_fcf(cashflow):
-    try:
-        if "Total Cash From Operating Activities" in cashflow.index and "Capital Expenditures" in cashflow.index:
-            op = cashflow.loc["Total Cash From Operating Activities"].dropna()
-            capex = cashflow.loc["Capital Expenditures"].dropna()
-            if not op.empty and not capex.empty:
-                return op.iloc[0] - capex.iloc[0]
-        elif "Operating Cash Flow" in cashflow.index and "Capital Expenditures" in cashflow.index:
-            op = cashflow.loc["Operating Cash Flow"].dropna()
-            capex = cashflow.loc["Capital Expenditures"].dropna()
-            if not op.empty and not capex.empty:
-                return op.iloc[0] - capex.iloc[0]
-    except:
-        return None
-
-
-# Fallback net profit margin calculation
-def get_net_profit_margin(info, financials):
-    net_income = financials.loc["Net Income"].dropna().iloc[0] if "Net Income" in financials.index else None
-    revenue = info.get("totalRevenue", None)
-    if net_income is not None and revenue:
-        return net_income / revenue
-    return info.get("netMargins", None)
-
-kpi_data = {
-    "Revenue": {
-        "value": info.get("totalRevenue"),
-        "format": "${:,.2f}B",
-        "divisor": 1e9
-    },
-    "Net Profit Margin (%)": {
-        "value": get_net_profit_margin(info, financials),
-        "format": "{:.2%}",
-        "divisor": 1
-    },
-    "EPS (Earnings Per Share)": {
-        "value": info.get("trailingEps", None),
-        "format": "${:,.2f}",
-        "divisor": 1
-    },
-    "Free Cash Flow (FCF)": {
-        "value": get_fcf(cashflow),
-        "format": "${:,.2f}B",
-        "divisor": 1e9
-    },
-    "Return on Equity (%)": {
-        "value": info.get("returnOnEquity", None),
-        "format": "{:.2%}",
-        "divisor": 1
-    },
-    "Revenue Growth (%)": {
-        "value": info.get("revenueGrowth", None),
-        "format": "{:.2%}",
-        "divisor": 1
-    },
-}
-
-# Dropdown for selection
-selected_kpis = st.multiselect("Select KPIs to display:", list(kpi_data.keys()), default=list(kpi_data.keys()))
-
-# Display KPIs
-cols = st.columns(len(selected_kpis))
-for i, kpi in enumerate(selected_kpis):
-    with cols[i]:
-        val = kpi_data[kpi]["value"]
-        if val is not None and pd.notnull(val):
-            formatted = kpi_data[kpi]["format"].format(val / kpi_data[kpi]["divisor"])
-            st.metric(kpi, formatted)
-        else:
-            st.metric(kpi, "N/A")
-
-# --- Investment Thesis ---
-st.markdown("## 💡 Investment Thesis & Upside Potential")
-
-try:
-    if stock and stock.info:
-        name = stock.info.get("longName", ticker)
-        sector = stock.info.get("sector", "N/A")
-        rev_growth = stock.info.get("revenueGrowth", 0)
-        net_margin = stock.info.get("profitMargins", 0)
-        roe = stock.info.get("returnOnEquity", 0)
-        roic = stock.info.get("returnOnAssets", 0)
-        fwd_pe = stock.info.get("forwardPE", None)
-        peg = stock.info.get("pegRatio", None)
-
-        thesis = []
-
-        if rev_growth and rev_growth > 0.1:
-            thesis.append(f"- **Strong Revenue Growth**: Revenue is growing at **{rev_growth*100:.1f}% YoY**, indicating business expansion.")
-        if net_margin and net_margin > 0.15:
-            thesis.append(f"- **Healthy Profitability**: Net profit margins are **{net_margin*100:.1f}%**, signaling operational strength.")
-        if roe and roe > 0.15:
-            thesis.append(f"- **High Return on Equity**: ROE of **{roe*100:.1f}%** implies effective use of shareholder capital.")
-        if roic and roic > 0.1:
-            thesis.append(f"- **Efficient Capital Use**: ROIC at **{roic*100:.1f}%** reflects good return on invested assets.")
-        if peg and peg < 1:
-            thesis.append(f"- **Undervalued on PEG**: PEG ratio of **{peg:.2f}** may indicate undervaluation relative to growth.")
-        if sector == "Technology":
-            thesis.append(f"- **Strategic Moat**: As a tech sector leader, {name} is positioned to benefit from long-term digital trends like AI, cloud, and automation.")
-
-        if thesis:
-            st.success("**Investment Thesis:**\n" + "\n".join(thesis))
-        else:
-            st.info("No compelling thesis could be generated from available data.")
-    else:
-        st.warning("⚠️ Company info not available.")
-except Exception as e:
-    st.warning(f"Could not generate investment thesis: {e}")
-
-# --- Extract Key Financial Ratios (required for risk assessment) ---
-try:
-    fin_ratios = stock.info  # or wherever you assign stock info via yfinance
-    key_metrics = {
-        "Debt to Equity": fin_ratios.get("debtToEquity", None),
-        "Profit Margin": fin_ratios.get("profitMargins", None),
-        "Current Ratio": fin_ratios.get("currentRatio", None),
-        "Return on Equity": fin_ratios.get("returnOnEquity", None),
-    }
-except Exception as e:
-    key_metrics = {}
-    st.warning(f"Could not extract key metrics: {e}")
-
-# --- ⚠️ Risks & Concerns ---
-st.markdown("## ⚠️ Risks & Concerns")
-
-try:
-    # Define fallback peer tickers if not already defined
-    if 'peer_tickers' not in locals():
-        peer_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN']  # fallback group
-    st.caption(f"Peer group used: {', '.join(peer_tickers)}")
-
-    # Load peer data (ensure yf.download or cache is already available)
-    peer_data = yf.download(peer_tickers, period="1y", group_by='ticker', progress=False)
-    
-    # Calculate average revenue growth and margin for peers
-    peer_revenue_growth = []
-    peer_net_margins = []
-
-    for pt in peer_tickers:
-        pt_ticker = yf.Ticker(pt)
-        pt_financials = pt_ticker.financials
-        pt_income = pt_financials if isinstance(pt_financials, pd.DataFrame) else pt_financials.get('incomeStatementHistory', {})
-        if pt_income is not None and "Total Revenue" in pt_income:
-            rev = pt_income.loc["Total Revenue"].values
-            if len(rev) >= 2 and rev[0] and rev[1]:
-                growth = (rev[0] - rev[1]) / rev[1]
-                peer_revenue_growth.append(growth)
-
-        if pt_income is not None and "Net Income" in pt_income and "Total Revenue" in pt_income:
-            net_income = pt_income.loc["Net Income"].values[0]
-            total_rev = pt_income.loc["Total Revenue"].values[0]
-            if net_income and total_rev:
-                margin = net_income / total_rev
-                peer_net_margins.append(margin)
-
-    avg_peer_growth = np.mean(peer_revenue_growth) if peer_revenue_growth else None
-    avg_peer_margin = np.mean(peer_net_margins) if peer_net_margins else None
-
-    # Load target company data
-    target = yf.Ticker(ticker)
-    income_stmt = target.financials
-    balance_sheet = target.balance_sheet
-    cashflow = target.cashflow
-
-    # 1. Leverage Risk
-    if key_metrics.get("Debt to Equity", 0) > 2:
-        st.error(f"**Leverage Risk:** Debt-to-Equity ratio is **{key_metrics['Debt to Equity']:.2f}**, indicating potential over-leverage.")
-
-    # 2. Earnings Volatility (based on quarterly EPS)
-    try:
-        eps = target.earnings
-        if not eps.empty and len(eps) > 4:
-            earnings_std = eps['Earnings'].pct_change().std()
-            if earnings_std > 0.5:
-                st.error(f"**Earnings Volatility Risk:** High variability in quarterly earnings. Std Dev: **{earnings_std:.2f}**")
-    except:
-        pass
-
-    # 3. Revenue Decline
-    try:
-        revenue = income_stmt.loc["Total Revenue"]
-        if revenue.iloc[0] < revenue.iloc[1]:
-            st.error(f"**Revenue Risk:** Revenue declined from **${revenue.iloc[1]:,.0f}** to **${revenue.iloc[0]:,.0f}** YoY.")
-    except:
-        pass
-
-    # 4. Margin Compression vs peers
-    try:
-        net_income = income_stmt.loc["Net Income"].iloc[0]
-        total_revenue = income_stmt.loc["Total Revenue"].iloc[0]
-        net_margin = net_income / total_revenue
-        if avg_peer_margin and net_margin < avg_peer_margin * 0.8:
-            st.error(f"**Margin Risk:** Net margin is **{net_margin:.2%}**, significantly below peer average **{avg_peer_margin:.2%}**.")
-    except:
-        pass
-
-    # 5. Shareholder Dilution (check share count increase)
-    try:
-        shares = balance_sheet.loc["Ordinary Shares Number"]
-        if shares.iloc[0] > shares.iloc[1]:
-            dilution_pct = (shares.iloc[0] - shares.iloc[1]) / shares.iloc[1]
-            st.error(f"**Dilution Risk:** Share count increased by **{dilution_pct:.1%}**, indicating potential dilution.")
-    except:
-        pass
-
-    # 6. Liquidity Risk (current ratio)
-    try:
-        current_assets = balance_sheet.loc["Total Current Assets"].iloc[0]
-        current_liab = balance_sheet.loc["Total Current Liabilities"].iloc[0]
-        current_ratio = current_assets / current_liab
-        if current_ratio < 1:
-            st.error(f"**Liquidity Risk:** Current Ratio is **{current_ratio:.2f}**, indicating short-term liquidity pressure.")
-    except:
-        pass
-
-except Exception as e:
-    st.warning(f"⚠️ Could not generate risk section: {e}")
