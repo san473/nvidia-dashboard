@@ -1355,103 +1355,75 @@ def get_balance_value(df, keys):
             return df.loc[key].iloc[0]
     return None
 
+
+
+# ✅ Add solvency section trigger
+with st.container():
+    solvency_overview_section(ticker)
+
+
 def solvency_overview_section(ticker: str):
     st.markdown("## 🏦 Solvency Overview")
 
     try:
         yf_ticker = yf.Ticker(ticker)
-        
-        # Load quarterly data to get historical trends
-        balance_sheets = yf_ticker.quarterly_balance_sheet.fillna(0).T
-        income_statements = yf_ticker.quarterly_income_stmt.fillna(0).T
+        balance_sheet = yf_ticker.balance_sheet.fillna(0)
+        income_stmt = yf_ticker.income_stmt.fillna(0)
 
-        # Normalize columns to lowercase for consistency
-        balance_sheets.columns = balance_sheets.columns.str.lower()
-        income_statements.columns = income_statements.columns.str.lower()
+        balance_sheet.index = balance_sheet.index.str.lower()
+        income_stmt.index = income_stmt.index.str.lower()
 
-        # Define keys for each metric with fallbacks
-        total_assets_keys = ["total assets"]
-        total_equity_keys = [
-            "total stockholder equity",
-            "stockholders equity",
-            "common stock equity",
-            "total equity gross minority interest"
-        ]
-        total_debt_keys = ["short long term debt", "long term debt", "long-term debt", "debt"]
-        cash_keys = ["cash", "cash and cash equivalents"]
-        current_assets_keys = ["total current assets", "current assets"]
-        current_liabilities_keys = ["total current liabilities", "current liabilities"]
-        inventory_keys = ["inventory"]
+        # Extract required data
+        total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
+        total_equity = next((balance_sheet.loc[k].iloc[0] for k in [
+            "total stockholder equity", "stockholders equity", "common stock equity", "total equity gross minority interest"
+        ] if k in balance_sheet.index), None)
 
-        # Prepare empty lists for time series
-        net_debt_equity_list = []
-        debt_asset_ratio_list = []
-        interest_coverage_list = []
-        cash_ratio_list = []
-        quick_ratio_list = []
-        current_ratio_list = []
-        z_score_list = []
-        dates = []
+        total_debt = sum(balance_sheet.loc[k].iloc[0] for k in ["short long term debt", "long term debt"] if k in balance_sheet.index)
+        cash = balance_sheet.loc["cash"].iloc[0] if "cash" in balance_sheet.index else None
+        current_assets = balance_sheet.loc["total current assets"].iloc[0] if "total current assets" in balance_sheet.index else None
+        current_liabilities = balance_sheet.loc["total current liabilities"].iloc[0] if "total current liabilities" in balance_sheet.index else None
+        inventory = balance_sheet.loc["inventory"].iloc[0] if "inventory" in balance_sheet.index else 0
 
-        for date, bs in balance_sheets.iterrows():
-            inc = income_statements.loc[date] if date in income_statements.index else None
+        ebit = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else None
+        interest_expense = income_stmt.loc["interest expense"].iloc[0] if "interest expense" in income_stmt.index else None
+        retained_earnings = balance_sheet.loc["retained earnings"].iloc[0] if "retained earnings" in balance_sheet.index else 0
 
-            total_assets = get_balance_value(bs, total_assets_keys)
-            total_equity = get_balance_value(bs, total_equity_keys)
-            total_debt = sum(get_balance_value(bs, [k]) or 0 for k in total_debt_keys)
-            cash = get_balance_value(bs, cash_keys) or 0
-            current_assets = get_balance_value(bs, current_assets_keys) or 0
-            current_liabilities = get_balance_value(bs, current_liabilities_keys) or 0
-            inventory = get_balance_value(bs, inventory_keys) or 0
+        # Compute ratios
+        net_debt = (total_debt - cash) if cash is not None else None
+        net_debt_equity = (net_debt / total_equity) if net_debt is not None and total_equity else None
+        debt_asset_ratio = (total_debt / total_assets) if total_debt and total_assets else None
+        interest_coverage = (ebit / abs(interest_expense)) if ebit and interest_expense else None
+        cash_ratio = (cash / current_liabilities) if cash and current_liabilities else None
+        quick_ratio = ((current_assets - inventory) / current_liabilities) if current_assets and current_liabilities else None
+        current_ratio = (current_assets / current_liabilities) if current_assets and current_liabilities else None
 
-            ebit = inc.get("ebit", None) if inc is not None else None
-            interest_expense = inc.get("interest expense", None) if inc is not None else None
-            retained_earnings = bs.get("retained earnings", 0)
+        working_capital = (current_assets - current_liabilities) if current_assets and current_liabilities else None
+        try:
+            z_score = (
+                1.2 * (working_capital / total_assets) +
+                1.4 * (retained_earnings / total_assets) +
+                3.3 * (ebit / total_assets) +
+                0.6 * (total_equity / total_debt) +
+                1.0 * (yf_ticker.info.get("totalRevenue", 0) / total_assets)
+            )
+        except Exception:
+            z_score = None
 
-            working_capital = current_assets - current_liabilities if current_assets and current_liabilities else 0
-            net_debt = total_debt - cash
-
-            # Calculate ratios safely
-            try:
-                net_debt_equity = net_debt / total_equity if total_equity else None
-                debt_asset_ratio = total_debt / total_assets if total_assets else None
-                interest_coverage = ebit / abs(interest_expense) if ebit and interest_expense else None
-                cash_ratio = cash / current_liabilities if current_liabilities else None
-                quick_ratio = (current_assets - inventory) / current_liabilities if current_liabilities else None
-                current_ratio = current_assets / current_liabilities if current_liabilities else None
-
-                z_score = (1.2 * (working_capital / total_assets) +
-                           1.4 * (retained_earnings / total_assets) +
-                           3.3 * (ebit / total_assets if ebit else 0) +
-                           0.6 * (total_equity / total_debt if total_debt else 0) +
-                           1.0 * (yf_ticker.info.get('totalRevenue', 0) / total_assets if total_assets else 0))
-            except Exception:
-                net_debt_equity = debt_asset_ratio = interest_coverage = None
-                cash_ratio = quick_ratio = current_ratio = z_score = None
-
-            net_debt_equity_list.append(net_debt_equity)
-            debt_asset_ratio_list.append(debt_asset_ratio)
-            interest_coverage_list.append(interest_coverage)
-            cash_ratio_list.append(cash_ratio)
-            quick_ratio_list.append(quick_ratio)
-            current_ratio_list.append(current_ratio)
-            z_score_list.append(z_score)
-            dates.append(date)
-
-        # Display latest metrics with progress bars
-        latest_metrics = {
-            "Net Debt/Equity": net_debt_equity_list[-1] if net_debt_equity_list else None,
-            "Debt/Assets": debt_asset_ratio_list[-1] if debt_asset_ratio_list else None,
-            "Interest Coverage": interest_coverage_list[-1] if interest_coverage_list else None,
-            "Cash Ratio": cash_ratio_list[-1] if cash_ratio_list else None,
-            "Quick Ratio": quick_ratio_list[-1] if quick_ratio_list else None,
-            "Current Ratio": current_ratio_list[-1] if current_ratio_list else None,
-            "Altman Z-Score": z_score_list[-1] if z_score_list else None,
+        # Display
+        metrics = {
+            "Net Debt/Equity": net_debt_equity,
+            "Debt/Assets": debt_asset_ratio,
+            "Interest Coverage": interest_coverage,
+            "Cash Ratio": cash_ratio,
+            "Quick Ratio": quick_ratio,
+            "Current Ratio": current_ratio,
+            "Altman Z-Score": z_score
         }
 
         cols = st.columns(4)
-        for idx, (label, value) in enumerate(latest_metrics.items()):
-            with cols[idx % 4]:
+        for i, (label, value) in enumerate(metrics.items()):
+            with cols[i % 4]:
                 if value is not None:
                     st.metric(label, f"{value:.2f}")
                     st.progress(min(max(value / 10, 0.01), 1.0))
@@ -1459,29 +1431,9 @@ def solvency_overview_section(ticker: str):
                     st.metric(label, "N/A")
                     st.progress(0.01)
 
-        # Plot line charts for trends
-        import pandas as pd
-        import plotly.express as px
-
-        df_trends = pd.DataFrame({
-            "Date": dates,
-            "Net Debt/Equity": net_debt_equity_list,
-            "Debt/Assets": debt_asset_ratio_list,
-            "Interest Coverage": interest_coverage_list,
-            "Cash Ratio": cash_ratio_list,
-            "Quick Ratio": quick_ratio_list,
-            "Current Ratio": current_ratio_list,
-            "Altman Z-Score": z_score_list
-        }).set_index("Date")
-
-        st.markdown("### 📊 Solvency Ratios Trend")
-
-        for metric in df_trends.columns:
-            fig = px.line(df_trends, y=metric, title=f"{metric} over time")
-            st.plotly_chart(fig, use_container_width=True)
-
     except Exception as e:
         st.error(f"Failed to load solvency overview: {e}")
+
 
 
 
