@@ -1224,11 +1224,10 @@ st.write("Income statement rows:", income_stmt.index.tolist())
 st.write("Income statement columns:", income_stmt.columns.tolist())
 
 latest_period = income_stmt.columns[0]
-
-git add nvidia_dashboard_app.py
-git commit -m "Add dynamic earnings breakdown waterfall chart section"
-git push
-
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import plotly.graph_objects as go
 
 def earnings_waterfall_section(ticker: str):
     st.markdown("## 💰 Earnings Breakdown Waterfall")
@@ -1329,7 +1328,6 @@ def earnings_waterfall_section(ticker: str):
 ticker = st.text_input("Ticker symbol", value="NVDA")
 if ticker:
     earnings_waterfall_section(ticker)
-
 
 
 # -------- Revenue Trends --------
