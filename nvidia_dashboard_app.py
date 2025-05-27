@@ -1225,84 +1225,110 @@ st.write("Income statement columns:", income_stmt.columns.tolist())
 
 latest_period = income_stmt.columns[0]
 
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-
-st.subheader("Earnings Breakdown Waterfall")
-
-try:
-    # Get the latest available quarter
-    latest_col = income_stmt.columns[0]
-
-    # Normalize index to strings for matching
-    income_stmt.index = income_stmt.index.map(str)
-
-    def find_row(df, keywords):
-        for keyword in keywords:
-            for idx in df.index:
-                if keyword.lower().replace(" ", "") in idx.lower().replace(" ", ""):
-                    return idx
-        return None
-
-    def get_amount(keywords):
-        row_label = find_row(income_stmt, keywords)
-        if row_label:
-            val = income_stmt.loc[row_label, latest_col]
-            return float(val) if pd.notna(val) else 0.0
-        return 0.0
-
-    # Define line items and their keywords
-    items = {
-        "Revenue": ["total revenue", "revenue"],
-        "Cost of Revenue": ["cost of revenue"],
-        "Gross Profit": ["gross profit"],
-        "Operating Expenses": ["operating expense"],
-        "Operating Income": ["operating income"],
-        "Other Expenses": ["other non operating income expenses", "other expenses"],
-        "Net Income": ["net income"]
-    }
-
-    # Get actual values
-    amounts = {k: get_amount(v) for k, v in items.items()}
-
-    # Left side box: item + value
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("#### Key Financials")
-        for label, value in amounts.items():
-            display_value = f"${value:,.0f}" if value != 0 else "–"
-            st.markdown(f"**{label}**: {display_value}")
-
-    # Right side: Waterfall Chart
-    measures = ["relative"] * len(amounts)
-    measures[0] = "absolute"  # Revenue base
-    measures[-1] = "total"    # Net Income is total
-
-    waterfall = go.Figure(go.Waterfall(
-        orientation="v",
-        x=list(amounts.keys()),
-        y=list(amounts.values()),
-        measure=measures,
-        text=[f"${v:,.0f}" if v != 0 else "–" for v in amounts.values()],
-        textposition="outside",
-        connector={"line": {"color": "gray"}},
-    ))
-
-    waterfall.update_layout(
-        title="Earnings Waterfall Chart (Latest Quarter)",
-        height=500,
-        margin=dict(l=40, r=40, t=40, b=40),
-        xaxis=dict(tickangle=-45),
-        showlegend=False
-    )
-
-    with col2:
-        st.plotly_chart(waterfall, use_container_width=True)
-
-except Exception as e:
-    st.warning(f"⚠️ Earnings Waterfall Chart failed: {e}")
+git add nvidia_dashboard_app.py
+git commit -m "Add dynamic earnings breakdown waterfall chart section"
+git push
 
 
+def earnings_waterfall_section(ticker: str):
+    st.markdown("## 💰 Earnings Breakdown Waterfall")
+
+    try:
+        yf_ticker = yf.Ticker(ticker)
+        income_stmt = yf_ticker.financials.fillna(0)
+
+        # yfinance financials columns are dates — pick the most recent
+        latest_period = income_stmt.columns[0]
+
+        # Extract items (use common labels - some fallback)
+        def get_value(possible_names):
+            for name in possible_names:
+                if name in income_stmt.index:
+                    return income_stmt.loc[name, latest_period]
+            return 0
+
+        revenue = get_value(["Total Revenue", "Revenue"])
+        cost_of_revenue = get_value(["Cost Of Revenue", "Cost of Revenue", "Cost of Goods Sold"])
+        gross_profit = get_value(["Gross Profit"])
+        operating_expenses = get_value(["Total Operating Expenses", "Operating Expenses"])
+        operating_income = get_value(["Operating Income", "Operating Income or Loss"])
+        other_expenses = get_value(["Other Income Expense Net", "Other Expenses"])
+        net_income = get_value(["Net Income", "Net Income Applicable To Common Shares"])
+
+        # Defensive calculation if some missing
+        if gross_profit == 0 and revenue and cost_of_revenue:
+            gross_profit = revenue - cost_of_revenue
+        if operating_income == 0 and gross_profit and operating_expenses:
+            operating_income = gross_profit - operating_expenses
+
+        # Waterfall breakdown components with labels
+        breakdown = {
+            "Revenue": revenue,
+            "Cost of Revenue": -cost_of_revenue,
+            "Gross Profit": gross_profit,
+            "Operating Expenses": -operating_expenses,
+            "Operating Income": operating_income,
+            "Other Expenses": -other_expenses,
+            "Net Income": net_income,
+        }
+
+        # Build waterfall plot
+        measure = []
+        y_vals = []
+        text = []
+        for i, (label, val) in enumerate(breakdown.items()):
+            if label == "Revenue":
+                measure.append("absolute")
+            elif label in ["Gross Profit", "Operating Income", "Net Income"]:
+                measure.append("total")
+            else:
+                measure.append("relative")
+            y_vals.append(val)
+            text.append(f"{val:,.0f}")
+
+        fig = go.Figure(go.Waterfall(
+            name = "Earnings Breakdown",
+            orientation = "v",
+            measure = measure,
+            x = list(breakdown.keys()),
+            text = text,
+            textposition = "outside",
+            y = y_vals,
+            connector = {"line":{"color":"rgb(63, 63, 63)"}},
+            increasing = {"marker":{"color":"#2ca02c"}},
+            decreasing = {"marker":{"color":"#d62728"}},
+            totals = {"marker":{"color":"#1f77b4"}},
+        ))
+
+        fig.update_layout(
+            title=f"Earnings Breakdown Waterfall for {ticker.upper()} (Most Recent)",
+            yaxis_title="USD",
+            waterfallgroupgap = 0.5,
+            autosize=False,
+            width=700,
+            height=450,
+            margin=dict(l=40, r=40, t=80, b=40),
+            font=dict(size=12)
+        )
+
+        # Display side-by-side with summary box
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            st.markdown("### Earnings Summary")
+            for label, val in breakdown.items():
+                st.write(f"**{label}:** {val:,.0f}")
+
+    except Exception as e:
+        st.error(f"Error loading earnings breakdown: {e}")
+
+# Example usage in your app:
+ticker = st.text_input("Ticker symbol", value="NVDA")
+if ticker:
+    earnings_waterfall_section(ticker)
 
 
 
