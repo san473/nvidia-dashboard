@@ -1353,7 +1353,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-
 def solvency_overview_section(ticker: str):
     st.markdown("## 🏦 Solvency Overview")
 
@@ -1361,12 +1360,10 @@ def solvency_overview_section(ticker: str):
         yf_ticker = yf.Ticker(ticker)
         balance_sheet = yf_ticker.balance_sheet.fillna(0)
         income_stmt = yf_ticker.income_stmt.fillna(0)
-        cashflow_stmt = yf_ticker.cashflow.fillna(0)
 
         # Normalize index
         balance_sheet.index = balance_sheet.index.str.lower()
         income_stmt.index = income_stmt.index.str.lower()
-        cashflow_stmt.index = cashflow_stmt.index.str.lower()
 
         # Extract values
         total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
@@ -1437,6 +1434,10 @@ def solvency_overview_section(ticker: str):
 
     except Exception as e:
         st.error(f"Failed to load solvency overview: {e}")
+
+
+with st.container():
+    solvency_overview_section(ticker)
 
 
 # Example usage:
