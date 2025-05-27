@@ -1357,13 +1357,12 @@ def get_balance_value(df, keys):
 
 
 
-# ✅ Add solvency section trigger
-with st.container():
-    solvency_overview_section(ticker)
-
 
 def solvency_overview_section(ticker: str):
     st.markdown("## 🏦 Solvency Overview")
+
+with st.container():
+    solvency_overview_section(ticker)
 
     try:
         yf_ticker = yf.Ticker(ticker)
