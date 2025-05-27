@@ -1356,8 +1356,6 @@ def get_balance_value(df, keys):
     return None
 
 
-with st.container():
-    solvency_overview_section(ticker)
 
 def solvency_overview_section(ticker: str):
     st.markdown("## 🏦 Solvency and Liquidity Overview")
