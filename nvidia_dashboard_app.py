@@ -722,19 +722,32 @@ with st.container():
                     st.progress(min(max(value, 0), 1) if value else 0)
 
         # --- Return Ratios ---
+        # --- Return Ratios ---
         st.markdown("### 🧾 Return on Capital Measures")
         col1, col2, col3, col4 = st.columns(4)
 
-        total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
-        total_equity = balance_sheet.loc["total stockholder equity"].iloc[0] if "total stockholder equity" in balance_sheet.index else None
-        total_debt = balance_sheet.loc["short long term debt"].iloc[0] if "short long term debt" in balance_sheet.index else 0
-        long_term_debt = balance_sheet.loc["long term debt"].iloc[0] if "long term debt" in balance_sheet.index else 0
-        ebit = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else operating_income
+        # pull raw values (or None)
+        total_assets       = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
+        total_equity       = balance_sheet.loc["total stockholder equity"].iloc[0] if "total stockholder equity" in balance_sheet.index else None
+        short_long_debt    = balance_sheet.loc["short long term debt"].iloc[0] if "short long term debt" in balance_sheet.index else 0
+        long_term_debt     = balance_sheet.loc["long term debt"].iloc[0] if "long term debt" in balance_sheet.index else 0
+        oper_inc           = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
+        ebit               = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else oper_inc
+        net_income         = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
 
-        roe = net_income / total_equity if total_equity else None
-        roa = net_income / total_assets if total_assets else None
-        roic = ebit / (total_equity + total_debt) if ebit and (total_equity + total_debt) else None
-        roce = ebit / (total_equity + long_term_debt) if ebit and (total_equity + long_term_debt) else None
+        # replace None with 0 for denominators
+        ta = total_assets     or 0
+        te = total_equity     or 0
+        td = short_long_debt  or 0
+        ld = long_term_debt   or 0
+        ei = ebit             or 0
+        ni = net_income       or 0
+
+        # compute safely
+        roe  = ni / te        if te > 0 else None
+        roa  = ni / ta        if ta > 0 else None
+        roic = ei / (te + td) if (te + td) > 0 else None
+        roce = ei / (te + ld) if (te + ld) > 0 else None
 
         for col, label, value in zip(
             [col1, col2, col3, col4],
@@ -742,11 +755,18 @@ with st.container():
             [roe, roa, roic, roce]
         ):
             with col:
-                st.metric(label, f"{value*100:.2f}%" if value else "N/A")
-                st.progress(min(max(value, 0), 1) if value else 0)
+                if value is not None:
+                    pct = value * 100
+                    st.metric(label, f"{pct:.2f}%")
+                    st.progress(min(max(value, 0), 1))
+                else:
+                    st.metric(label, "N/A")
+                    st.progress(0)
 
-    except Exception as e:
-        st.error(f"Error loading profitability data: {e}")
+        
+        
+        
+        
 
 
 
