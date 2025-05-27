@@ -1546,46 +1546,107 @@ else:
 
 
 import streamlit as st
-import yfinance as yf
+import requests
+from bs4 import BeautifulSoup
 import datetime
+
+def scrape_nvidia_earnings_calls():
+    url = "https://investor.nvidia.com/investor-relations/events-and-presentations/default.aspx"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        calls = []
+        tables = soup.find_all("table")
+        for table in tables:
+            rows = table.find_all("tr")
+            for row in rows:
+                cols = row.find_all("td")
+                if len(cols) >= 2:
+                    date = cols[0].text.strip()
+                    title = cols[1].text.strip()
+                    audio_link = None
+                    links = row.find_all("a")
+                    for link in links:
+                        href = link.get("href", "")
+                        if href and ("audio" in href.lower() or "webcast" in href.lower() or href.endswith(".mp3")):
+                            audio_link = href
+                            if audio_link.startswith("/"):
+                                audio_link = "https://investor.nvidia.com" + audio_link
+                            break
+                    calls.append({"date": date, "title": title, "audio_link": audio_link})
+        return calls
+    except Exception as e:
+        st.error(f"Failed to scrape Nvidia earnings calls: {e}")
+        return []
+
+def scrape_apple_earnings_calls():
+    url = "https://investor.apple.com/investor-relations/default.aspx"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        calls = []
+        # Apple page is simpler, find links with earnings or webcast/audio in text/href
+        for link in soup.find_all("a", href=True):
+            href = link['href']
+            text = link.text.strip()
+            if ("earnings" in text.lower() or "conference call" in text.lower()) and ("audio" in href.lower() or "webcast" in href.lower()):
+                if href.startswith("/"):
+                    href = "https://investor.apple.com" + href
+                calls.append({"title": text, "audio_link": href})
+        return calls
+    except Exception as e:
+        st.error(f"Failed to scrape Apple earnings calls: {e}")
+        return []
 
 def earnings_call_section(ticker: str):
     st.markdown("## 📞 Earnings Call Summary")
 
+    ticker = ticker.upper()
+    calls = []
+
+    if ticker == "NVDA":
+        calls = scrape_nvidia_earnings_calls()
+    elif ticker == "AAPL":
+        calls = scrape_apple_earnings_calls()
+    else:
+        st.info(f"Earnings call audio scraping not supported for ticker {ticker}.")
+        return
+
+    if not calls:
+        st.info("No earnings call audio/webcast links found.")
+        return
+
+    # Show the most recent call (assuming sorted newest first)
+    recent_call = calls[0]
+
+    # Try to parse date if possible
     try:
-        yf_ticker = yf.Ticker(ticker)
+        call_date = datetime.datetime.strptime(recent_call.get("date", ""), "%m/%d/%Y")
+        date_str = call_date.strftime("%Y-%m-%d")
+    except Exception:
+        date_str = recent_call.get("date", "Unknown Date")
 
-        earnings_dates = yf_ticker.calendar  # This is a dict
+    st.write(f"**Date:** {date_str}")
+    st.write(f"**Title:** {recent_call.get('title', 'No Title')}")
 
-        if isinstance(earnings_dates, dict) and 'Earnings Date' in earnings_dates:
-            earnings_date_raw = earnings_dates['Earnings Date'][0]  # first item of list
-            if isinstance(earnings_date_raw, datetime.datetime):
-                earnings_date_str = earnings_date_raw.strftime('%Y-%m-%d')
-            else:
-                earnings_date_str = str(earnings_date_raw)
-        else:
-            earnings_date_str = "Date not available"
+    audio_url = recent_call.get("audio_link")
+    if audio_url:
+        st.audio(audio_url)
+    else:
+        st.info("Audio for the latest earnings call is not available.")
 
-        st.write(f"**Earnings Date:** {earnings_date_str}")
+    # Placeholder for summary (can be enhanced with NLP summarization)
+    st.markdown("""
+    ### Summary
+    This section can be enhanced to include a summary of the earnings call transcript or key points.
+    """)
 
-        # Placeholder for audio URL (yfinance does not provide this)
-        audio_url = None
 
-        if audio_url:
-            st.audio(audio_url)
-        else:
-            st.info("Audio for the latest earnings call is not available.")
-
-        # Placeholder for earnings call summary
-        st.markdown("""
-        ### Summary
-        This section will contain a concise summary of the latest earnings call.
-        You can integrate a text summarization model or API here to generate insights dynamically.
-        """)
-
-    except Exception as e:
-        st.error(f"Failed to load earnings call section: {e}")
-
-# Usage in main app:
+# Example usage inside your Streamlit app:
 with st.container():
     earnings_call_section(ticker)
+
