@@ -1551,43 +1551,41 @@ import datetime
 
 def earnings_call_section(ticker: str):
     st.markdown("## 📞 Earnings Call Summary")
-    
+
     try:
         yf_ticker = yf.Ticker(ticker)
-        
-        # Fetch earnings calendar or earnings call dates
-        earnings_dates = yf_ticker.calendar
-        
-        # Get the next earnings date or last earnings date
-        if 'Earnings Date' in earnings_dates.index:
-            earnings_date = earnings_dates.loc['Earnings Date'][0]
-            if isinstance(earnings_date, datetime.datetime):
-                earnings_date_str = earnings_date.strftime('%Y-%m-%d')
+
+        earnings_dates = yf_ticker.calendar  # This is a dict
+
+        if isinstance(earnings_dates, dict) and 'Earnings Date' in earnings_dates:
+            earnings_date_raw = earnings_dates['Earnings Date'][0]  # first item of list
+            if isinstance(earnings_date_raw, datetime.datetime):
+                earnings_date_str = earnings_date_raw.strftime('%Y-%m-%d')
             else:
-                earnings_date_str = str(earnings_date)
+                earnings_date_str = str(earnings_date_raw)
         else:
             earnings_date_str = "Date not available"
-        
+
         st.write(f"**Earnings Date:** {earnings_date_str}")
-        
-        # Placeholder for audio URL (yfinance does not provide audio links)
+
+        # Placeholder for audio URL (yfinance does not provide this)
         audio_url = None
-        
+
         if audio_url:
             st.audio(audio_url)
         else:
             st.info("Audio for the latest earnings call is not available.")
-        
+
         # Placeholder for earnings call summary
         st.markdown("""
         ### Summary
         This section will contain a concise summary of the latest earnings call.
         You can integrate a text summarization model or API here to generate insights dynamically.
         """)
-        
+
     except Exception as e:
         st.error(f"Failed to load earnings call section: {e}")
 
-# Usage in the main app code:
+# Usage in main app:
 with st.container():
     earnings_call_section(ticker)
