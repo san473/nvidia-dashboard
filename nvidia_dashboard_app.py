@@ -1544,109 +1544,66 @@ if profitability_data or leverage_data:
 else:
     st.warning("⚠️ No profitability or leverage data available.")
 
-
 import streamlit as st
+import yfinance as yf
+import datetime
 import requests
 from bs4 import BeautifulSoup
-import datetime
-
-def scrape_nvidia_earnings_calls():
-    url = "https://investor.nvidia.com/investor-relations/events-and-presentations/default.aspx"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        calls = []
-        tables = soup.find_all("table")
-        for table in tables:
-            rows = table.find_all("tr")
-            for row in rows:
-                cols = row.find_all("td")
-                if len(cols) >= 2:
-                    date = cols[0].text.strip()
-                    title = cols[1].text.strip()
-                    audio_link = None
-                    links = row.find_all("a")
-                    for link in links:
-                        href = link.get("href", "")
-                        if href and ("audio" in href.lower() or "webcast" in href.lower() or href.endswith(".mp3")):
-                            audio_link = href
-                            if audio_link.startswith("/"):
-                                audio_link = "https://investor.nvidia.com" + audio_link
-                            break
-                    calls.append({"date": date, "title": title, "audio_link": audio_link})
-        return calls
-    except Exception as e:
-        st.error(f"Failed to scrape Nvidia earnings calls: {e}")
-        return []
-
-def scrape_apple_earnings_calls():
-    url = "https://investor.apple.com/investor-relations/default.aspx"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        calls = []
-        # Apple page is simpler, find links with earnings or webcast/audio in text/href
-        for link in soup.find_all("a", href=True):
-            href = link['href']
-            text = link.text.strip()
-            if ("earnings" in text.lower() or "conference call" in text.lower()) and ("audio" in href.lower() or "webcast" in href.lower()):
-                if href.startswith("/"):
-                    href = "https://investor.apple.com" + href
-                calls.append({"title": text, "audio_link": href})
-        return calls
-    except Exception as e:
-        st.error(f"Failed to scrape Apple earnings calls: {e}")
-        return []
 
 def earnings_call_section(ticker: str):
     st.markdown("## 📞 Earnings Call Summary")
 
-    ticker = ticker.upper()
-    calls = []
-
-    if ticker == "NVDA":
-        calls = scrape_nvidia_earnings_calls()
-    elif ticker == "AAPL":
-        calls = scrape_apple_earnings_calls()
-    else:
-        st.info(f"Earnings call audio scraping not supported for ticker {ticker}.")
-        return
-
-    if not calls:
-        st.info("No earnings call audio/webcast links found.")
-        return
-
-    # Show the most recent call (assuming sorted newest first)
-    recent_call = calls[0]
-
-    # Try to parse date if possible
     try:
-        call_date = datetime.datetime.strptime(recent_call.get("date", ""), "%m/%d/%Y")
-        date_str = call_date.strftime("%Y-%m-%d")
-    except Exception:
-        date_str = recent_call.get("date", "Unknown Date")
+        yf_ticker = yf.Ticker(ticker)
+        earnings_dates = yf_ticker.calendar
 
-    st.write(f"**Date:** {date_str}")
-    st.write(f"**Title:** {recent_call.get('title', 'No Title')}")
+        # Get last earnings date
+        if not earnings_dates.empty and 'Earnings Date' in earnings_dates.index:
+            earnings_date = earnings_dates.loc['Earnings Date'][0]
+            earnings_date_str = earnings_date.strftime('%Y-%m-%d') if isinstance(earnings_date, datetime.datetime) else str(earnings_date)
+        else:
+            earnings_date_str = "Date not available"
 
-    audio_url = recent_call.get("audio_link")
-    if audio_url:
-        st.audio(audio_url)
-    else:
-        st.info("Audio for the latest earnings call is not available.")
+        st.write(f"**Earnings Date:** {earnings_date_str}")
 
-    # Placeholder for summary (can be enhanced with NLP summarization)
-    st.markdown("""
-    ### Summary
-    This section can be enhanced to include a summary of the earnings call transcript or key points.
-    """)
+        # --- Try to find webcast/audio link from official IR page ---
+        ir_links = {
+            "NVDA": "https://www.nvidia.com/en-us/about-nvidia/investor-relations/financial-info/",
+            "AAPL": "https://investor.apple.com/earnings/default.aspx"
+        }
 
+        audio_url = None
+        if ticker.upper() in ir_links:
+            response = requests.get(ir_links[ticker.upper()], timeout=10)
+            soup = BeautifulSoup(response.text, 'html.parser')
 
-# Example usage inside your Streamlit app:
+            # Try to find audio/video links (simple logic for demo purposes)
+            for link in soup.find_all("a", href=True):
+                href = link['href']
+                if any(ext in href.lower() for ext in [".mp3", ".m4a", "webcast", "audio", "eventid"]):
+                    audio_url = href
+                    if not audio_url.startswith("http"):
+                        audio_url = "https://investor.apple.com" + audio_url if "apple" in ir_links[ticker.upper()] else "https://www.nvidia.com" + audio_url
+                    break
+
+        if audio_url:
+            st.audio(audio_url)
+        else:
+            st.info("🎧 No earnings call audio/webcast links found.")
+
+        # --- Static summary placeholder ---
+        st.markdown("""
+        ### Summary
+        This section will soon include a dynamic summary of the most recent earnings call, extracted via NLP summarization from transcript or audio highlights.
+        """)
+
+    except Exception as e:
+        st.error(f"Failed to load earnings call section: {e}")
+
+# --- In your main Streamlit app ---
 with st.container():
     earnings_call_section(ticker)
+
+
+    
 
