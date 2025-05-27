@@ -685,116 +685,121 @@ except Exception as e:
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+git add nvidia_dashboard_app.py
+git commit -m "Fix ROE/ROIC fallback logic and restore margin/return progress bars"
+git push origin main
 
-try:
-    yf_ticker = yf.Ticker(ticker)
-    info = yf_ticker.info
-    income_stmt = yf_ticker.income_stmt.fillna(0)
-    balance_sheet = yf_ticker.balance_sheet.fillna(0)
 
-    # Lowercase index for uniformity
-    income_stmt.index = income_stmt.index.str.lower()
-    balance_sheet.index = balance_sheet.index.str.lower()
+    with st.container():
+    st.markdown("## 📈 Profitability Overview")
 
-    # --- Margins ---
-    st.markdown("### 🧮 Margin Profile")
-    col1, col2, col3 = st.columns(3)
+    try:
+        yf_ticker = yf.Ticker(ticker)
+        info = yf_ticker.info
+        income_stmt = yf_ticker.income_stmt.fillna(0)
+        balance_sheet = yf_ticker.balance_sheet.fillna(0)
 
-    revenue = income_stmt.loc["total revenue"].iloc[0] if "total revenue" in income_stmt.index else None
-    gross_profit = income_stmt.loc["gross profit"].iloc[0] if "gross profit" in income_stmt.index else None
-    operating_income = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
-    net_income = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
+        income_stmt.index = income_stmt.index.str.lower()
+        balance_sheet.index = balance_sheet.index.str.lower()
 
-    if revenue:
-        gross_margin = gross_profit / revenue if gross_profit else None
-        op_margin = operating_income / revenue if operating_income else None
-        net_margin = net_income / revenue if net_income else None
+        # --- Margins ---
+        st.markdown("### 🧮 Margin Profile")
+        col1, col2, col3 = st.columns(3)
+
+        revenue = income_stmt.loc["total revenue"].iloc[0] if "total revenue" in income_stmt.index else None
+        gross_profit = income_stmt.loc["gross profit"].iloc[0] if "gross profit" in income_stmt.index else None
+        operating_income = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
+        net_income = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
+
+        if revenue:
+            gross_margin = gross_profit / revenue if gross_profit else None
+            op_margin = operating_income / revenue if operating_income else None
+            net_margin = net_income / revenue if net_income else None
+
+            for col, label, value in zip(
+                [col1, col2, col3],
+                ["Gross Margin", "Operating Margin", "Net Margin"],
+                [gross_margin, op_margin, net_margin]
+            ):
+                with col:
+                    if value is not None:
+                        pct = value * 100
+                        st.metric(label, f"{pct:.2f}%")
+                        st.progress(min(max(value, 0), 1.0))  # Clamp 0-1
+                    else:
+                        st.metric(label, "N/A")
+                        st.progress(0.001)  # Tiny visible bar
+
+        # --- Return on Capital Measures ---
+        st.markdown("### 🧾 Return on Capital Measures")
+        col1, col2, col3, col4 = st.columns(4)
+
+        # Total assets
+        total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
+
+        # Try multiple fallback keys for equity
+        equity_keys = [
+            "total stockholder equity",
+            "stockholders equity",
+            "common stock equity",
+            "total equity gross minority interest"
+        ]
+        total_equity = None
+        for key in equity_keys:
+            if key in balance_sheet.index:
+                total_equity = balance_sheet.loc[key].iloc[0]
+                break
+
+        # Debt
+        short_long_debt = balance_sheet.loc["short long term debt"].iloc[0] if "short long term debt" in balance_sheet.index else 0
+        long_term_debt = balance_sheet.loc["long term debt"].iloc[0] if "long term debt" in balance_sheet.index else 0
+
+        # Income
+        oper_inc = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
+        ebit = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else oper_inc
+        net_income = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
+
+        # Debug
+        st.write("Debug: Raw Balance Sheet and Income Statement values:")
+        st.write(f"Total Assets: {total_assets}")
+        st.write(f"Total Equity: {total_equity}")
+        st.write(f"Short/Long Debt: {short_long_debt}")
+        st.write(f"Long Term Debt: {long_term_debt}")
+        st.write(f"EBIT: {ebit}")
+        st.write(f"Net Income: {net_income}")
+
+        # Denominator fallback logic
+        ta = total_assets or 0
+        te = total_equity or 0
+        td = short_long_debt or 0
+        ld = long_term_debt or 0
+        ei = ebit if ebit is not None else 0
+        ni = net_income if net_income is not None else 0
+
+        # Compute metrics
+        roe = (ni / te) if (te > 0 and net_income is not None) else None
+        roa = (ni / ta) if (ta > 0 and net_income is not None) else None
+        roic = (ei / (te + td)) if ((te + td) > 0 and ebit is not None) else None
+        roce = (ei / (te + ld)) if ((te + ld) > 0 and ebit is not None) else None
+
+        st.write(f"Computed Ratios: ROE={roe}, ROA={roa}, ROIC={roic}, ROCE={roce}")
 
         for col, label, value in zip(
-            [col1, col2, col3],
-            ["Gross Margin", "Operating Margin", "Net Margin"],
-            [gross_margin, op_margin, net_margin]
+            [col1, col2, col3, col4],
+            ["ROE", "ROA", "ROIC", "ROCE"],
+            [roe, roa, roic, roce]
         ):
             with col:
                 if value is not None:
                     pct = value * 100
                     st.metric(label, f"{pct:.2f}%")
-                    st.progress(min(value, 1.0))  # Cap at 100%
+                    st.progress(min(max(value, 0), 1.0))
                 else:
                     st.metric(label, "N/A")
-                    st.progress(0)
+                    st.progress(0.001)
 
-    # --- Return on Capital Measures ---
-    st.markdown("### 🧾 Return on Capital Measures")
-    col1, col2, col3, col4 = st.columns(4)
-
-    total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
-    
-    # Robust total equity lookup using multiple keys:
-    equity_keys = [
-        "stockholders equity",
-        "total equity gross minority interest",
-        "common stock equity",
-        "total equity"
-    ]
-    total_equity = None
-    for key in equity_keys:
-        if key in balance_sheet.index:
-            total_equity = balance_sheet.loc[key].iloc[0]
-            break
-
-    short_long_debt = balance_sheet.loc["short long term debt"].iloc[0] if "short long term debt" in balance_sheet.index else 0
-    long_term_debt = balance_sheet.loc["long term debt"].iloc[0] if "long term debt" in balance_sheet.index else 0
-
-    oper_inc = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
-    ebit = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else oper_inc
-    net_income = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
-
-    # Debug: Print raw values retrieved
-    st.write("Debug: Raw Balance Sheet and Income Statement values:")
-    st.write(f"Total Assets: {total_assets}")
-    st.write(f"Total Equity: {total_equity}")
-    st.write(f"Short/Long Debt: {short_long_debt}")
-    st.write(f"Long Term Debt: {long_term_debt}")
-    st.write(f"EBIT: {ebit}")
-    st.write(f"Net Income: {net_income}")
-
-    # Replace None with 0 only for denominators; numerator None means metric can't be computed
-    ta = total_assets or 0
-    te = total_equity or 0
-    td = short_long_debt or 0
-    ld = long_term_debt or 0
-    ei = ebit if ebit is not None else 0
-    ni = net_income if net_income is not None else 0
-
-    # Debug: Show adjusted values
-    st.write(f"Adjusted ta={ta}, te={te}, td={td}, ld={ld}, ei={ei}, ni={ni}")
-
-    # Compute ratios; if numerator is None, ratio is None
-    roe = (ni / te) if (te > 0 and net_income is not None) else None
-    roa = (ni / ta) if (ta > 0 and net_income is not None) else None
-    roic = (ei / (te + td)) if ((te + td) > 0 and ebit is not None) else None
-    roce = (ei / (te + ld)) if ((te + ld) > 0 and ebit is not None) else None
-
-    # Debug: Show computed ratios
-    st.write(f"Computed Ratios: ROE={roe}, ROA={roa}, ROIC={roic}, ROCE={roce}")
-
-    for col, label, value in zip(
-        [col1, col2, col3, col4],
-        ["ROE", "ROA", "ROIC", "ROCE"],
-        [roe, roa, roic, roce]
-    ):
-        with col:
-            if value is not None:
-                pct = value * 100
-                st.metric(label, f"{pct:.2f}%")
-                st.progress(min(max(value, 0), 1.0))  # Clamp 0-1
-            else:
-                st.metric(label, "N/A")
-                st.progress(0)
-
-except Exception as e:
-    st.error(f"Error loading profitability section: {e}")
+    except Exception as e:
+        st.error(f"Error loading profitability section: {e}")
 
 
 
