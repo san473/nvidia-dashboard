@@ -1349,6 +1349,92 @@ try:
 except Exception as e:
     st.error(f"Failed to load revenue trend: {e}")
 
+def solvency_overview_section(ticker: str):
+    st.markdown("## 🏦 Solvency Overview")
+
+    try:
+        yf_ticker = yf.Ticker(ticker)
+        balance = yf_ticker.balance_sheet.fillna(0)
+        income = yf_ticker.financials.fillna(0)
+        cashflow = yf_ticker.cashflow.fillna(0)
+
+        balance.index = balance.index.str.lower()
+        income.index = income.index.str.lower()
+        cashflow.index = cashflow.index.str.lower()
+
+        # Extract key values
+        total_debt = 0
+        if "short long term debt" in balance.index:
+            total_debt += balance.loc["short long term debt"].iloc[0]
+        if "long term debt" in balance.index:
+            total_debt += balance.loc["long term debt"].iloc[0]
+
+        cash = balance.loc["cash"].iloc[0] if "cash" in balance.index else 0
+        total_equity = balance.loc["total stockholder equity"].iloc[0] if "total stockholder equity" in balance.index else None
+        total_assets = balance.loc["total assets"].iloc[0] if "total assets" in balance.index else None
+        current_assets = balance.loc["total current assets"].iloc[0] if "total current assets" in balance.index else None
+        current_liabilities = balance.loc["total current liabilities"].iloc[0] if "total current liabilities" in balance.index else None
+        receivables = balance.loc["net receivables"].iloc[0] if "net receivables" in balance.index else 0
+        interest_expense = income.loc["interest expense"].iloc[0] if "interest expense" in income.index else None
+        ebit = income.loc["ebit"].iloc[0] if "ebit" in income.index else None
+
+        # Ratios
+        net_debt_equity = ((total_debt - cash) / total_equity) if total_equity else None
+        debt_assets = (total_debt / total_assets) if total_assets else None
+        interest_coverage = (ebit / abs(interest_expense)) if interest_expense and ebit else None
+        cash_ratio = (cash / current_liabilities) if current_liabilities else None
+        quick_ratio = ((cash + receivables) / current_liabilities) if current_liabilities else None
+        current_ratio = (current_assets / current_liabilities) if current_liabilities else None
+
+        # Altman Z-Score – basic proxy (approximation)
+        z_score = None
+        if total_assets and total_equity and ebit and current_assets:
+            working_capital = current_assets - current_liabilities
+            retained_earnings = income.loc["net income"].iloc[0] if "net income" in income.index else 0
+            market_value_equity = total_equity  # proxy
+            total_liabilities = total_assets - total_equity
+            sales = income.loc["total revenue"].iloc[0] if "total revenue" in income.index else 0
+            z_score = (
+                1.2 * (working_capital / total_assets)
+                + 1.4 * (retained_earnings / total_assets)
+                + 3.3 * (ebit / total_assets)
+                + 0.6 * (market_value_equity / total_liabilities)
+                + 1.0 * (sales / total_assets)
+            )
+
+        # Layout
+        col1, col2, col3 = st.columns(3)
+        col4, col5, col6 = st.columns(3)
+        col7 = st.columns(1)[0]
+
+        def display_metric(col, label, value, invert=False, clamp=(0, 5)):
+            if value is not None:
+                val = float(value)
+                col.metric(label, f"{val:.2f}")
+                if invert:
+                    bar_val = 1.0 - min(max(val, clamp[0]) / clamp[1], 1.0)
+                else:
+                    bar_val = min(max(val, clamp[0]) / clamp[1], 1.0)
+                col.progress(bar_val)
+            else:
+                col.metric(label, "N/A")
+                col.progress(0.001)
+
+        display_metric(col1, "Net Debt / Equity", net_debt_equity, invert=True)
+        display_metric(col2, "Debt / Assets", debt_assets, invert=True)
+        display_metric(col3, "Interest Coverage", interest_coverage, clamp=(0, 10))
+        display_metric(col4, "Cash Ratio", cash_ratio)
+        display_metric(col5, "Quick Ratio", quick_ratio)
+        display_metric(col6, "Current Ratio", current_ratio)
+        display_metric(col7, "Altman Z-Score", z_score, clamp=(0, 4))
+
+    except Exception as e:
+        st.error(f"Error in Solvency Overview: {e}")
+
+
+
+
+
 import yfinance as yf
 import streamlit as st
 import pandas as pd
