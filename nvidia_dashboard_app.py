@@ -1356,13 +1356,14 @@ def get_balance_value(df, keys):
     return None
 
 
-
-
-def solvency_overview_section(ticker: str):
-    st.markdown("## 🏦 Solvency Overview")
-
 with st.container():
     solvency_overview_section(ticker)
+
+def solvency_overview_section(ticker: str):
+    st.markdown("## 🏦 Solvency and Liquidity Overview")
+
+with st.container():
+    solvency_overview_section(ticker)    
 
     try:
         yf_ticker = yf.Ticker(ticker)
@@ -1372,32 +1373,40 @@ with st.container():
         balance_sheet.index = balance_sheet.index.str.lower()
         income_stmt.index = income_stmt.index.str.lower()
 
-        # Extract required data
-        total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
-        total_equity = next((balance_sheet.loc[k].iloc[0] for k in [
-            "total stockholder equity", "stockholders equity", "common stock equity", "total equity gross minority interest"
-        ] if k in balance_sheet.index), None)
+        def try_get(df, keys):
+            for key in keys:
+                if key in df.index:
+                    return df.loc[key].iloc[0]
+            return None
 
-        total_debt = sum(balance_sheet.loc[k].iloc[0] for k in ["short long term debt", "long term debt"] if k in balance_sheet.index)
-        cash = balance_sheet.loc["cash"].iloc[0] if "cash" in balance_sheet.index else None
-        current_assets = balance_sheet.loc["total current assets"].iloc[0] if "total current assets" in balance_sheet.index else None
-        current_liabilities = balance_sheet.loc["total current liabilities"].iloc[0] if "total current liabilities" in balance_sheet.index else None
-        inventory = balance_sheet.loc["inventory"].iloc[0] if "inventory" in balance_sheet.index else 0
+        total_assets = try_get(balance_sheet, ["total assets", "totalAssets"])
+        total_equity = try_get(balance_sheet, [
+            "total stockholder equity", "stockholders equity", 
+            "common stock equity", "total equity gross minority interest"
+        ])
+        total_debt = sum([
+            try_get(balance_sheet, ["short long term debt", "short/long term debt", "short term debt"]) or 0,
+            try_get(balance_sheet, ["long term debt"]) or 0
+        ])
+        cash = try_get(balance_sheet, ["cash", "cash and cash equivalents"]) or 0
+        current_assets = try_get(balance_sheet, ["total current assets", "current assets", "totalCurrentAssets"]) or 0
+        current_liabilities = try_get(balance_sheet, ["total current liabilities", "current liabilities"]) or 0
+        inventory = try_get(balance_sheet, ["inventory"]) or 0
+        ebit = try_get(income_stmt, ["ebit", "operating income"]) or 0
+        interest_expense = try_get(income_stmt, ["interest expense"]) or 0
+        retained_earnings = try_get(balance_sheet, ["retained earnings"]) or 0
+        working_capital = current_assets - current_liabilities if current_assets and current_liabilities else 0
 
-        ebit = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else None
-        interest_expense = income_stmt.loc["interest expense"].iloc[0] if "interest expense" in income_stmt.index else None
-        retained_earnings = balance_sheet.loc["retained earnings"].iloc[0] if "retained earnings" in balance_sheet.index else 0
+        # --- Calculations ---
+        net_debt = total_debt - cash
+        net_debt_equity = (net_debt / total_equity) if total_equity else None
+        debt_asset_ratio = (total_debt / total_assets) if total_assets else None
+        interest_coverage = (ebit / abs(interest_expense)) if (ebit and interest_expense) else None
+        cash_ratio = (cash / current_liabilities) if current_liabilities else None
+        quick_ratio = ((current_assets - inventory) / current_liabilities) if current_liabilities else None
+        current_ratio = (current_assets / current_liabilities) if current_liabilities else None
 
-        # Compute ratios
-        net_debt = (total_debt - cash) if cash is not None else None
-        net_debt_equity = (net_debt / total_equity) if net_debt is not None and total_equity else None
-        debt_asset_ratio = (total_debt / total_assets) if total_debt and total_assets else None
-        interest_coverage = (ebit / abs(interest_expense)) if ebit and interest_expense else None
-        cash_ratio = (cash / current_liabilities) if cash and current_liabilities else None
-        quick_ratio = ((current_assets - inventory) / current_liabilities) if current_assets and current_liabilities else None
-        current_ratio = (current_assets / current_liabilities) if current_assets and current_liabilities else None
-
-        working_capital = (current_assets - current_liabilities) if current_assets and current_liabilities else None
+        # Altman Z-score (approximate)
         try:
             z_score = (
                 1.2 * (working_capital / total_assets) +
@@ -1405,8 +1414,8 @@ with st.container():
                 3.3 * (ebit / total_assets) +
                 0.6 * (total_equity / total_debt) +
                 1.0 * (yf_ticker.info.get("totalRevenue", 0) / total_assets)
-            )
-        except Exception:
+            ) if total_assets and total_equity and total_debt else None
+        except:
             z_score = None
 
         # Display
@@ -1421,9 +1430,9 @@ with st.container():
         }
 
         cols = st.columns(4)
-        for i, (label, value) in enumerate(metrics.items()):
-            with cols[i % 4]:
-                if value is not None:
+        for idx, (label, value) in enumerate(metrics.items()):
+            with cols[idx % 4]:
+                if value is not None and value != float("inf"):
                     st.metric(label, f"{value:.2f}")
                     st.progress(min(max(value / 10, 0.01), 1.0))
                 else:
@@ -1432,6 +1441,9 @@ with st.container():
 
     except Exception as e:
         st.error(f"Failed to load solvency overview: {e}")
+
+
+
 
 
 
