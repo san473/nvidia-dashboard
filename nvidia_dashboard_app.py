@@ -11,6 +11,7 @@ from datetime import datetime
 from streamlit.runtime.caching import cache_data
 import requests
 import altair as alt
+import matplotlib.pyplot as plt
 import nltk
 nltk.download('vader_lexicon')
 
