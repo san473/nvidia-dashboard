@@ -1358,14 +1358,13 @@ def get_balance_value(df, keys):
     return None
 
 
-
+import matplotlib.pyplot as plt
 
 def solvency_overview_section(ticker: str):
     st.markdown("## 🏦 Solvency and Liquidity Overview")
 
 with st.container():
     solvency_overview_section(ticker)    
-
 
     try:
         yf_ticker = yf.Ticker(ticker)
@@ -1377,28 +1376,29 @@ with st.container():
         balance_sheet.index = balance_sheet.index.str.lower()
         income_stmt.index = income_stmt.index.str.lower()
 
-        def safe_get(df, key):
-            key = key.lower()
-            matches = [k for k in df.index if key in k]
-            return df.loc[matches[0]].iloc[0] if matches else 0
+        def extract_value(df, candidates):
+            for name in candidates:
+                for index in df.index:
+                    if name in index.lower():
+                        return df.loc[index].iloc[0]
+            return 0
 
-        total_assets = safe_get(balance_sheet, "total assets")
-        total_equity = (
-            safe_get(balance_sheet, "total stockholder equity") or
-            safe_get(balance_sheet, "common stock equity")
-        )
-        total_debt = safe_get(balance_sheet, "short long term debt") + safe_get(balance_sheet, "long term debt")
-        cash = safe_get(balance_sheet, "cash")
-        current_assets = safe_get(balance_sheet, "total current assets")
-        current_liabilities = safe_get(balance_sheet, "total current liabilities")
-        inventory = safe_get(balance_sheet, "inventory")
+        # --- Extract Key Inputs ---
+        total_assets = extract_value(balance_sheet, ["total assets"])
+        total_equity = extract_value(balance_sheet, ["total stockholder equity", "common stock equity"])
+        total_debt = extract_value(balance_sheet, ["short term debt", "short/long term debt"]) + extract_value(balance_sheet, ["long term debt"])
+        cash = extract_value(balance_sheet, ["cash"])
+        current_assets = extract_value(balance_sheet, ["total current assets"])
+        current_liabilities = extract_value(balance_sheet, ["total current liabilities"])
+        inventory = extract_value(balance_sheet, ["inventory"])
+        ebit = extract_value(income_stmt, ["ebit"])
+        interest_expense = abs(extract_value(income_stmt, ["interest expense"]))
+        retained_earnings = extract_value(balance_sheet, ["retained earnings"])
+        total_revenue = yf_ticker.info.get("totalRevenue", 0)
 
-        ebit = safe_get(income_stmt, "ebit")
-        interest_expense = abs(safe_get(income_stmt, "interest expense"))
-        retained_earnings = safe_get(balance_sheet, "retained earnings")
         working_capital = current_assets - current_liabilities
 
-        # --- Calculations ---
+        # --- Ratio Calculations ---
         net_debt = total_debt - cash
         net_debt_equity = net_debt / total_equity if total_equity else None
         debt_asset_ratio = total_debt / total_assets if total_assets else None
@@ -1407,20 +1407,18 @@ with st.container():
         quick_ratio = (current_assets - inventory) / current_liabilities if current_liabilities else None
         current_ratio = current_assets / current_liabilities if current_liabilities else None
 
-        # Altman Z-score
         try:
-            total_revenue = yf_ticker.info.get("totalRevenue", 0)
             z_score = (
                 1.2 * (working_capital / total_assets) +
                 1.4 * (retained_earnings / total_assets) +
                 3.3 * (ebit / total_assets) +
-                0.6 * (total_equity / total_debt) +
-                1.0 * (total_revenue / total_assets)
+                0.6 * (total_equity / total_debt if total_debt else 0) +
+                1.0 * (total_revenue / total_assets if total_assets else 0)
             )
         except:
             z_score = None
 
-        # --- Metrics Display ---
+        # --- Ratios Dictionary ---
         ratios = {
             "Net Debt/Equity": net_debt_equity,
             "Debt/Assets": debt_asset_ratio,
@@ -1431,33 +1429,32 @@ with st.container():
             "Altman Z-Score": z_score
         }
 
+        # --- Display Metrics ---
         st.markdown("### 📊 Key Ratios")
         cols = st.columns(4)
-        for idx, (label, value) in enumerate(ratios.items()):
-            with cols[idx % 4]:
-                st.metric(label, f"{value:.2f}" if value is not None else "N/A")
+        for i, (label, val) in enumerate(ratios.items()):
+            with cols[i % 4]:
+                st.metric(label, f"{val:.2f}" if val is not None else "N/A")
 
-        # --- Graphs ---
+        # --- Bar Charts ---
         st.markdown("### 📈 Ratio Visualizations")
-
         simple_ratios = {k: v for k, v in ratios.items() if k not in ["Interest Coverage", "Altman Z-Score"] and v is not None}
-        fig, ax = plt.subplots(figsize=(10, 4), facecolor='none')
-        plt.style.use("ggplot")
 
-        ax.bar(simple_ratios.keys(), simple_ratios.values(), color='skyblue')
+        fig, ax = plt.subplots(figsize=(10, 4), facecolor='none')
+        ax.bar(simple_ratios.keys(), simple_ratios.values(), color='royalblue')
         ax.set_ylabel("Ratio Value")
         ax.set_title("Solvency Ratios Overview")
         ax.tick_params(axis='x', rotation=15)
         st.pyplot(fig)
 
-        # Large-value ratios
-        st.markdown("### 🔍 High-Magnitude Ratios")
+        # Large-ratio visuals
         high_ratios = {k: v for k, v in ratios.items() if k in ["Interest Coverage", "Altman Z-Score"] and v is not None}
+        st.markdown("### 🔍 High-Magnitude Ratios")
         for key, val in high_ratios.items():
-            fig2, ax2 = plt.subplots(figsize=(5, 3), facecolor='none')
+            fig2, ax2 = plt.subplots(figsize=(4, 3), facecolor='none')
             ax2.bar([key], [val], color='orange')
-            ax2.set_title(f"{key}")
             ax2.set_ylabel("Value")
+            ax2.set_title(key)
             st.pyplot(fig2)
 
     except Exception as e:
