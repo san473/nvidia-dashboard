@@ -1370,98 +1370,78 @@ with st.container():
         yf_ticker = yf.Ticker(ticker)
         balance_sheet = yf_ticker.balance_sheet.fillna(0)
         income_stmt = yf_ticker.income_stmt.fillna(0)
-        cashflow_stmt = yf_ticker.cashflow.fillna(0)
 
-        # Normalize index
         balance_sheet.index = balance_sheet.index.str.lower()
         income_stmt.index = income_stmt.index.str.lower()
 
-        def extract_value(df, candidates):
-            for name in candidates:
-                for index in df.index:
-                    if name in index.lower():
-                        return df.loc[index].iloc[0]
-            return 0
+        def try_get(df, keys):
+            for key in keys:
+                if key in df.index:
+                    return df.loc[key].iloc[0]
+            return None
 
-        # --- Extract Key Inputs ---
-        total_assets = extract_value(balance_sheet, ["total assets"])
-        total_equity = extract_value(balance_sheet, ["total stockholder equity", "common stock equity"])
-        total_debt = extract_value(balance_sheet, ["short term debt", "short/long term debt"]) + extract_value(balance_sheet, ["long term debt"])
-        cash = extract_value(balance_sheet, ["cash"])
-        current_assets = extract_value(balance_sheet, ["total current assets"])
-        current_liabilities = extract_value(balance_sheet, ["total current liabilities"])
-        inventory = extract_value(balance_sheet, ["inventory"])
-        ebit = extract_value(income_stmt, ["ebit"])
-        interest_expense = abs(extract_value(income_stmt, ["interest expense"]))
-        retained_earnings = extract_value(balance_sheet, ["retained earnings"])
-        total_revenue = yf_ticker.info.get("totalRevenue", 0)
+        total_assets = try_get(balance_sheet, ["total assets", "totalAssets"])
+        total_equity = try_get(balance_sheet, [
+            "total stockholder equity", "stockholders equity", 
+            "common stock equity", "total equity gross minority interest"
+        ])
+        total_debt = sum([
+            try_get(balance_sheet, ["short long term debt", "short/long term debt", "short term debt"]) or 0,
+            try_get(balance_sheet, ["long term debt"]) or 0
+        ])
+        cash = try_get(balance_sheet, ["cash", "cash and cash equivalents"]) or 0
+        current_assets = try_get(balance_sheet, ["total current assets", "current assets", "totalCurrentAssets"]) or 0
+        current_liabilities = try_get(balance_sheet, ["total current liabilities", "current liabilities"]) or 0
+        inventory = try_get(balance_sheet, ["inventory"]) or 0
+        ebit = try_get(income_stmt, ["ebit", "operating income"]) or 0
+        interest_expense = try_get(income_stmt, ["interest expense"]) or 0
+        retained_earnings = try_get(balance_sheet, ["retained earnings"]) or 0
+        working_capital = current_assets - current_liabilities if current_assets and current_liabilities else 0
 
-        working_capital = current_assets - current_liabilities
-
-        # --- Ratio Calculations ---
+        # --- Calculations ---
         net_debt = total_debt - cash
-        net_debt_equity = net_debt / total_equity if total_equity else None
-        debt_asset_ratio = total_debt / total_assets if total_assets else None
-        interest_coverage = ebit / interest_expense if interest_expense else None
-        cash_ratio = cash / current_liabilities if current_liabilities else None
-        quick_ratio = (current_assets - inventory) / current_liabilities if current_liabilities else None
-        current_ratio = current_assets / current_liabilities if current_liabilities else None
+        net_debt_equity = (net_debt / total_equity) if total_equity else None
+        debt_asset_ratio = (total_debt / total_assets) if total_assets else None
+        interest_coverage = (ebit / abs(interest_expense)) if (ebit and interest_expense) else None
+        cash_ratio = (cash / current_liabilities) if current_liabilities else None
+        quick_ratio = ((current_assets - inventory) / current_liabilities) if current_liabilities else None
+        current_ratio = (current_assets / current_liabilities) if current_liabilities else None
 
+        # Altman Z-score (approximate)
         try:
             z_score = (
                 1.2 * (working_capital / total_assets) +
                 1.4 * (retained_earnings / total_assets) +
                 3.3 * (ebit / total_assets) +
-                0.6 * (total_equity / total_debt if total_debt else 0) +
-                1.0 * (total_revenue / total_assets if total_assets else 0)
-            )
+                0.6 * (total_equity / total_debt) +
+                1.0 * (yf_ticker.info.get("totalRevenue", 0) / total_assets)
+            ) if total_assets and total_equity and total_debt else None
         except:
             z_score = None
 
-        # --- Ratios Dictionary ---
-        ratios = {
+        # Display
+        metrics = {
             "Net Debt/Equity": net_debt_equity,
             "Debt/Assets": debt_asset_ratio,
+            "Interest Coverage": interest_coverage,
             "Cash Ratio": cash_ratio,
             "Quick Ratio": quick_ratio,
             "Current Ratio": current_ratio,
-            "Interest Coverage": interest_coverage,
             "Altman Z-Score": z_score
         }
 
-        # --- Display Metrics ---
-        st.markdown("### 📊 Key Ratios")
         cols = st.columns(4)
-        for i, (label, val) in enumerate(ratios.items()):
-            with cols[i % 4]:
-                st.metric(label, f"{val:.2f}" if val is not None else "N/A")
-
-        # --- Bar Charts ---
-        st.markdown("### 📈 Ratio Visualizations")
-        simple_ratios = {k: v for k, v in ratios.items() if k not in ["Interest Coverage", "Altman Z-Score"] and v is not None}
-
-        fig, ax = plt.subplots(figsize=(10, 4), facecolor='none')
-        ax.bar(simple_ratios.keys(), simple_ratios.values(), color='royalblue')
-        ax.set_ylabel("Ratio Value")
-        ax.set_title("Solvency Ratios Overview")
-        ax.tick_params(axis='x', rotation=15)
-        st.pyplot(fig)
-
-        # Large-ratio visuals
-        high_ratios = {k: v for k, v in ratios.items() if k in ["Interest Coverage", "Altman Z-Score"] and v is not None}
-        st.markdown("### 🔍 High-Magnitude Ratios")
-        for key, val in high_ratios.items():
-            fig2, ax2 = plt.subplots(figsize=(4, 3), facecolor='none')
-            ax2.bar([key], [val], color='orange')
-            ax2.set_ylabel("Value")
-            ax2.set_title(key)
-            st.pyplot(fig2)
+        for idx, (label, value) in enumerate(metrics.items()):
+            with cols[idx % 4]:
+                if value is not None and value != float("inf"):
+                    st.metric(label, f"{value:.2f}")
+                    st.progress(min(max(value / 10, 0.01), 1.0))
+                else:
+                    st.metric(label, "N/A")
+                    st.progress(0.01)
 
     except Exception as e:
         st.error(f"Failed to load solvency overview: {e}")
-
-
-    
 
 
 
