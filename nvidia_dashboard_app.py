@@ -686,18 +686,18 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
+st.write("Balance Sheet Index:", balance_sheet.index.tolist())
+
+
 with st.container():
     st.markdown("## 📈 Profitability Overview")
 
     try:
         yf_ticker = yf.Ticker(ticker)
         info = yf_ticker.info
-        
-        # Use quarterly or yearly data as needed; here yearly is assumed:
         income_stmt = yf_ticker.income_stmt.fillna(0)
         balance_sheet = yf_ticker.balance_sheet.fillna(0)
 
-        # Normalize index names to lowercase for consistent lookup
         income_stmt.index = income_stmt.index.str.lower()
         balance_sheet.index = balance_sheet.index.str.lower()
 
@@ -705,107 +705,88 @@ with st.container():
         st.markdown("### 🧮 Margin Profile")
         col1, col2, col3 = st.columns(3)
 
-        revenue = income_stmt.loc["total revenue"] if "total revenue" in income_stmt.index else None
-        gross_profit = income_stmt.loc["gross profit"] if "gross profit" in income_stmt.index else None
-        operating_income = income_stmt.loc["operating income"] if "operating income" in income_stmt.index else None
-        net_income = income_stmt.loc["net income"] if "net income" in income_stmt.index else None
+        revenue = income_stmt.loc["total revenue"].iloc[0] if "total revenue" in income_stmt.index else None
+        gross_profit = income_stmt.loc["gross profit"].iloc[0] if "gross profit" in income_stmt.index else None
+        operating_income = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
+        net_income = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
 
-        if revenue is not None and len(revenue) > 0:
-            # Calculate margins across years
-            gross_margin_series = gross_profit / revenue if gross_profit is not None else None
-            op_margin_series = operating_income / revenue if operating_income is not None else None
-            net_margin_series = net_income / revenue if net_income is not None else None
+        if revenue:
+            gross_margin = gross_profit / revenue if gross_profit else None
+            op_margin = operating_income / revenue if operating_income else None
+            net_margin = net_income / revenue if net_income else None
 
-            # Display current year (most recent) margin metrics
-            for col, label, series in zip(
+            for col, label, value in zip(
                 [col1, col2, col3],
                 ["Gross Margin", "Operating Margin", "Net Margin"],
-                [gross_margin_series, op_margin_series, net_margin_series]
+                [gross_margin, op_margin, net_margin]
             ):
                 with col:
-                    if series is not None and not series.empty:
-                        latest_val = series.iloc[0]
-                        pct = latest_val * 100
+                    if value is not None:
+                        pct = value * 100
                         st.metric(label, f"{pct:.2f}%")
-                        st.progress(min(latest_val, 1.0))
+                        st.progress(min(value, 1.0))  # Cap at 100%
                     else:
                         st.metric(label, "N/A")
                         st.progress(0)
-
-            # Plot line charts below the metrics
-            st.markdown("#### Margin Trends (Last Years)")
-            margin_df = income_stmt.loc[["gross profit", "operating income", "net income", "total revenue"]]
-            # Calculate margin % for each year, transpose to get columns as years
-            margin_data = {
-                "Gross Margin": margin_df.loc["gross profit"] / margin_df.loc["total revenue"],
-                "Operating Margin": margin_df.loc["operating income"] / margin_df.loc["total revenue"],
-                "Net Margin": margin_df.loc["net income"] / margin_df.loc["total revenue"],
-            }
-            margin_chart_df = (
-                pd.DataFrame(margin_data)
-                .T
-                .apply(lambda x: x * 100)
-                .fillna(0)
-                .T
-                .sort_index(ascending=True)  # chronological order
-            )
-            st.line_chart(margin_chart_df)
 
         # --- Return on Capital Measures ---
         st.markdown("### 🧾 Return on Capital Measures")
         col1, col2, col3, col4 = st.columns(4)
 
-        # Pull historical balance sheet and income statement for all columns (years)
-        ta_series = balance_sheet.loc["total assets"] if "total assets" in balance_sheet.index else None
-        te_series = balance_sheet.loc["total stockholder equity"] if "total stockholder equity" in balance_sheet.index else None
-        sld_series = balance_sheet.loc["short long term debt"] if "short long term debt" in balance_sheet.index else pd.Series(0, index=balance_sheet.columns)
-        ld_series = balance_sheet.loc["long term debt"] if "long term debt" in balance_sheet.index else pd.Series(0, index=balance_sheet.columns)
+        total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
+        total_equity = balance_sheet.loc["total stockholder equity"].iloc[0] if "total stockholder equity" in balance_sheet.index else None
+        short_long_debt = balance_sheet.loc["short long term debt"].iloc[0] if "short long term debt" in balance_sheet.index else 0
+        long_term_debt = balance_sheet.loc["long term debt"].iloc[0] if "long term debt" in balance_sheet.index else 0
+        oper_inc = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
+        ebit = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else oper_inc
+        net_income = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
 
-        oper_inc_series = income_stmt.loc["operating income"] if "operating income" in income_stmt.index else None
-        ebit_series = income_stmt.loc["ebit"] if "ebit" in income_stmt.index else oper_inc_series
-        ni_series = income_stmt.loc["net income"] if "net income" in income_stmt.index else None
+        # Debug: Print raw values retrieved
+        st.write("Debug: Raw Balance Sheet and Income Statement values:")
+        st.write(f"Total Assets: {total_assets}")
+        st.write(f"Total Equity: {total_equity}")
+        st.write(f"Short/Long Debt: {short_long_debt}")
+        st.write(f"Long Term Debt: {long_term_debt}")
+        st.write(f"EBIT: {ebit}")
+        st.write(f"Net Income: {net_income}")
 
-        # Compute ROE, ROA, ROIC, ROCE as pandas series for each year, safely handling division by zero
-        roe_series = ni_series / te_series.replace({0: pd.NA}) if ni_series is not None and te_series is not None else None
-        roa_series = ni_series / ta_series.replace({0: pd.NA}) if ni_series is not None and ta_series is not None else None
-        roic_series = ebit_series / (te_series + sld_series).replace({0: pd.NA}) if ebit_series is not None and te_series is not None else None
-        roce_series = ebit_series / (te_series + ld_series).replace({0: pd.NA}) if ebit_series is not None and te_series is not None else None
+        # Replace None with 0 only for denominators; numerator None means metric can't be computed
+        ta = total_assets or 0
+        te = total_equity or 0
+        td = short_long_debt or 0
+        ld = long_term_debt or 0
+        ei = ebit if ebit is not None else 0
+        ni = net_income if net_income is not None else 0
 
-        # Display latest values as metrics and progress bars
-        for col, label, series in zip(
+        # Debug: Show adjusted values
+        st.write(f"Adjusted ta={ta}, te={te}, td={td}, ld={ld}, ei={ei}, ni={ni}")
+
+        # Compute ratios; if numerator is None, ratio is None
+        roe = (ni / te) if (te > 0 and net_income is not None) else None
+        roa = (ni / ta) if (ta > 0 and net_income is not None) else None
+        roic = (ei / (te + td)) if ((te + td) > 0 and ebit is not None) else None
+        roce = (ei / (te + ld)) if ((te + ld) > 0 and ebit is not None) else None
+
+        # Debug: Show computed ratios
+        st.write(f"Computed Ratios: ROE={roe}, ROA={roa}, ROIC={roic}, ROCE={roce}")
+
+        for col, label, value in zip(
             [col1, col2, col3, col4],
             ["ROE", "ROA", "ROIC", "ROCE"],
-            [roe_series, roa_series, roic_series, roce_series]
+            [roe, roa, roic, roce]
         ):
             with col:
-                if series is not None and not series.empty:
-                    latest_val = series.iloc[0]
-                    if latest_val is not None and not pd.isna(latest_val):
-                        pct = latest_val * 100
-                        st.metric(label, f"{pct:.2f}%")
-                        st.progress(min(max(latest_val, 0), 1.0))
-                    else:
-                        st.metric(label, "N/A")
-                        st.progress(0)
+                if value is not None:
+                    pct = value * 100
+                    st.metric(label, f"{pct:.2f}%")
+                    st.progress(min(max(value, 0), 1.0))  # Clamp 0-1
                 else:
                     st.metric(label, "N/A")
                     st.progress(0)
 
-        # Line chart for return ratios (last few years)
-        st.markdown("#### Return on Capital Trends (Last Years)")
-        roc_data = pd.DataFrame({
-            "ROE": roe_series,
-            "ROA": roa_series,
-            "ROIC": roic_series,
-            "ROCE": roce_series
-        }).fillna(0).sort_index(ascending=True) * 100  # convert to percent
-
-        st.line_chart(roc_data)
-
     except Exception as e:
         st.error(f"Error loading profitability section: {e}")
 
-        
         
 
 
