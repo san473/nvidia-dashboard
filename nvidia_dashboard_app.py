@@ -10,7 +10,6 @@ import plotly.express as px
 from datetime import datetime
 from streamlit.runtime.caching import cache_data
 import requests
-import seaborn as sns
 import altair as alt
 import matplotlib.pyplot as plt
 import nltk
