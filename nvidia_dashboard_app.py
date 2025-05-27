@@ -691,14 +691,15 @@ with st.container():
 
     try:
         yf_ticker = yf.Ticker(ticker)
-        info = yf_ticker.info
+
+        # Get current financials for the metrics and progress bars
         income_stmt = yf_ticker.income_stmt.fillna(0)
         balance_sheet = yf_ticker.balance_sheet.fillna(0)
 
         income_stmt.index = income_stmt.index.str.lower()
         balance_sheet.index = balance_sheet.index.str.lower()
 
-        # --- Margins ---
+        # --- Margins (current period) ---
         st.markdown("### 🧮 Margin Profile")
         col1, col2, col3 = st.columns(3)
 
@@ -726,45 +727,30 @@ with st.container():
                         st.metric(label, "N/A")
                         st.progress(0.001)  # Tiny visible bar
 
-        # --- Return on Capital Measures ---
+        # --- Return on Capital Measures (current period) ---
         st.markdown("### 🧾 Return on Capital Measures")
         col1, col2, col3, col4 = st.columns(4)
 
-        # Total assets
-        total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
-
-        # Try multiple fallback keys for equity
         equity_keys = [
             "total stockholder equity",
             "stockholders equity",
             "common stock equity",
             "total equity gross minority interest"
         ]
+        total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
         total_equity = None
         for key in equity_keys:
             if key in balance_sheet.index:
                 total_equity = balance_sheet.loc[key].iloc[0]
                 break
 
-        # Debt
         short_long_debt = balance_sheet.loc["short long term debt"].iloc[0] if "short long term debt" in balance_sheet.index else 0
         long_term_debt = balance_sheet.loc["long term debt"].iloc[0] if "long term debt" in balance_sheet.index else 0
 
-        # Income
         oper_inc = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
         ebit = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else oper_inc
         net_income = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
 
-        # Debug
-        st.write("Debug: Raw Balance Sheet and Income Statement values:")
-        st.write(f"Total Assets: {total_assets}")
-        st.write(f"Total Equity: {total_equity}")
-        st.write(f"Short/Long Debt: {short_long_debt}")
-        st.write(f"Long Term Debt: {long_term_debt}")
-        st.write(f"EBIT: {ebit}")
-        st.write(f"Net Income: {net_income}")
-
-        # Denominator fallback logic
         ta = total_assets or 0
         te = total_equity or 0
         td = short_long_debt or 0
@@ -772,13 +758,10 @@ with st.container():
         ei = ebit if ebit is not None else 0
         ni = net_income if net_income is not None else 0
 
-        # Compute metrics
         roe = (ni / te) if (te > 0 and net_income is not None) else None
         roa = (ni / ta) if (ta > 0 and net_income is not None) else None
         roic = (ei / (te + td)) if ((te + td) > 0 and ebit is not None) else None
         roce = (ei / (te + ld)) if ((te + ld) > 0 and ebit is not None) else None
-
-        st.write(f"Computed Ratios: ROE={roe}, ROA={roa}, ROIC={roic}, ROCE={roce}")
 
         for col, label, value in zip(
             [col1, col2, col3, col4],
@@ -794,8 +777,93 @@ with st.container():
                     st.metric(label, "N/A")
                     st.progress(0.001)
 
+        # --- Historical line charts ---
+        # Use quarterly financials for history
+        income_stmt_q = yf_ticker.quarterly_financials.fillna(0)
+        balance_sheet_q = yf_ticker.quarterly_balance_sheet.fillna(0)
+
+        income_stmt_q.index = income_stmt_q.index.str.lower()
+        balance_sheet_q.index = balance_sheet_q.index.str.lower()
+
+        dates = list(income_stmt_q.columns)
+        dates.sort()
+
+        # Margins over time
+        margins_data = {
+            "Gross Margin": [],
+            "Operating Margin": [],
+            "Net Margin": []
+        }
+        for date in dates:
+            revenue = income_stmt_q.at["total revenue", date] if "total revenue" in income_stmt_q.index else None
+            gross_profit = income_stmt_q.at["gross profit", date] if "gross profit" in income_stmt_q.index else None
+            operating_income = income_stmt_q.at["operating income", date] if "operating income" in income_stmt_q.index else None
+            net_income = income_stmt_q.at["net income", date] if "net income" in income_stmt_q.index else None
+
+            if revenue and revenue != 0:
+                margins_data["Gross Margin"].append(gross_profit / revenue if gross_profit else None)
+                margins_data["Operating Margin"].append(operating_income / revenue if operating_income else None)
+                margins_data["Net Margin"].append(net_income / revenue if net_income else None)
+            else:
+                margins_data["Gross Margin"].append(None)
+                margins_data["Operating Margin"].append(None)
+                margins_data["Net Margin"].append(None)
+
+        margins_df = pd.DataFrame(margins_data, index=dates).sort_index()
+
+        st.markdown("### 🧮 Margin Profile Over Time")
+        st.line_chart(margins_df)
+
+        # Return on Capital over time
+        ro_data = {
+            "ROE": [],
+            "ROA": [],
+            "ROIC": [],
+            "ROCE": []
+        }
+
+        for date in dates:
+            total_assets = balance_sheet_q.at["total assets", date] if "total assets" in balance_sheet_q.index else None
+            total_equity = None
+            for key in equity_keys:
+                if key in balance_sheet_q.index:
+                    total_equity = balance_sheet_q.at[key, date]
+                    break
+
+            short_long_debt = balance_sheet_q.at["short long term debt", date] if "short long term debt" in balance_sheet_q.index else 0
+            long_term_debt = balance_sheet_q.at["long term debt", date] if "long term debt" in balance_sheet_q.index else 0
+
+            oper_inc = income_stmt_q.at["operating income", date] if "operating income" in income_stmt_q.index else None
+            ebit = income_stmt_q.at["ebit", date] if "ebit" in income_stmt_q.index else oper_inc
+            net_income = income_stmt_q.at["net income", date] if "net income" in income_stmt_q.index else None
+
+            ta = total_assets or 0
+            te = total_equity or 0
+            td = short_long_debt or 0
+            ld = long_term_debt or 0
+            ei = ebit if ebit is not None else 0
+            ni = net_income if net_income is not None else 0
+
+            roe = (ni / te) if (te > 0 and net_income is not None) else None
+            roa = (ni / ta) if (ta > 0 and net_income is not None) else None
+            roic = (ei / (te + td)) if ((te + td) > 0 and ebit is not None) else None
+            roce = (ei / (te + ld)) if ((te + ld) > 0 and ebit is not None) else None
+
+            ro_data["ROE"].append(roe)
+            ro_data["ROA"].append(roa)
+            ro_data["ROIC"].append(roic)
+            ro_data["ROCE"].append(roce)
+
+        ro_df = pd.DataFrame(ro_data, index=dates).sort_index()
+
+        st.markdown("### 🧾 Return on Capital Over Time")
+        st.line_chart(ro_df)
+
     except Exception as e:
         st.error(f"Error loading profitability section: {e}")
+git add nvidia_dashboard_app.py
+git commit -m "Add profitability section with historical margin and ROIC line charts"
+git push origin main
 
 
 import streamlit as st
