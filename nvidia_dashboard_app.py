@@ -686,20 +686,21 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-st.write("Balance Sheet Index:", balance_sheet.index.tolist())
+try:
+    yf_ticker = yf.Ticker(ticker)
+    income_stmt = yf_ticker.income_stmt.fillna(0)
+    balance_sheet = yf_ticker.balance_sheet.fillna(0)
 
+    # Debug: show the indexes of the dataframes
+    st.write("Income Statement Index:", income_stmt.index.tolist())
+    st.write("Balance Sheet Index:", balance_sheet.index.tolist())
 
-with st.container():
-    st.markdown("## 📈 Profitability Overview")
+    # Normalize index to lowercase strings for consistent lookups
+    income_stmt.index = income_stmt.index.str.lower()
+    balance_sheet.index = balance_sheet.index.str.lower()
 
-    try:
-        yf_ticker = yf.Ticker(ticker)
-        info = yf_ticker.info
-        income_stmt = yf_ticker.income_stmt.fillna(0)
-        balance_sheet = yf_ticker.balance_sheet.fillna(0)
-
-        income_stmt.index = income_stmt.index.str.lower()
-        balance_sheet.index = balance_sheet.index.str.lower()
+    with st.container():
+        st.markdown("## 📈 Profitability Overview")
 
         # --- Margins ---
         st.markdown("### 🧮 Margin Profile")
@@ -784,8 +785,8 @@ with st.container():
                     st.metric(label, "N/A")
                     st.progress(0)
 
-    except Exception as e:
-        st.error(f"Error loading profitability section: {e}")
+except Exception as e:
+    st.error(f"Error loading profitability section: {e}")
 
         
 
