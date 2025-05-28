@@ -1690,55 +1690,69 @@ if ticker:
 import streamlit as st
 import yfinance as yf
 
-st.subheader("💹 Wall Street Analyst Price Targets")
+def wall_street_price_targets(ticker: str):
+    st.subheader("💹 Wall Street Analyst Price Targets")
 
-ticker = st.text_input("Enter Stock Ticker for Price Targets", value="NVDA").upper()
-if ticker:
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
+    stock = yf.Ticker(ticker)
+    info = stock.info
 
-        target_low = info.get("targetLowPrice")
-        target_mean = info.get("targetMeanPrice")
-        target_high = info.get("targetHighPrice")
-        target_median = info.get("targetMedianPrice")
-        num_analysts = info.get("numberOfAnalystOpinions")
+    target_low = info.get("targetLowPrice")
+    target_median = info.get("targetMedianPrice")
+    target_mean = info.get("targetMeanPrice")
+    target_high = info.get("targetHighPrice")
+    num_analysts = info.get("numberOfAnalystOpinions")
+    current_price = info.get("currentPrice")
 
-        if any([target_low, target_mean, target_high, target_median]):
-            st.markdown(f"- **Low Target Price:** ${target_low if target_low else 'N/A':,.2f}")
-            st.markdown(f"- **Median Target Price:** ${target_median if target_median else 'N/A':,.2f}")
-            st.markdown(f"- **Mean Target Price:** ${target_mean if target_mean else 'N/A':,.2f}")
-            st.markdown(f"- **High Target Price:** ${target_high if target_high else 'N/A':,.2f}")
-            st.markdown(f"- **Number of Analysts:** {num_analysts if num_analysts else 'N/A'}")
+    if any([target_low, target_median, target_mean, target_high]):
+        cols = st.columns([1, 1, 1, 1, 1])
+        cols[0].markdown("**Current Price**")
+        cols[1].markdown("**Low Target**")
+        cols[2].markdown("**Median Target**")
+        cols[3].markdown("**Mean Target**")
+        cols[4].markdown("**High Target**")
 
-            # Optional: Visual comparison bar chart
-            import pandas as pd
-            import matplotlib.pyplot as plt
+        values = [
+            current_price,
+            target_low,
+            target_median,
+            target_mean,
+            target_high,
+        ]
 
-            prices = {
-                "Low Target": target_low,
-                "Median Target": target_median,
-                "Mean Target": target_mean,
-                "High Target": target_high,
-            }
-            prices = {k: v for k, v in prices.items() if v is not None}
-            current_price = info.get("currentPrice", None)
-            if current_price:
-                prices["Current Price"] = current_price
+        # Format prices with $ and 2 decimals or N/A
+        formatted = [f"${v:,.2f}" if v is not None else "N/A" for v in values]
 
-            df = pd.DataFrame(prices.values(), index=prices.keys(), columns=["Price"])
+        cols = st.columns([1, 1, 1, 1, 1])
+        for col, val in zip(cols, formatted):
+            col.markdown(val)
 
-            fig, ax = plt.subplots()
-            df.plot(kind="bar", legend=False, ax=ax)
-            ax.set_ylabel("Price ($)")
-            ax.set_title(f"Price Targets & Current Price for {ticker}")
-            st.pyplot(fig)
+        st.markdown(f"**Number of Analysts:** {num_analysts if num_analysts else 'N/A'}")
 
+        # Minimal horizontal bar using st.progress style (scaled)
+        st.markdown("### Price Target Range Visualization")
+
+        # Normalize targets for bar length (avoid None)
+        valid_targets = [v for v in [target_low, target_high, current_price] if v is not None]
+        if len(valid_targets) >= 2:
+            min_price, max_price = min(valid_targets), max(valid_targets)
+            scale = max_price - min_price if max_price > min_price else 1
+
+            def scaled_bar(value):
+                length = int(((value - min_price) / scale) * 100)  # 0-100 scale
+                bar = "█" * (length // 5)
+                return f"{bar} {value:.2f}"
+
+            st.markdown(f"- **Low Target:** {scaled_bar(target_low) if target_low else 'N/A'}")
+            st.markdown(f"- **Current Price:** {scaled_bar(current_price) if current_price else 'N/A'}")
+            st.markdown(f"- **High Target:** {scaled_bar(target_high) if target_high else 'N/A'}")
         else:
-            st.info("No Wall Street price target data available for this stock.")
+            st.info("Insufficient data to display price target range visualization.")
 
-    except Exception as e:
-        st.error(f"Error fetching data for {ticker}: {e}")
+    else:
+        st.info("No Wall Street price target data available for this stock.")
 
-    
+# Usage example:
+ticker_input = st.text_input("Enter Stock Ticker", value="NVDA").upper()
+if ticker_input:
+    wall_street_price_targets(ticker_input)
 
