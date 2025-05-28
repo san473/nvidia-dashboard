@@ -1857,3 +1857,81 @@ def wall_street_price_targets(ticker: str):
 
 # Insert this line at the end of any logical section (e.g., scenario modeling)
 wall_street_price_targets(ticker)
+
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+
+def insider_institutional_section(ticker: str):
+    stock = yf.Ticker(ticker)
+
+    with st.container():
+        st.subheader("🏢 Insider Activity & Institutional Ownership Changes")
+
+        # Insider Transactions
+        try:
+            insider_df = stock.insider_transactions
+            if insider_df is not None and not insider_df.empty:
+                st.markdown("**Recent Insider Transactions (Last 10):**")
+                insider_df_sorted = insider_df.sort_values(by="date", ascending=False).head(10)
+
+                insider_df_sorted = insider_df_sorted.rename(columns={
+                    "date": "Date",
+                    "ownerName": "Insider",
+                    "relationship": "Relationship",
+                    "transactionType": "Type",
+                    "shares": "Shares",
+                    "price": "Price",
+                    "value": "Value",
+                    "secForm4Link": "SEC Form 4"
+                })
+
+                if "Relationship" not in insider_df_sorted.columns:
+                    insider_df_sorted["Relationship"] = "N/A"
+
+                def make_link(url):
+                    if pd.isna(url):
+                        return "N/A"
+                    return f"[Link]({url})"
+
+                insider_df_sorted["SEC Form 4"] = insider_df_sorted["SEC Form 4"].apply(make_link)
+
+                st.dataframe(insider_df_sorted[[
+                    "Date", "Insider", "Relationship", "Type", "Shares", "Price", "Value", "SEC Form 4"
+                ]])
+            else:
+                st.info("No recent insider transactions data available.")
+        except Exception as e:
+            st.error(f"Error loading insider transactions: {e}")
+
+        st.markdown("---")
+
+        # Institutional Holders
+        try:
+            inst_df = stock.institutional_holders
+            if inst_df is not None and not inst_df.empty:
+                st.markdown("**Top Institutional Holders (Top 10):**")
+
+                inst_df_renamed = inst_df.rename(columns={
+                    "Holder": "Institution",
+                    "Shares": "Shares Owned",
+                    "% Out": "% Owned",
+                    "Date Reported": "Date Reported"
+                })
+
+                if "Date Reported" not in inst_df_renamed.columns:
+                    inst_df_renamed["Date Reported"] = "N/A"
+
+                inst_df_sorted = inst_df_renamed.sort_values(by="Shares Owned", ascending=False).head(10)
+
+                st.dataframe(inst_df_sorted[[
+                    "Institution", "Shares Owned", "% Owned", "Date Reported"
+                ]])
+            else:
+                st.info("No institutional holders data available.")
+        except Exception as e:
+            st.error(f"Error loading institutional holders: {e}")
+
+# Call the section somewhere below your ticker input:
+if ticker:
+    insider_institutional_section(ticker)
