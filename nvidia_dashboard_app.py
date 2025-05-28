@@ -686,6 +686,199 @@ except Exception as e:
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import numpy as np
+
+# Assuming sp500_df is your DataFrame of S&P 500 stocks with columns:
+# 'symbol', 'industry', 'sector', 'marketcap'
+
+def find_suggested_peers(ticker, sp500_df):
+    """Find peers based on industry and market cap proximity."""
+    ticker = ticker.upper()
+    current_row = sp500_df[sp500_df["symbol"].str.upper() == ticker]
+    if current_row.empty:
+        return []
+    selected_industry = current_row["industry"].values[0]
+    selected_sector = current_row["sector"].values[0]
+    selected_marketcap = current_row["marketcap"].values[0]
+
+    lower_bound = selected_marketcap * 0.4
+    upper_bound = selected_marketcap * 2.5
+
+    peer_df = sp500_df[
+        (sp500_df["symbol"].str.upper() != ticker) &
+        (sp500_df["industry"] == selected_industry) &
+        (sp500_df["marketcap"] >= lower_bound) &
+        (sp500_df["marketcap"] <= upper_bound)
+    ]
+
+    if peer_df.empty:
+        # fallback sector-based
+        peer_df = sp500_df[
+            (sp500_df["symbol"].str.upper() != ticker) &
+            (sp500_df["sector"] == selected_sector) &
+            (sp500_df["marketcap"] >= lower_bound) &
+            (sp500_df["marketcap"] <= upper_bound)
+        ]
+
+    return peer_df["symbol"].str.upper().tolist()
+
+def fetch_peer_data(tickers):
+    """Fetch valuation, margin, and performance data for tickers."""
+    data = []
+    for sym in tickers:
+        try:
+            stock = yf.Ticker(sym)
+            info = stock.info
+            fast_info = stock.fast_info
+            
+            # Basic valuation metrics
+            pe_ratio = info.get("trailingPE", None)
+            pb_ratio = info.get("priceToBook", None)
+            peg_ratio = info.get("pegRatio", None)
+            earnings_yield = (1 / pe_ratio) if pe_ratio and pe_ratio > 0 else None
+            ev_to_ebitda = info.get("enterpriseToEbitda", None)
+            ev_to_ebit = info.get("enterpriseToEbit", None)
+
+            # Margin: Use operatingMargins if available (operating margin)
+            operating_margin = info.get("operatingMargins", None)  # decimal (e.g. 0.25)
+
+            # Price Performance 1-year % change (approximate)
+            hist = stock.history(period="1y")
+            if hist.empty:
+                perf_1y = None
+            else:
+                perf_1y = (hist["Close"][-1] / hist["Close"][0] - 1) * 100  # %
+
+            data.append({
+                "Symbol": sym,
+                "Name": info.get("longName", "N/A"),
+                "Sector": info.get("sector", "N/A"),
+                "Industry": info.get("industry", "N/A"),
+                "Market Cap": info.get("marketCap", None),
+                "Current Price": fast_info.get("lastPrice", None),
+                "P/E": pe_ratio,
+                "P/B": pb_ratio,
+                "PEG": peg_ratio,
+                "Earnings Yield": earnings_yield,
+                "EV/EBITDA": ev_to_ebitda,
+                "EV/EBIT": ev_to_ebit,
+                "Operating Margin": operating_margin,
+                "1Y Price Perf (%)": perf_1y,
+            })
+        except Exception as e:
+            st.warning(f"Could not fetch data for {sym}: {e}")
+
+    return pd.DataFrame(data)
+
+def highlight_outliers(df, target_ticker):
+    """
+    Highlight where the target ticker's metrics notably differ from peers.
+    For example, if margins are compressing in peers but stable in target,
+    or vice versa.
+    """
+    df_numeric = df.select_dtypes(include=[np.number])
+    target_row = df[df["Symbol"] == target_ticker]
+
+    if target_row.empty:
+        return df  # no target found, return as is
+
+    target_vals = target_row.iloc[0]
+
+    def margin_outlier(row):
+        if pd.isna(row["Operating Margin"]) or pd.isna(target_vals["Operating Margin"]):
+            return ""
+        diff = row["Operating Margin"] - target_vals["Operating Margin"]
+        # Example heuristic: margin difference > 5% (0.05) is notable
+        if diff <= -0.05:
+            return "🔻 Margin Compressing"
+        elif diff >= 0.05:
+            return "🔺 Margin Stronger"
+        else:
+            return ""
+
+    df["Margin Signal"] = df.apply(margin_outlier, axis=1)
+
+    return df
+
+# --------- STREAMLIT UI -------------
+
+st.header("📈 Peer Signal Tracker: Monitor Competitor Performance & Signals")
+
+ticker_input = st.text_input("Enter Target Stock Ticker:", value="NVDA").upper()
+
+if ticker_input:
+    # 1. Find suggested peers
+    suggested_peers = find_suggested_peers(ticker_input, sp500_df)
+
+    # 2. Full universe tickers for search in multiselect
+    all_tickers = sp500_df["symbol"].str.upper().sort_values().unique().tolist()
+
+    # 3. Multiselect with suggested peers pre-selected, but full universe as options
+    selected_peers = st.multiselect(
+        "Select or search peers to compare:",
+        options=all_tickers,
+        default=suggested_peers,
+        help="Search or add peers beyond suggested ones."
+    )
+
+    if not selected_peers:
+        st.warning("Please select at least one peer to compare.")
+    else:
+        # Include target ticker in dataset for comparison
+        tickers_to_fetch = list(set(selected_peers + [ticker_input]))
+
+        # 4. Fetch data for target + peers
+        df = fetch_peer_data(tickers_to_fetch)
+
+        if df.empty:
+            st.error("No data available for the selected tickers.")
+        else:
+            # 5. Highlight outliers / signals in margin trends
+            df = highlight_outliers(df, ticker_input)
+
+            # 6. Format columns nicely, sort by Market Cap descending
+            df_display = df.copy()
+            df_display["Market Cap"] = df_display["Market Cap"].apply(lambda x: f"${x/1e9:.2f}B" if pd.notna(x) else "N/A")
+            df_display["Current Price"] = df_display["Current Price"].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "N/A")
+            df_display["P/E"] = df_display["P/E"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
+            df_display["P/B"] = df_display["P/B"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
+            df_display["PEG"] = df_display["PEG"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
+            df_display["Earnings Yield"] = df_display["Earnings Yield"].apply(lambda x: f"{x:.2%}" if pd.notna(x) else "N/A")
+            df_display["EV/EBITDA"] = df_display["EV/EBITDA"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
+            df_display["EV/EBIT"] = df_display["EV/EBIT"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
+            df_display["Operating Margin"] = df_display["Operating Margin"].apply(lambda x: f"{x:.2%}" if pd.notna(x) else "N/A")
+            df_display["1Y Price Perf (%)"] = df_display["1Y Price Perf (%)"].apply(lambda x: f"{x:.2f}%" if pd.notna(x) else "N/A")
+
+            df_display = df_display.sort_values(by="Market Cap", ascending=False)
+
+            # 7. Display table
+            st.dataframe(df_display.reset_index(drop=True))
+
+            # 8. Summary insights for target vs peers
+            st.markdown("---")
+            st.subheader(f"Insights on {ticker_input} vs Selected Peers")
+
+            # Margin signals summary
+            margin_signals = df[df["Margin Signal"] != ""]
+            if not margin_signals.empty:
+                for _, row in margin_signals.iterrows():
+                    if row["Symbol"] == ticker_input:
+                        st.success(f"✅ {ticker_input}: {row['Margin Signal']}")
+                    else:
+                        st.warning(f"{row['Symbol']}: {row['Margin Signal']}")
+            else:
+                st.info("No notable margin divergence signals detected among selected peers.")
+
+else:
+    st.info("Enter a ticker above to see peer signal tracking.")
+
+
+
+
+
+import streamlit as st
+import yfinance as yf
+import pandas as pd
 
 with st.container():
     st.markdown("## 📈 Profitability Overview")
