@@ -1690,10 +1690,6 @@ if ticker:
 import streamlit as st
 import yfinance as yf
 
-# Main ticker input used across the app
-ticker_input = st.text_input("Enter Stock Ticker", value="NVDA").upper()
-
-# Function to display Wall Street Price Targets (no input widget inside)
 def wall_street_price_targets(ticker: str):
     st.subheader("💹 Wall Street Analyst Price Targets")
 
@@ -1723,7 +1719,6 @@ def wall_street_price_targets(ticker: str):
             target_high,
         ]
 
-        # Format prices with $ and 2 decimals or N/A
         formatted = [f"${v:,.2f}" if v is not None else "N/A" for v in values]
 
         cols = st.columns([1, 1, 1, 1, 1])
@@ -1732,7 +1727,6 @@ def wall_street_price_targets(ticker: str):
 
         st.markdown(f"**Number of Analysts:** {num_analysts if num_analysts else 'N/A'}")
 
-        # Minimal horizontal bar visualization using block characters
         st.markdown("### Price Target Range Visualization")
 
         valid_targets = [v for v in [target_low, target_high, current_price] if v is not None]
@@ -1741,7 +1735,7 @@ def wall_street_price_targets(ticker: str):
             scale = max_price - min_price if max_price > min_price else 1
 
             def scaled_bar(value):
-                length = int(((value - min_price) / scale) * 20)  # bar length max 20 blocks
+                length = int(((value - min_price) / scale) * 20)  # max 20 blocks
                 bar = "█" * length
                 return f"{bar} {value:.2f}"
 
@@ -1750,11 +1744,5 @@ def wall_street_price_targets(ticker: str):
             st.markdown(f"- **High Target:** {scaled_bar(target_high) if target_high else 'N/A'}")
         else:
             st.info("Insufficient data to display price target range visualization.")
-
     else:
         st.info("No Wall Street price target data available for this stock.")
-
-
-# Only call the display function if ticker is set
-if ticker_input:
-    wall_street_price_targets(ticker_input)
