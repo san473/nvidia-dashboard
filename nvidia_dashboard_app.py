@@ -1747,3 +1747,5 @@ def wall_street_price_targets(ticker: str):
         else:
             st.info("No Wall Street price target data available for this stock.")
 
+# Insert this line at the end of any logical section (e.g., scenario modeling)
+wall_street_price_targets(ticker)
