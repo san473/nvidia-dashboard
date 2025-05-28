@@ -1606,6 +1606,90 @@ with st.container():
 import streamlit as st
 import yfinance as yf
 
+st.header("📊 Portfolio Exposure & Risk Dashboard (Custom Input)")
+
+# User inputs ticker
+ticker = st.text_input("Enter Stock Ticker", value="NVDA").upper()
+if ticker:
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        current_price = info.get("currentPrice", None)
+        sector = info.get("sector", "N/A")
+        industry = info.get("industry", "N/A")
+        beta = info.get("beta", "N/A")
+        long_name = info.get("longName", ticker)
+
+        if not current_price:
+            st.error("Unable to fetch current stock price.")
+        else:
+            st.subheader("1️⃣ Portfolio & Holding Inputs")
+
+            # Portfolio input
+            portfolio_value = st.number_input(
+                "Total Portfolio Value ($)", value=1_000_000, step=10_000
+            )
+            holding_value = st.number_input(
+                f"Current Holding Value in {ticker} ($)", value=50_000, step=1_000
+            )
+            position_pct = (holding_value / portfolio_value) * 100
+
+            st.markdown(f"- **{ticker} position = {position_pct:.2f}% of portfolio**")
+            st.markdown(f"- **Stock Sector**: {sector} | **Industry**: {industry}")
+            st.markdown(f"- **Stock Beta**: {beta}")
+
+            st.subheader("2️⃣ Sector/Industry Exposure Impact")
+
+            current_sector_pct = st.slider(
+                f"Your current exposure to {sector} (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=12.0,
+                step=0.1,
+            )
+            new_sector_pct = current_sector_pct + position_pct
+
+            st.markdown(
+                f"- After adding this position, **sector exposure becomes: {new_sector_pct:.2f}%**"
+            )
+
+            st.subheader("3️⃣ Upside / Downside Scenario Modeling")
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                bull_price = st.number_input(
+                    "🎯 Bull Case Price", value=round(current_price * 1.3, 2)
+                )
+            with col2:
+                base_price = st.number_input(
+                    "📌 Base Case Price", value=round(current_price, 2)
+                )
+            with col3:
+                bear_price = st.number_input(
+                    "⚠️ Bear Case Price", value=round(current_price * 0.7, 2)
+                )
+
+            def scenario_output(label, target_price):
+                pct_change = (target_price - current_price) / current_price * 100
+                value_change = (pct_change / 100) * holding_value
+                st.markdown(
+                    f"**{label} Case** → Target: ${target_price:.2f} → "
+                    f"Return: {pct_change:.1f}% → ${value_change:,.0f} gain/loss"
+                )
+
+            st.divider()
+            st.subheader("📈 Scenario Results")
+            scenario_
+            output("🎯 Bull", bull_price)
+            scenario_output("📌 Base", base_price)
+            scenario_output("⚠️ Bear", bear_price)
+
+    except Exception as e:
+        st.error(f"Error fetching data for {ticker}: {e}")
+
+import streamlit as st
+import yfinance as yf
+
 def wall_street_price_targets(ticker: str):
     with st.container():
         st.subheader("💹 Wall Street Analyst Price Targets")
@@ -1663,3 +1747,4 @@ def wall_street_price_targets(ticker: str):
                 st.info("Insufficient data to display price target range visualization.")
         else:
             st.info("No Wall Street price target data available for this stock.")
+
