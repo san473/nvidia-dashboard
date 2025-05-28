@@ -1735,9 +1735,10 @@ def wall_street_price_targets(ticker: str):
                 scale = max_price - min_price if max_price > min_price else 1
 
                 def scaled_bar(value):
-                    length = int(((value - min_price) / scale) * 20)  # max 20 blocks
+                    length = max(1, int(((value - min_price) / scale) * 20))  # Always at least 1 block
                     bar = "█" * length
-                    return f"{bar} {value:.2f}"
+                    return f"{bar} ${value:,.2f}"
+
 
                 st.markdown(f"- **Low Target:** {scaled_bar(target_low) if target_low else 'N/A'}")
                 st.markdown(f"- **Current Price:** {scaled_bar(current_price) if current_price else 'N/A'}")
