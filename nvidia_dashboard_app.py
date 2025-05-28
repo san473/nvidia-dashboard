@@ -1858,63 +1858,81 @@ def wall_street_price_targets(ticker: str):
 # Insert this line at the end of any logical section (e.g., scenario modeling)
 wall_street_price_targets(ticker)
 
+import yfinance as yf
+import streamlit as st
+import matplotlib.pyplot as plt
+
 # ----------------- INSIDER & INSTITUTIONAL OWNERSHIP -----------------
-# ----------------- INSIDER & INSTITUTIONAL OWNERSHIP -----------------
-st.header("🏛️ Insider & Institutional Ownership")
+def insider_institutional_section(ticker):
+    st.header("🏛️ Insider & Institutional Ownership")
 
-try:
-    ticker_obj = yf.Ticker(ticker)
+    try:
+        ticker_obj = yf.Ticker(ticker)
 
-    with st.expander("🏢 Major Holders Breakdown"):
-        st.markdown("#### 📊 Ownership Distribution")
-        try:
-            major_holders = ticker_obj.get_major_holders()
-            if major_holders is not None and not major_holders.empty:
-                # Rename and clean
-                major_holders.columns = ["Value"]
-                major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
+        with st.expander("🏢 Major Holders Breakdown"):
+            st.markdown("#### 📊 Ownership Distribution")
+            try:
+                major_holders = ticker_obj.get_major_holders()
+                if major_holders is not None and not major_holders.empty:
+                    # Fix columns: sometimes it's a Series with one column
+                    if len(major_holders.columns) == 1:
+                        major_holders.columns = ["Value"]
+                    major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
 
-                st.dataframe(major_holders)
+                    st.dataframe(major_holders)
 
-                # Pie chart
-                fig, ax = plt.subplots()
-                ax.pie(
-                    major_holders["Value"],
-                    labels=major_holders["Holder"],
-                    autopct="%1.1f%%",
-                    startangle=140,
-                    textprops={'fontsize': 10}
-                )
-                ax.axis("equal")
-                st.pyplot(fig)
-            else:
-                st.info("No major holders data available.")
-        except Exception as e:
-            st.warning(f"Could not generate chart: {e}")
+                    # Prepare pie chart
+                    values = major_holders["Value"]
+                    labels = major_holders["Holder"]
 
-    with st.expander("🏦 Institutional Holders"):
-        st.markdown("#### Top Institutional Holders")
-        try:
-            inst_holders = ticker_obj.institutional_holders
-            if inst_holders is not None and not inst_holders.empty:
-                st.dataframe(inst_holders)
-            else:
-                st.info("No institutional holders data available.")
-        except Exception as e:
-            st.error(f"Failed to load institutional holders: {e}")
+                    # Filter out zero or negative values to avoid pie chart errors
+                    mask = values > 0
+                    values = values[mask]
+                    labels = labels[mask]
 
-    with st.expander("👥 Insider Transactions"):
-        st.markdown("#### Insider Activity Log")
-        try:
-            insider_trades = ticker_obj.insider_transactions
-            if insider_trades is not None and not insider_trades.empty:
-                st.dataframe(insider_trades)
-            else:
-                st.info("No insider transaction data available.")
-        except Exception as e:
-            st.error(f"Failed to load insider transactions: {e}")
+                    if len(values) > 0:
+                        fig, ax = plt.subplots()
+                        ax.pie(
+                            values,
+                            labels=labels,
+                            autopct="%1.1f%%",
+                            startangle=140,
+                            textprops={'fontsize': 10}
+                        )
+                        ax.axis("equal")
+                        st.pyplot(fig)
+                    else:
+                        st.info("No positive ownership values to display in pie chart.")
+                else:
+                    st.info("No major holders data available.")
+            except Exception as e:
+                st.warning(f"Could not generate Major Holders chart or table: {e}")
 
-except Exception as e:
-    st.error(f"Ownership section error: {e}")
+        with st.expander("🏦 Institutional Holders"):
+            st.markdown("#### Top Institutional Holders")
+            try:
+                inst_holders = ticker_obj.institutional_holders
+                if inst_holders is not None and not inst_holders.empty:
+                    st.dataframe(inst_holders)
+                else:
+                    st.info("No institutional holders data available.")
+            except Exception as e:
+                st.error(f"Failed to load institutional holders: {e}")
+
+        with st.expander("👥 Insider Transactions"):
+            st.markdown("#### Insider Activity Log")
+            try:
+                insider_trades = ticker_obj.insider_transactions
+                if insider_trades is not None and not insider_trades.empty:
+                    st.dataframe(insider_trades)
+                else:
+                    st.info("No insider transaction data available.")
+            except Exception as e:
+                st.error(f"Failed to load insider transactions: {e}")
+
+    except Exception as e:
+        st.error(f"Ownership section error: {e}")
 
 
+# Example usage (put this where you want to call it in your app):
+# insider_institutional_section(ticker)
