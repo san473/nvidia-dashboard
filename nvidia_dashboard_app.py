@@ -1858,11 +1858,12 @@ def wall_street_price_targets(ticker: str):
 # Insert this line at the end of any logical section (e.g., scenario modeling)
 wall_street_price_targets(ticker)
 
-import yfinance as yf
+
+
 import streamlit as st
+import yfinance as yf
 import matplotlib.pyplot as plt
 
-# ----------------- INSIDER & INSTITUTIONAL OWNERSHIP -----------------
 def insider_institutional_section(ticker):
     st.header("🏛️ Insider & Institutional Ownership")
 
@@ -1874,18 +1875,15 @@ def insider_institutional_section(ticker):
             try:
                 major_holders = ticker_obj.get_major_holders()
                 if major_holders is not None and not major_holders.empty:
-                    # Fix columns: sometimes it's a Series with one column
                     if len(major_holders.columns) == 1:
                         major_holders.columns = ["Value"]
                     major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
 
                     st.dataframe(major_holders)
 
-                    # Prepare pie chart
                     values = major_holders["Value"]
                     labels = major_holders["Holder"]
 
-                    # Filter out zero or negative values to avoid pie chart errors
                     mask = values > 0
                     values = values[mask]
                     labels = labels[mask]
@@ -1933,6 +1931,5 @@ def insider_institutional_section(ticker):
     except Exception as e:
         st.error(f"Ownership section error: {e}")
 
-
-# Example usage (put this where you want to call it in your app):
-# insider_institutional_section(ticker)
+# Call with an example ticker:
+insider_institutional_section("AAPL")
