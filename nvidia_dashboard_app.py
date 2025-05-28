@@ -1729,24 +1729,15 @@ def wall_street_price_targets(ticker: str):
 
             st.markdown("### Price Target Range Visualization")
 
-            valid_targets = [v for v in [target_low, target_high, current_price] if v is not None]
-            if len(valid_targets) >= 2:
-                min_price, max_price = min(valid_targets), max(valid_targets)
-                scale = max_price - min_price if max_price > min_price else 1
-
-                def scaled_bar(value):
-                    length = max(1, int(((value - min_price) / scale) * 20))  # Always at least 1 block
-                    bar = "█" * length
-                    return f"{bar} ${value:,.2f}"
-
-
-                st.markdown(f"- **Low Target:** {scaled_bar(target_low) if target_low else 'N/A'}")
-                st.markdown(f"- **Current Price:** {scaled_bar(current_price) if current_price else 'N/A'}")
-                st.markdown(f"- **High Target:** {scaled_bar(target_high) if target_high else 'N/A'}")
+            if all(v is not None for v in [target_low, target_high, current_price]):
+                st.markdown(f"- **Low Target:** ${target_low:.2f}")
+                st.markdown(f"- **Current Price:** ${current_price:.2f}")
+                st.markdown(f"- **High Target:** ${target_high:.2f}")
             else:
                 st.info("Insufficient data to display price target range visualization.")
         else:
             st.info("No Wall Street price target data available for this stock.")
+
 
 # Insert this line at the end of any logical section (e.g., scenario modeling)
 wall_street_price_targets(ticker)
