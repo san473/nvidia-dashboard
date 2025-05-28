@@ -1859,47 +1859,36 @@ def wall_street_price_targets(ticker: str):
 wall_street_price_targets(ticker)
 
 # ----------------- INSIDER & INSTITUTIONAL OWNERSHIP -----------------
-st.header("🏛️ Insider & Institutional Ownership")
+with st.expander("Institutional Ownership"):
+    st.markdown("#### 🏢 Major Holders Breakdown")
+    try:
+        major_holders = ticker_obj.get_major_holders()
+        if major_holders is not None and not major_holders.empty:
+            major_holders.columns = ["Holder", "Value"]
 
-try:
-    ticker_obj = yf.Ticker(ticker)
+            # Try plotting clean pie chart
+            try:
+                fig = px.pie(
+                    major_holders,
+                    names="Holder",
+                    values="Value",
+                    title="Ownership Distribution",
+                    hole=0.4,
+                )
+                fig.update_traces(textinfo='percent+label')
+                fig.update_layout(
+                    showlegend=True,
+                    margin=dict(t=30, b=10, l=10, r=10),
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as chart_error:
+                st.warning(f"Could not generate chart: {chart_error}")
 
-    with st.expander("Institutional Ownership"):
-        st.markdown("#### 🏢 Major Holders Breakdown")
-        try:
-            major_holders = ticker_obj.get_major_holders()
-            if major_holders is not None and not major_holders.empty:
-                # Generate pie chart from first 3 rows (if they contain %)
-                try:
-                    labels = []
-                    values = []
-                    for i in range(3):  # Typically first 3 rows contain % data
-                        row_text = major_holders.iloc[i, 0]
-                        if "%" in row_text:
-                            percent = float(row_text.split("%")[0].strip())
-                            label = row_text.split("of")[-1].strip().capitalize()
-                            labels.append(label)
-                            values.append(percent)
-
-                    if values:
-                        fig = px.pie(
-                            names=labels,
-                            values=values,
-                            title="Ownership Breakdown",
-                            hole=0.4,
-                            color_discrete_sequence=px.colors.sequential.Blues
-                        )
-                        fig.update_traces(textinfo='percent+label', textfont_size=12)
-                        fig.update_layout(margin=dict(t=20, b=20, l=0, r=0))
-                        st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not generate chart: {e}")
-
-                st.dataframe(major_holders)
-            else:
-                st.info("No major holders data available.")
-        except Exception as e:
-            st.error(f"Failed to load major holders: {e}")
+            st.dataframe(major_holders)
+        else:
+            st.info("No major holders data available.")
+    except Exception as e:
+        st.error(f"Failed to load major holders: {e}")
 
         st.markdown("#### 🏦 Institutional Holders")
         try:
