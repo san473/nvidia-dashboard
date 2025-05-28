@@ -1679,8 +1679,7 @@ if ticker:
 
             st.divider()
             st.subheader("📈 Scenario Results")
-            scenario_
-            output("🎯 Bull", bull_price)
+            scenario_output("🎯 Bull", bull_price)
             scenario_output("📌 Base", base_price)
             scenario_output("⚠️ Bear", bear_price)
 
