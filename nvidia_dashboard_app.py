@@ -1659,61 +1659,62 @@ if profitability_data or leverage_data:
 else:
     st.warning("⚠️ No profitability or leverage data available.")
 
-import streamlit as st
 import yfinance as yf
-import datetime
+import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 
-def earnings_call_section(ticker: str):
-    st.markdown("## 📞 Earnings Call Summary")
-
+def get_latest_earnings_date(ticker):
     try:
-        yf_ticker = yf.Ticker(ticker)
-        earnings_dates = yf_ticker.calendar
+        ticker_obj = yf.Ticker(ticker)
+        earnings_calendar = ticker_obj.calendar
+        if 'Earnings Date' in earnings_calendar.index:
+            earnings_date = earnings_calendar.loc['Earnings Date'][0]
+            return earnings_date
+    except Exception:
+        return None
+    return None
 
-        # Get last earnings date
-        if not earnings_dates.empty and 'Earnings Date' in earnings_dates.index:
-            earnings_date = earnings_dates.loc['Earnings Date'][0]
-            earnings_date_str = earnings_date.strftime('%Y-%m-%d') if isinstance(earnings_date, datetime.datetime) else str(earnings_date)
+def get_earnings_summary_yahoo(ticker):
+    # Scrape Yahoo Finance earnings summary (this is a lightweight way)
+    try:
+        url = f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            # Find earnings estimate table caption as a proxy for latest info
+            summary = ""
+            summary_section = soup.find('section', {'data-test':'qsp-analysis'})
+            if summary_section:
+                paragraphs = summary_section.find_all('p')
+                summary = " ".join(p.get_text() for p in paragraphs)
+            if summary.strip() == "":
+                summary = "No earnings summary available."
+            return summary
         else:
-            earnings_date_str = "Date not available"
-
-        st.write(f"**Earnings Date:** {earnings_date_str}")
-
-        # --- Try to find webcast/audio link from official IR page ---
-        ir_links = {
-            "NVDA": "https://www.nvidia.com/en-us/about-nvidia/investor-relations/financial-info/",
-            "AAPL": "https://investor.apple.com/earnings/default.aspx"
-        }
-
-        audio_url = None
-        if ticker.upper() in ir_links:
-            response = requests.get(ir_links[ticker.upper()], timeout=10)
-            soup = BeautifulSoup(response.text, 'html.parser')
-
-            # Try to find audio/video links (simple logic for demo purposes)
-            for link in soup.find_all("a", href=True):
-                href = link['href']
-                if any(ext in href.lower() for ext in [".mp3", ".m4a", "webcast", "audio", "eventid"]):
-                    audio_url = href
-                    if not audio_url.startswith("http"):
-                        audio_url = "https://investor.apple.com" + audio_url if "apple" in ir_links[ticker.upper()] else "https://www.nvidia.com" + audio_url
-                    break
-
-        if audio_url:
-            st.audio(audio_url)
-        else:
-            st.info("🎧 No earnings call audio/webcast links found.")
-
-        # --- Static summary placeholder ---
-        st.markdown("""
-        ### Summary
-        This section will soon include a dynamic summary of the most recent earnings call, extracted via NLP summarization from transcript or audio highlights.
-        """)
-
+            return "Failed to retrieve earnings summary."
     except Exception as e:
-        st.error(f"Failed to load earnings call section: {e}")
+        return f"Error fetching earnings summary: {e}"
+
+def earnings_call_summary_section(ticker):
+    st.header("📢 Latest Earnings Call Summary")
+
+    earnings_date = get_latest_earnings_date(ticker)
+    if earnings_date:
+        st.markdown(f"**Earnings Date:** {earnings_date.strftime('%Y-%m-%d')}")
+    else:
+        st.info("Earnings date information is not available.")
+
+    st.markdown("---")
+
+    summary = get_earnings_summary_yahoo(ticker)
+    st.markdown(summary)
+
+# Usage example: call this after your ticker input
+if ticker:
+    earnings_call_summary_section(ticker)
+
 
 # --- In your main Streamlit app ---
 with st.container():
