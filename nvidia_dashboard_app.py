@@ -1676,20 +1676,19 @@ def get_latest_earnings_date(ticker):
     return None
 
 def get_earnings_summary_yahoo(ticker):
-    # Scrape Yahoo Finance earnings summary (this is a lightweight way)
+    # Scrape Yahoo Finance analysis page for earnings summary text
     try:
         url = f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}"
         headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
-            # Find earnings estimate table caption as a proxy for latest info
             summary = ""
             summary_section = soup.find('section', {'data-test':'qsp-analysis'})
             if summary_section:
                 paragraphs = summary_section.find_all('p')
                 summary = " ".join(p.get_text() for p in paragraphs)
-            if summary.strip() == "":
+            if not summary.strip():
                 summary = "No earnings summary available."
             return summary
         else:
@@ -1711,7 +1710,7 @@ def earnings_call_summary_section(ticker):
     summary = get_earnings_summary_yahoo(ticker)
     st.markdown(summary)
 
-# Usage example: call this after your ticker input
+# === Usage: call this after your ticker input is defined ===
 if ticker:
     earnings_call_summary_section(ticker)
 
