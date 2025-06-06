@@ -1882,15 +1882,15 @@ def insider_institutional_section(ticker):
                   if len(major_holders.columns) == 1:
                      major_holders.columns = ["Value"]
 
-                 major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
+                  major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
 
                  # Calculate percentage ownership
-                 total = major_holders["Value"].sum()
-                 major_holders["% Ownership"] = major_holders["Value"] / total * 100
-                 major_holders["% Ownership"] = major_holders["% Ownership"].map("{:.2f}%".format)
+                  total = major_holders["Value"].sum()
+                  major_holders["% Ownership"] = major_holders["Value"] / total * 100
+                  major_holders["% Ownership"] = major_holders["% Ownership"].map("{:.2f}%".format)
 
-                 # Display only relevant columns
-                 st.dataframe(major_holders[["Holder", "% Ownership"]], use_container_width=True)
+                  # Display only relevant columns
+                  st.dataframe(major_holders[["Holder", "% Ownership"]], use_container_width=True)
 
                 else:
                     st.info("No major holders data available.")
