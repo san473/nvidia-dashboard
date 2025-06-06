@@ -1872,30 +1872,30 @@ def insider_institutional_section(ticker):
         ticker_obj = yf.Ticker(ticker)
 
         with st.expander("🏢 Major Holders Breakdown"):
-    st.markdown("#### Ownership Distribution (as % of total shares)")
+            st.markdown("#### Ownership Distribution (as % of total shares)")
 
-    try:
-        major_holders = ticker_obj.get_major_holders()
+            try:
+               major_holders = ticker_obj.get_major_holders()
 
-        if major_holders is not None and not major_holders.empty:
-            # Ensure correct formatting
-            if len(major_holders.columns) == 1:
-                major_holders.columns = ["Value"]
+               if major_holders is not None and not major_holders.empty:
+                  # Ensure correct formatting
+                  if len(major_holders.columns) == 1:
+                     major_holders.columns = ["Value"]
 
-            major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
+                 major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
 
-            # Calculate percentage ownership
-            total = major_holders["Value"].sum()
-            major_holders["% Ownership"] = major_holders["Value"] / total * 100
-            major_holders["% Ownership"] = major_holders["% Ownership"].map("{:.2f}%".format)
+                 # Calculate percentage ownership
+                 total = major_holders["Value"].sum()
+                 major_holders["% Ownership"] = major_holders["Value"] / total * 100
+                 major_holders["% Ownership"] = major_holders["% Ownership"].map("{:.2f}%".format)
 
-            # Display only relevant columns
-            st.dataframe(major_holders[["Holder", "% Ownership"]], use_container_width=True)
+                 # Display only relevant columns
+                 st.dataframe(major_holders[["Holder", "% Ownership"]], use_container_width=True)
 
-        else:
-            st.info("No major holders data available.")
-    except Exception as e:
-        st.warning(f"Could not load Major Holders data: {e}")
+                else:
+                    st.info("No major holders data available.")
+            except Exception as e:
+                st.warning(f"Could not load Major Holders data: {e}")
 
 
         with st.expander("🏦 Institutional Holders"):
