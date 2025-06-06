@@ -1862,8 +1862,9 @@ wall_street_price_targets(ticker)
 
 import streamlit as st
 import yfinance as yf
-import matplotlib.pyplot as plt
+import pandas as pd
 
+# ----------------- INSIDER & INSTITUTIONAL OWNERSHIP -----------------
 def insider_institutional_section(ticker):
     st.header("🏛️ Insider & Institutional Ownership")
 
@@ -1871,40 +1872,31 @@ def insider_institutional_section(ticker):
         ticker_obj = yf.Ticker(ticker)
 
         with st.expander("🏢 Major Holders Breakdown"):
-            st.markdown("#### 📊 Ownership Distribution")
-            try:
-                major_holders = ticker_obj.get_major_holders()
-                if major_holders is not None and not major_holders.empty:
-                    if len(major_holders.columns) == 1:
-                        major_holders.columns = ["Value"]
-                    major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
+    st.markdown("#### Ownership Distribution (as % of total shares)")
 
-                    st.dataframe(major_holders)
+    try:
+        major_holders = ticker_obj.get_major_holders()
 
-                    values = major_holders["Value"]
-                    labels = major_holders["Holder"]
+        if major_holders is not None and not major_holders.empty:
+            # Ensure correct formatting
+            if len(major_holders.columns) == 1:
+                major_holders.columns = ["Value"]
 
-                    mask = values > 0
-                    values = values[mask]
-                    labels = labels[mask]
+            major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
 
-                    if len(values) > 0:
-                        fig, ax = plt.subplots()
-                        ax.pie(
-                            values,
-                            labels=labels,
-                            autopct="%1.1f%%",
-                            startangle=140,
-                            textprops={'fontsize': 10}
-                        )
-                        ax.axis("equal")
-                        st.pyplot(fig)
-                    else:
-                        st.info("No positive ownership values to display in pie chart.")
-                else:
-                    st.info("No major holders data available.")
-            except Exception as e:
-                st.warning(f"Could not generate Major Holders chart or table: {e}")
+            # Calculate percentage ownership
+            total = major_holders["Value"].sum()
+            major_holders["% Ownership"] = major_holders["Value"] / total * 100
+            major_holders["% Ownership"] = major_holders["% Ownership"].map("{:.2f}%".format)
+
+            # Display only relevant columns
+            st.dataframe(major_holders[["Holder", "% Ownership"]], use_container_width=True)
+
+        else:
+            st.info("No major holders data available.")
+    except Exception as e:
+        st.warning(f"Could not load Major Holders data: {e}")
+
 
         with st.expander("🏦 Institutional Holders"):
             st.markdown("#### Top Institutional Holders")
@@ -1931,5 +1923,9 @@ def insider_institutional_section(ticker):
     except Exception as e:
         st.error(f"Ownership section error: {e}")
 
-# Call with an example ticker:
-insider_institutional_section("AAPL")
+
+# ====== USAGE ======
+# Assuming ticker is defined earlier in your app, e.g.:
+# ticker = st.text_input("Enter Stock Ticker", value="NVDA").upper()
+
+insider_institutional_section(ticker)
