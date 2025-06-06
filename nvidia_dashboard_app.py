@@ -1867,54 +1867,54 @@ import pandas as pd
 # ----------------- INSIDER & INSTITUTIONAL OWNERSHIP -----------------
 def insider_institutional_section(ticker):
     st.header("🏛️ Insider & Institutional Ownership")
+    st.subheader(f"📊 Ownership Data for: {ticker.upper()}")
 
     try:
         ticker_obj = yf.Ticker(ticker)
 
+        # ----------- Major Holders Breakdown -----------
         with st.expander("🏢 Major Holders Breakdown"):
             st.markdown("#### Ownership Distribution (as % of total shares)")
 
             try:
-               major_holders = ticker_obj.get_major_holders()
+                major_holders = ticker_obj.get_major_holders()
 
-               if major_holders is not None and not major_holders.empty:
-                  # Ensure correct formatting
-                  if len(major_holders.columns) == 1:
-                     major_holders.columns = ["Value"]
+                if major_holders is not None and not major_holders.empty:
+                    if len(major_holders.columns) == 1:
+                        major_holders.columns = ["Value"]
 
-                  major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
+                    major_holders = major_holders.reset_index().rename(columns={"index": "Holder"})
 
-                 # Calculate percentage ownership
-                  total = major_holders["Value"].sum()
-                  major_holders["% Ownership"] = major_holders["Value"] / total * 100
-                  major_holders["% Ownership"] = major_holders["% Ownership"].map("{:.2f}%".format)
+                    # Calculate % ownership
+                    total = major_holders["Value"].sum()
+                    major_holders["% Ownership"] = major_holders["Value"] / total * 100
+                    major_holders["% Ownership"] = major_holders["% Ownership"].map("{:.2f}%".format)
 
-                  # Display only relevant columns
-                  st.dataframe(major_holders[["Holder", "% Ownership"]], use_container_width=True)
-
+                    st.dataframe(major_holders[["Holder", "% Ownership"]], use_container_width=True)
                 else:
                     st.info("No major holders data available.")
             except Exception as e:
                 st.warning(f"Could not load Major Holders data: {e}")
 
-
+        # ----------- Institutional Holders -----------
         with st.expander("🏦 Institutional Holders"):
             st.markdown("#### Top Institutional Holders")
             try:
                 inst_holders = ticker_obj.institutional_holders
                 if inst_holders is not None and not inst_holders.empty:
-                    st.dataframe(inst_holders)
+                    st.dataframe(inst_holders, use_container_width=True)
                 else:
                     st.info("No institutional holders data available.")
             except Exception as e:
                 st.error(f"Failed to load institutional holders: {e}")
 
+        # ----------- Insider Transactions -----------
         with st.expander("👥 Insider Transactions"):
             st.markdown("#### Insider Activity Log")
             try:
                 insider_trades = ticker_obj.insider_transactions
                 if insider_trades is not None and not insider_trades.empty:
-                    st.dataframe(insider_trades)
+                    st.dataframe(insider_trades, use_container_width=True)
                 else:
                     st.info("No insider transaction data available.")
             except Exception as e:
@@ -1922,10 +1922,3 @@ def insider_institutional_section(ticker):
 
     except Exception as e:
         st.error(f"Ownership section error: {e}")
-
-
-# ====== USAGE ======
-# Assuming ticker is defined earlier in your app, e.g.:
-# ticker = st.text_input("Enter Stock Ticker", value="NVDA").upper()
-
-insider_institutional_section(ticker)
