@@ -1866,7 +1866,7 @@ import pandas as pd
 
 # ----------------- INSIDER & INSTITUTIONAL OWNERSHIP -----------------
 def insider_institutional_section(ticker: str):
-    with st.container():  # Container to group the entire section
+    with st.container():
         st.header("🏛️ Insider & Institutional Ownership")
         st.subheader(f"📊 Ownership Data for: {ticker}")
 
@@ -1931,3 +1931,7 @@ def insider_institutional_section(ticker: str):
 
         except Exception as e:
             st.error(f"Ownership section error: {e}")
+
+# --- Call the function after ticker is defined ---
+if ticker:
+    insider_institutional_section(ticker)
