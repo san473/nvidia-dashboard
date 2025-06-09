@@ -1665,24 +1665,24 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
-# ─────────────────── Helper: fetch NewsAPI key from st.secrets ────────────────────
+# ─────────────────────── Helper: get NewsAPI key from st.secrets ───────────────────────
 def _get_newsapi_key():
     for k in ("news_api_key", "NEWS_API_KEY", "newsapi"):
         if k in st.secrets:
             return st.secrets[k]
-    return None  # key not found
+    return None
 
-# ─────────────────── Helper: latest earnings date via yfinance ────────────────────
+# ─────────────────────── Helper: earnings date from calendar or fallback ────────────────
 def _latest_earnings_date(ticker: str):
     try:
         cal = yf.Ticker(ticker).calendar
         if "Earnings Date" in cal.index:
-            return cal.loc["Earnings Date"][0]  # datetime-like
+            return cal.loc["Earnings Date"][0]
     except Exception:
         pass
     return None
 
-# ─────────────────── Helper: scrape Yahoo Finance analysis summary ────────────────
+# ─────────────────────── Helper: Yahoo Finance Analysis scraping ────────────────────────
 def _yahoo_earnings_summary(ticker: str):
     try:
         url = f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}"
@@ -1700,14 +1700,14 @@ def _yahoo_earnings_summary(ticker: str):
     except Exception:
         return None
 
-# ─────────────────── Helper: NewsAPI fallback headlines ───────────────────────────
+# ─────────────────────── Helper: NewsAPI fallback headlines ─────────────────────────────
 def _newsapi_earnings_headlines(ticker: str, api_key: str):
     if not api_key:
         return None
     try:
         today = datetime.utcnow()
-        past  = today - timedelta(days=30)
-        query = f'"{ticker}" AND (earnings OR "quarterly results" OR "Q1 results" OR "Q2 results" OR "Q3 results" OR "Q4 results")'
+        past = today - timedelta(days=30)
+        query = f'"{ticker}" AND (earnings OR "quarterly results" OR "Q1" OR "Q2" OR "Q3" OR "Q4")'
         url = (
             "https://newsapi.org/v2/everything?"
             f"q={requests.utils.quote(query)}&"
@@ -1729,39 +1729,34 @@ def _newsapi_earnings_headlines(ticker: str, api_key: str):
     except Exception:
         return None
 
-# ─────────────────── Main Section ────────────────────────────────────────────────
+# ─────────────────────── Main Section: Earnings Call Summary ────────────────────────────
 def earnings_call_summary_section(ticker: str):
     with st.container():
         st.header("📢 Latest Earnings Call Summary")
 
-        # 1️⃣ Earnings date
+        # Step 1: Show earnings date
         edate = _latest_earnings_date(ticker)
-        if edate is not None:
-            st.markdown(f"**Earnings Date:** {edate:%Y-%m-%d}")
+        if edate:
+            st.markdown(f"**Earnings Date:** {edate.strftime('%Y-%m-%d')}")
         else:
-            st.info("Earnings date not available.")
+            st.info("📆 Earnings date not available.")
 
         st.divider()
 
-        # 2️⃣ Yahoo summary
+        # Step 2: Try Yahoo Finance Summary
         summary = _yahoo_earnings_summary(ticker)
         if summary:
-            st.subheader("📄 Yahoo Finance Analysis Summary")
+            st.subheader("📄 Yahoo Finance Summary")
             st.markdown(summary)
-            return  # summary found → stop here
+            return
 
-        # 3️⃣ NewsAPI fallback
+        # Step 3: Fallback to NewsAPI headlines
         headlines = _newsapi_earnings_headlines(ticker, _get_newsapi_key())
         if headlines:
-            st.subheader("📰 Recent Earnings-Related Headlines")
-            st.markdown(headlines)
+            st.subheader("📰 Recent Earnings-Related News")
+            st.markdown(headlines, unsafe_allow_html=True)
         else:
-            st.info("No earnings summary or relevant headlines found.")
-
-# ─────────────────── Call the section (assuming `ticker` is already defined) ─────
-if ticker:
-    earnings_call_summary_section(ticker)
-
+            st.warning("No earnings summary or relevant headlines found.")
 
 
 
