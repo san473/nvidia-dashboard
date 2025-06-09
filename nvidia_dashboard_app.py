@@ -1664,6 +1664,7 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 
+# --------- Earnings Date Fetcher ----------
 def get_latest_earnings_date(ticker):
     try:
         ticker_obj = yf.Ticker(ticker)
@@ -1675,8 +1676,8 @@ def get_latest_earnings_date(ticker):
         return None
     return None
 
+# --------- Earnings Summary Scraper ----------
 def get_earnings_summary_yahoo(ticker):
-    # Scrape Yahoo Finance analysis page for earnings summary text
     try:
         url = f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}"
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -1684,7 +1685,7 @@ def get_earnings_summary_yahoo(ticker):
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
             summary = ""
-            summary_section = soup.find('section', {'data-test':'qsp-analysis'})
+            summary_section = soup.find('section', {'data-test': 'qsp-analysis'})
             if summary_section:
                 paragraphs = summary_section.find_all('p')
                 summary = " ".join(p.get_text() for p in paragraphs)
@@ -1696,28 +1697,26 @@ def get_earnings_summary_yahoo(ticker):
     except Exception as e:
         return f"Error fetching earnings summary: {e}"
 
+# --------- Main Section Block ----------
 def earnings_call_summary_section(ticker):
-    st.header("📢 Latest Earnings Call Summary")
+    with st.container():
+        st.header("📢 Latest Earnings Call Summary")
 
-    earnings_date = get_latest_earnings_date(ticker)
-    if earnings_date:
-        st.markdown(f"**Earnings Date:** {earnings_date.strftime('%Y-%m-%d')}")
-    else:
-        st.info("Earnings date information is not available.")
+        earnings_date = get_latest_earnings_date(ticker)
+        if earnings_date:
+            st.markdown(f"**Earnings Date:** {earnings_date.strftime('%Y-%m-%d')}")
+        else:
+            st.info("Earnings date information is not available.")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    summary = get_earnings_summary_yahoo(ticker)
-    st.markdown(summary)
+        summary = get_earnings_summary_yahoo(ticker)
+        st.markdown(summary)
 
-# === Usage: call this after your ticker input is defined ===
+# --------- Call the Section (make sure 'ticker' is defined earlier) ----------
 if ticker:
     earnings_call_summary_section(ticker)
 
-
-# --- In your main Streamlit app ---
-with st.container():
-    earnings_call_section(ticker)
 
 import streamlit as st
 import yfinance as yf
