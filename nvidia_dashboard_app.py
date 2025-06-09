@@ -454,45 +454,6 @@ for point in risk_points:
 import yfinance as yf
 import pandas as pd
 
-# ---------------------- Debug: Cash Flow Data Rows ----------------------
-st.markdown("### 🔍 Debug: Available Financial Rows")
-st.markdown("**Cash Flow Statement Rows:**")
-
-if not ticker:
-    st.warning("⚠️ Debug failed: No ticker entered.")
-else:
-    try:
-        yf_ticker = yf.Ticker(ticker)
-        cashflow = yf_ticker.cashflow
-
-        if cashflow.empty:
-            st.warning("⚠️ Debug failed: No cash flow data found for this ticker.")
-        else:
-            # Normalize index names (row labels)
-            cashflow.index = cashflow.index.str.lower()
-            detected_rows = list(cashflow.index)
-            st.success("✅ Cash flow data retrieved.")
-            st.write("Available rows:", detected_rows)
-
-            # Keywords to detect FCF-related rows
-            fcf_keywords = [
-                "free cash flow", 
-                "operating cash flow",
-                "total cash from operating activities",
-                "capital expenditures",
-                "cash from operations",
-                "net cash provided by operating activities"
-            ]
-
-            matched_rows = [row for row in detected_rows if any(key in row for key in fcf_keywords)]
-
-            if matched_rows:
-                st.success(f"✅ Detected FCF-related rows: {matched_rows}")
-            else:
-                st.warning("⚠️ Cash flow retrieved, but no Free Cash Flow rows matched expected patterns.")
-    
-    except Exception as e:
-        st.error(f"❌ Debug failed: {e}")
 
 
 
@@ -1160,7 +1121,7 @@ except Exception as e:
 
 
 
-st.write("Cashflow index labels:", [str(col).lower() for col in cashflow.columns])
+
 
 
 def find_capex_row(cashflow_df):
@@ -1258,16 +1219,7 @@ try:
     fcf_margin = (last_fcf / last_revenue) * 100 if last_revenue != 0 else None
     conversion_rate = (last_fcf / last_net_income) * 100 if last_net_income != 0 else None
 
-    # Optional Debug (set to False to hide)
-    if True:
-        st.write("🔧 Debug Info", {
-            "FCF Years": fcf.index.tolist(),
-            "Revenue Years": revenue.index.tolist(),
-            "Net Income Years": net_income.index.tolist(),
-            "Last FCF": last_fcf,
-            "Last Revenue": last_revenue,
-            "Last Net Income": last_net_income
-        })
+    
 
     # Display
     col1, col2, col3, col4 = st.columns(4)
@@ -1337,8 +1289,7 @@ st.altair_chart(chart, use_container_width=True)
 
 
 
-st.write("Income statement rows:", income_stmt.index.tolist())
-st.write("Income statement columns:", income_stmt.columns.tolist())
+
 
 latest_period = income_stmt.columns[0]
 import streamlit as st
