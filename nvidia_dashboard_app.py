@@ -1659,88 +1659,110 @@ if profitability_data or leverage_data:
 else:
     st.warning("⚠️ No profitability or leverage data available.")
 
-import yfinance as yf
 import streamlit as st
+import yfinance as yf
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
-# --------- Earnings Date Fetcher ----------
-def get_latest_earnings_date(ticker):
+# ─────────────────── Helper: fetch NewsAPI key from st.secrets ────────────────────
+def _get_newsapi_key():
+    for k in ("news_api_key", "NEWS_API_KEY", "newsapi"):
+        if k in st.secrets:
+            return st.secrets[k]
+    return None  # key not found
+
+# ─────────────────── Helper: latest earnings date via yfinance ────────────────────
+def _latest_earnings_date(ticker: str):
     try:
-        ticker_obj = yf.Ticker(ticker)
-        earnings_calendar = ticker_obj.calendar
-        if 'Earnings Date' in earnings_calendar.index:
-            earnings_date = earnings_calendar.loc['Earnings Date'][0]
-            return earnings_date
+        cal = yf.Ticker(ticker).calendar
+        if "Earnings Date" in cal.index:
+            return cal.loc["Earnings Date"][0]  # datetime-like
     except Exception:
-        return None
+        pass
     return None
 
-# --------- Yahoo Analysis Summary ----------
-def get_earnings_summary_yahoo(ticker):
+# ─────────────────── Helper: scrape Yahoo Finance analysis summary ────────────────
+def _yahoo_earnings_summary(ticker: str):
     try:
         url = f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}"
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, "html.parser")
-            summary_section = soup.find('section', {'data-test': 'qsp-analysis'})
-            if summary_section:
-                paragraphs = summary_section.find_all('p')
-                summary = " ".join(p.get_text() for p in paragraphs)
-                if summary.strip():
-                    return summary
-        return None
-    except Exception:
-        return None
-
-# --------- NewsAPI Earnings Headline Fallback ----------
-def get_earnings_headlines_from_newsapi(ticker, api_key):
-    try:
-        today = datetime.now().strftime('%Y-%m-%d')
-        past = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        query = f"{ticker} earnings OR {ticker} results OR {ticker} quarterly"
-        url = f"https://newsapi.org/v2/everything?q={query}&from={past}&to={today}&language=en&sortBy=publishedAt&apiKey={api_key}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            articles = response.json().get("articles", [])
-            if not articles:
-                return None
-            headlines = [f"• {a['title']} ({a['source']['name']})" for a in articles[:5]]
-            return "\n".join(headlines)
-        else:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code != 200:
             return None
+        soup = BeautifulSoup(r.text, "html.parser")
+        section = soup.find("section", {"data-test": "qsp-analysis"})
+        if not section:
+            return None
+        paragraphs = section.find_all("p")
+        text = " ".join(p.get_text(" ", strip=True) for p in paragraphs)
+        return text.strip() or None
     except Exception:
         return None
 
-# --------- Main Earnings Call Summary Section ----------
-def earnings_call_summary_section(ticker, NEWS_API_KEY):
+# ─────────────────── Helper: NewsAPI fallback headlines ───────────────────────────
+def _newsapi_earnings_headlines(ticker: str, api_key: str):
+    if not api_key:
+        return None
+    try:
+        today = datetime.utcnow()
+        past  = today - timedelta(days=30)
+        query = f'"{ticker}" AND (earnings OR "quarterly results" OR "Q1 results" OR "Q2 results" OR "Q3 results" OR "Q4 results")'
+        url = (
+            "https://newsapi.org/v2/everything?"
+            f"q={requests.utils.quote(query)}&"
+            f"from={past:%Y-%m-%d}&to={today:%Y-%m-%d}&"
+            "language=en&sortBy=publishedAt&pageSize=10&"
+            f"apiKey={api_key}"
+        )
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            return None
+        articles = r.json().get("articles", [])
+        if not articles:
+            return None
+        headlines = [
+            f"• {a['title']}  \n<sub>{a['source']['name']} – {a['publishedAt'][:10]}</sub>"
+            for a in articles[:5]
+        ]
+        return "\n\n".join(headlines)
+    except Exception:
+        return None
+
+# ─────────────────── Main Section ────────────────────────────────────────────────
+def earnings_call_summary_section(ticker: str):
     with st.container():
         st.header("📢 Latest Earnings Call Summary")
 
-        earnings_date = get_latest_earnings_date(ticker)
-        if earnings_date and hasattr(earnings_date, "strftime"):
-            st.markdown(f"**Earnings Date:** {earnings_date.strftime('%Y-%m-%d')}")
+        # 1️⃣ Earnings date
+        edate = _latest_earnings_date(ticker)
+        if edate is not None:
+            st.markdown(f"**Earnings Date:** {edate:%Y-%m-%d}")
         else:
-            st.info("Earnings date information is not available.")
+            st.info("Earnings date not available.")
 
-        st.markdown("---")
+        st.divider()
 
-        summary = get_earnings_summary_yahoo(ticker)
+        # 2️⃣ Yahoo summary
+        summary = _yahoo_earnings_summary(ticker)
         if summary:
-            st.subheader("📄 Yahoo Finance Summary")
+            st.subheader("📄 Yahoo Finance Analysis Summary")
             st.markdown(summary)
-        else:
-            fallback = get_earnings_headlines_from_newsapi(ticker, NEWS_API_KEY)
-            if fallback:
-                st.subheader("📰 Latest Earnings Headlines")
-                st.markdown(fallback)
-            else:
-                st.info("No earnings summary or related headlines available.")
+            return  # summary found → stop here
 
+        # 3️⃣ NewsAPI fallback
+        headlines = _newsapi_earnings_headlines(ticker, _get_newsapi_key())
+        if headlines:
+            st.subheader("📰 Recent Earnings-Related Headlines")
+            st.markdown(headlines)
+        else:
+            st.info("No earnings summary or relevant headlines found.")
+
+# ─────────────────── Call the section (assuming `ticker` is already defined) ─────
 if ticker:
-    earnings_call_summary_section(ticker, NEWS_API_KEY)
+    earnings_call_summary_section(ticker)
+
+
 
 
 
