@@ -1666,6 +1666,8 @@ from datetime import datetime, timedelta
 def earnings_call_summary_section(ticker: str):
     with st.container():
         st.header("📢 Latest Earnings Call Summary")
+        st.write(f"Debug: ticker received = {ticker}")
+
         if not ticker:
             st.info("Please enter a valid stock ticker.")
             return
@@ -1675,11 +1677,9 @@ def earnings_call_summary_section(ticker: str):
             st.error("Finnhub API key not found in secrets.")
             return
 
-        # Calculate date range: last 60 days until today
         to_date = datetime.utcnow().date()
         from_date = to_date - timedelta(days=60)
 
-        # Finnhub earnings calendar endpoint
         url = "https://finnhub.io/api/v1/calendar/earnings"
         params = {
             "from": from_date.strftime("%Y-%m-%d"),
@@ -1690,11 +1690,10 @@ def earnings_call_summary_section(ticker: str):
 
         try:
             response = requests.get(url, headers=headers, params=params, timeout=10)
-            st.debug(f"Debug: Finnhub response status: {response.status_code}")
+            st.write(f"Debug: Finnhub response status: {response.status_code}")
             content_type = response.headers.get("Content-Type", "")
-            st.debug(f"Debug: Finnhub content-type: {content_type}")
+            st.write(f"Debug: Finnhub content-type: {content_type}")
 
-            # Check if response is JSON
             if "application/json" not in content_type:
                 st.warning(f"Expected JSON response but got: {content_type}")
                 st.info("No earnings call data found from Finnhub.")
@@ -1702,9 +1701,8 @@ def earnings_call_summary_section(ticker: str):
 
             data = response.json()
             earnings = data.get("earningsCalendar", [])
-            st.debug(f"Debug: Finnhub earnings calendar entries found: {len(earnings)}")
+            st.write(f"Debug: Finnhub earnings calendar entries found: {len(earnings)}")
 
-            # Filter for earnings with date <= today (past earnings)
             past_earnings = [
                 e for e in earnings
                 if "date" in e and datetime.strptime(e["date"], "%Y-%m-%d").date() <= to_date
@@ -1715,18 +1713,11 @@ def earnings_call_summary_section(ticker: str):
                 st.info("No earnings call summary available.")
                 return
 
-            # Sort by date descending to get most recent past earnings
             past_earnings.sort(key=lambda x: x["date"], reverse=True)
             recent_earnings = past_earnings[0]
             earnings_date = recent_earnings["date"]
             st.markdown(f"🗓 Earnings Call Date: **{earnings_date}**")
 
-            # Get summary text if available (e.g. in 'epsEstimate' or 'epsActual' or other fields)
-            # Finnhub's earningsCalendar doesn't provide textual summary directly,
-            # so fallback to fetching news headlines related to earnings for the ticker.
-
-            # Use NewsAPI or fallback approach here if needed
-            # For demo, just show available numeric info:
             eps_estimate = recent_earnings.get("epsEstimate", "N/A")
             eps_actual = recent_earnings.get("epsActual", "N/A")
             surprise = recent_earnings.get("epsSurpriseDollar", "N/A")
@@ -1735,22 +1726,16 @@ def earnings_call_summary_section(ticker: str):
             st.markdown(f"**EPS Actual:** {eps_actual}")
             st.markdown(f"**EPS Surprise:** {surprise}")
 
-            # You can also link to the official earnings release or news if available
-            # But Finnhub earningsCalendar does not have textual summaries
-
         except Exception as e:
             st.error(f"Section crashed: {e}")
-            st.stop()
 
-# Example usage inside your app:
-if "ticker" in st.session_state:
-    ticker = st.session_state["ticker"]
-else:
-    ticker = None
+ticker = st.text_input("Enter Stock Ticker").strip().upper()
 
 if ticker:
     st.caption(f"✅ Debug – rendering earnings call summary for: {ticker}")
     earnings_call_summary_section(ticker)
+else:
+    st.info("Please enter a valid ticker symbol.")
 
 
 
