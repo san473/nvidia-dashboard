@@ -1663,6 +1663,7 @@ import yfinance as yf
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 
 # --------- Earnings Date Fetcher ----------
 def get_latest_earnings_date(ticker):
@@ -1676,7 +1677,7 @@ def get_latest_earnings_date(ticker):
         return None
     return None
 
-# --------- Earnings Summary Scraper ----------
+# --------- Yahoo Analysis Summary ----------
 def get_earnings_summary_yahoo(ticker):
     try:
         url = f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}"
@@ -1684,26 +1685,42 @@ def get_earnings_summary_yahoo(ticker):
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
-            summary = ""
             summary_section = soup.find('section', {'data-test': 'qsp-analysis'})
             if summary_section:
                 paragraphs = summary_section.find_all('p')
                 summary = " ".join(p.get_text() for p in paragraphs)
-            if not summary.strip():
-                summary = "No earnings summary available."
-            return summary
-        else:
-            return "Failed to retrieve earnings summary."
-    except Exception as e:
-        return f"Error fetching earnings summary: {e}"
+                if summary.strip():
+                    return summary
+        return None
+    except Exception:
+        return None
 
-# --------- Main Section Block ----------
-def earnings_call_summary_section(ticker):
+# --------- NewsAPI Earnings Headline Fallback ----------
+def get_earnings_headlines_from_newsapi(ticker, api_key):
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        past = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        query = f"{ticker} earnings OR {ticker} results OR {ticker} quarterly"
+        url = f"https://newsapi.org/v2/everything?q={query}&from={past}&to={today}&language=en&sortBy=publishedAt&apiKey={api_key}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            articles = response.json().get("articles", [])
+            if not articles:
+                return None
+            headlines = [f"• {a['title']} ({a['source']['name']})" for a in articles[:5]]
+            return "\n".join(headlines)
+        else:
+            return None
+    except Exception:
+        return None
+
+# --------- Main Earnings Call Summary Section ----------
+def earnings_call_summary_section(ticker, NEWS_API_KEY):
     with st.container():
         st.header("📢 Latest Earnings Call Summary")
 
         earnings_date = get_latest_earnings_date(ticker)
-        if earnings_date:
+        if earnings_date and hasattr(earnings_date, "strftime"):
             st.markdown(f"**Earnings Date:** {earnings_date.strftime('%Y-%m-%d')}")
         else:
             st.info("Earnings date information is not available.")
@@ -1711,11 +1728,20 @@ def earnings_call_summary_section(ticker):
         st.markdown("---")
 
         summary = get_earnings_summary_yahoo(ticker)
-        st.markdown(summary)
+        if summary:
+            st.subheader("📄 Yahoo Finance Summary")
+            st.markdown(summary)
+        else:
+            fallback = get_earnings_headlines_from_newsapi(ticker, NEWS_API_KEY)
+            if fallback:
+                st.subheader("📰 Latest Earnings Headlines")
+                st.markdown(fallback)
+            else:
+                st.info("No earnings summary or related headlines available.")
 
-# --------- Call the Section (make sure 'ticker' is defined earlier) ----------
 if ticker:
-    earnings_call_summary_section(ticker)
+    earnings_call_summary_section(ticker, NEWS_API_KEY)
+
 
 
 import streamlit as st
