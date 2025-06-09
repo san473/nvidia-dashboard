@@ -1663,74 +1663,60 @@ import streamlit as st
 import requests
 from datetime import datetime
 
-# ───────────────────────── Helper: Get Finnhub API key from st.secrets ─────────────────────────
-def _get_finnhub_key():
-    for key in ("finnhub_api_key", "FINNHUB_API_KEY", "finnhub"):
-        if key in st.secrets:
-            return st.secrets[key]
-    return None
+FINNHUB_API_KEY = st.secrets.get("FINNHUB_API_KEY")
 
-# ───────────────────────── Helper: Fetch latest earnings call transcript snippet ────────────────
-def _fetch_latest_earnings_summary(ticker: str, api_key: str):
-    if not api_key:
+def fetch_finnhub_earnings(ticker):
+    if not FINNHUB_API_KEY:
+        st.error("Finnhub API key not found in secrets.")
         return None, None
+
+    url = f"https://finnhub.io/api/v1/earnings?symbol={ticker}&token={FINNHUB_API_KEY}"
+
     try:
-        url = f"https://finnhub.io/api/v1/stock/earnings-call-transcripts?symbol={ticker}&token={api_key}"
         response = requests.get(url, timeout=10)
-        if response.status_code != 200:
-            return None, None
         data = response.json()
-        if not data or "earningsCallTranscripts" not in data or len(data["earningsCallTranscripts"]) == 0:
+        st.write("### 🐞 Finnhub raw earnings response:")
+        st.json(data)  # Show full API response in the app for debugging
+
+        if "earnings" in data and data["earnings"]:
+            # Pick the latest earnings report, sorted by date descending
+            sorted_earnings = sorted(data["earnings"], key=lambda x: x.get("date", ""), reverse=True)
+            latest = sorted_earnings[0]
+            earnings_date = latest.get("date")
+            summary = latest.get("summary") or "No summary field in response."
+
+            if earnings_date:
+                earnings_date = datetime.strptime(earnings_date, "%Y-%m-%d").date()
+
+            return earnings_date, summary
+        else:
             return None, None
-        
-        latest_call = data["earningsCallTranscripts"][0]
-        # Extract date and summary snippet
-        call_date_str = latest_call.get("date")
-        summary = latest_call.get("content") or latest_call.get("summary") or None
-        
-        # Convert date string to datetime object if possible
-        call_date = None
-        if call_date_str:
-            try:
-                call_date = datetime.strptime(call_date_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-            except Exception:
-                try:
-                    call_date = datetime.strptime(call_date_str, "%Y-%m-%dT%H:%M:%SZ")
-                except Exception:
-                    call_date = None
-        
-        return call_date, summary
-    except Exception:
+    except Exception as e:
+        st.error(f"Finnhub earnings fetch failed: {e}")
         return None, None
 
-# ───────────────────────── Main Section: Earnings Call Summary ──────────────────────────────────
-def earnings_call_summary_section(ticker: str):
+def earnings_call_summary_section(ticker):
     with st.container():
         st.header("📢 Latest Earnings Call Summary")
-        api_key = _get_finnhub_key()
-        
-        if not ticker:
-            st.info("Please enter a stock ticker.")
-            return
-        
-        call_date, summary = _fetch_latest_earnings_summary(ticker, api_key)
-        
-        if call_date:
-            st.markdown(f"🗓 **Earnings Call Date:** {call_date.strftime('%Y-%m-%d')}")
+        st.caption(f"✅ Debug – rendering earnings call summary for: {ticker}")
+
+        earnings_date, summary = fetch_finnhub_earnings(ticker)
+
+        if earnings_date:
+            st.markdown(f"🗓 Earnings call date: {earnings_date}")
         else:
             st.info("🗓 Earnings call date not available.")
-        
+
         st.divider()
-        
-        if summary:
+
+        if summary and summary != "No summary field in response.":
             st.markdown(summary)
         else:
             st.warning("No earnings call summary available.")
 
-# ====== USAGE in your main app ======
 if ticker:
-    st.caption(f"✅ Debug – rendering earnings call summary for: {ticker}")
     earnings_call_summary_section(ticker)
+
 
 
 
