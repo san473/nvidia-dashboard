@@ -1664,60 +1664,57 @@ import requests
 from datetime import datetime
 
 def earnings_call_summary_section(ticker: str):
-    finnhub_api_key = st.secrets.get("FINNHUB_API_KEY", None)
-    if not finnhub_api_key:
-        st.error("Finnhub API key not found in secrets!")
-        return
-
     with st.container():
-        st.header("📢 Latest Earnings Call Summary")
-        st.caption(f"✅ Debug – rendering earnings call summary for: {ticker}")
-
-        url = f"https://finnhub.io/api/v1/earnings?symbol={ticker}&token={finnhub_api_key}"
-        headers = {"Accept": "application/json"}
-
         try:
-            response = requests.get(url, headers=headers, timeout=10)
+            st.header("📢 Latest Earnings Call Summary")
+            st.caption(f"✅ Debug – rendering earnings call summary for: {ticker}")
+
+            finnhub_api_key = st.secrets["FINNHUB_API_KEY"]
+            url = f"https://finnhub.io/api/v1/earnings?symbol={ticker}&token={finnhub_api_key}"
+
+            response = requests.get(url, timeout=10)
             st.caption(f"Debug: Finnhub response status: {response.status_code}")
-            st.caption(f"Debug: Finnhub content-type: {response.headers.get('Content-Type')}")
-            st.caption(f"Debug: Finnhub raw response text (first 500 chars): {response.text[:500]}")
+            content_type = response.headers.get("Content-Type", "")
+            st.caption(f"Debug: Finnhub content-type: {content_type}")
 
             if response.status_code != 200:
-                st.error(f"Finnhub API error: Status code {response.status_code}")
+                st.warning(f"Finnhub earnings fetch failed with status {response.status_code}")
+                st.warning(f"Response text: {response.text}")
+                st.info("No earnings call data found from Finnhub.")
+                return
+
+            if "application/json" not in content_type:
+                st.warning(f"Expected JSON response but got: {content_type}")
+                st.info("No earnings call data found from Finnhub.")
                 return
 
             data = response.json()
-            if not data or "earnings" not in data or len(data["earnings"]) == 0:
-                st.warning("No earnings call data found from Finnhub.")
+
+            if not data:
+                st.info("No earnings call data found from Finnhub.")
                 return
 
-            # Assuming 'earnings' is a list of earnings events sorted by date
-            # Find the most recent past earnings call
-            today = datetime.utcnow().date()
-            past_earnings = [e for e in data["earnings"] if datetime.strptime(e["date"], "%Y-%m-%d").date() <= today]
+            # Assuming the latest earnings call is the first in the list
+            latest_earning = data[0]
+            earnings_date = latest_earning.get("date")
+            if earnings_date:
+                # Convert from ISO 8601 string to readable date
+                dt = datetime.strptime(earnings_date, "%Y-%m-%d")
+                st.markdown(f"🗓 Earnings call date: {dt.strftime('%Y-%m-%d')}")
+            else:
+                st.info("🗓 Earnings call date not available.")
 
-            if not past_earnings:
-                st.warning("No past earnings call data available.")
-                return
-
-            latest_earnings = sorted(past_earnings, key=lambda x: x["date"], reverse=True)[0]
-
-            # Display earnings date
-            earnings_date = latest_earnings["date"]
-            st.markdown(f"🗓 Earnings call date: {earnings_date}")
-
-            # Show summary if available
-            summary = latest_earnings.get("summary") or latest_earnings.get("description") or None
+            summary = latest_earning.get("epsActual")  # or other relevant fields if available
             if summary:
-                st.markdown(f"📄 Summary: {summary}")
+                st.markdown(f"**Earnings summary:** EPS Actual: {summary}")
             else:
                 st.info("No earnings call summary available.")
 
         except Exception as e:
             st.error(f"Section crashed: {e}")
-            st.stop()
+            raise
 
-# Usage example (assuming ticker is defined)
+# Example usage, assuming ticker is defined
 if ticker:
     earnings_call_summary_section(ticker)
 
