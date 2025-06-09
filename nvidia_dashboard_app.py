@@ -1732,7 +1732,9 @@ def _newsapi_earnings_headlines(ticker: str, api_key: str):
 # ─────────────────────── Main Section: Earnings Call Summary ────────────────────────────
 def earnings_call_summary_section(ticker: str):
     with st.container():
-        st.header("📢 Latest Earnings Call Summary")
+        try:
+            st.header("📢 Latest Earnings Call Summary")
+
 
         # Step 1: Show earnings date
         edate = _latest_earnings_date(ticker)
@@ -1758,7 +1760,13 @@ def earnings_call_summary_section(ticker: str):
         else:
             st.warning("No earnings summary or relevant headlines found.")
 
-
+        except Exception as e:
+            st.error(f"Section crashed: {e}")
+            raise
+    
+if ticker:
+    st.caption(f"✅ Debug – about to render earnings section for: {ticker}")
+    earnings_call_summary_section(ticker)    
 
 
 import streamlit as st
