@@ -1735,38 +1735,41 @@ def earnings_call_summary_section(ticker: str):
         try:
             st.header("📢 Latest Earnings Call Summary")
 
+            # Step 1: Show earnings date
+            edate = _latest_earnings_date(ticker)
+            if edate:
+                st.markdown(f"**Earnings Date:** {edate.strftime('%Y-%m-%d')}")
+            else:
+                st.info("📆 Earnings date not available.")
 
-        # Step 1: Show earnings date
-        edate = _latest_earnings_date(ticker)
-        if edate:
-            st.markdown(f"**Earnings Date:** {edate.strftime('%Y-%m-%d')}")
-        else:
-            st.info("📆 Earnings date not available.")
+            st.divider()
 
-        st.divider()
+            # Step 2: Try Yahoo Finance Summary
+            summary = _yahoo_earnings_summary(ticker)
+            if summary:
+                st.subheader("📄 Yahoo Finance Summary")
+                st.markdown(summary)
+                return
 
-        # Step 2: Try Yahoo Finance Summary
-        summary = _yahoo_earnings_summary(ticker)
-        if summary:
-            st.subheader("📄 Yahoo Finance Summary")
-            st.markdown(summary)
-            return
-
-        # Step 3: Fallback to NewsAPI headlines
-        headlines = _newsapi_earnings_headlines(ticker, _get_newsapi_key())
-        if headlines:
-            st.subheader("📰 Recent Earnings-Related News")
-            st.markdown(headlines, unsafe_allow_html=True)
-        else:
-            st.warning("No earnings summary or relevant headlines found.")
+            # Step 3: Fallback to NewsAPI headlines
+            headlines = _newsapi_earnings_headlines(ticker, _get_newsapi_key())
+            if headlines:
+                st.subheader("📰 Recent Earnings-Related News")
+                st.markdown(headlines, unsafe_allow_html=True)
+            else:
+                st.warning("No earnings summary or relevant headlines found.")
 
         except Exception as e:
             st.error(f"Section crashed: {e}")
             raise
-    
+
+# ======= Usage Example =======
+ticker = st.text_input("Enter Stock Ticker", value="AAPL").upper().strip()
+
 if ticker:
     st.caption(f"✅ Debug – about to render earnings section for: {ticker}")
-    earnings_call_summary_section(ticker)    
+    earnings_call_summary_section(ticker)
+
 
 
 import streamlit as st
