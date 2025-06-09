@@ -1661,62 +1661,97 @@ else:
 
 import streamlit as st
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def earnings_call_summary_section(ticker: str):
     with st.container():
+        st.header("📢 Latest Earnings Call Summary")
+        if not ticker:
+            st.info("Please enter a valid stock ticker.")
+            return
+
+        api_key = st.secrets.get("FINNHUB_API_KEY")
+        if not api_key:
+            st.error("Finnhub API key not found in secrets.")
+            return
+
+        # Calculate date range: last 60 days until today
+        to_date = datetime.utcnow().date()
+        from_date = to_date - timedelta(days=60)
+
+        # Finnhub earnings calendar endpoint
+        url = "https://finnhub.io/api/v1/calendar/earnings"
+        params = {
+            "from": from_date.strftime("%Y-%m-%d"),
+            "to": to_date.strftime("%Y-%m-%d"),
+            "symbol": ticker.upper()
+        }
+        headers = {"X-Finnhub-Token": api_key}
+
         try:
-            st.header("📢 Latest Earnings Call Summary")
-            st.caption(f"✅ Debug – rendering earnings call summary for: {ticker}")
-
-            finnhub_api_key = st.secrets["FINNHUB_API_KEY"]
-            url = f"https://finnhub.io/api/v1/earnings?symbol={ticker}&token={finnhub_api_key}"
-
-            response = requests.get(url, timeout=10)
-            st.caption(f"Debug: Finnhub response status: {response.status_code}")
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            st.debug(f"Debug: Finnhub response status: {response.status_code}")
             content_type = response.headers.get("Content-Type", "")
-            st.caption(f"Debug: Finnhub content-type: {content_type}")
+            st.debug(f"Debug: Finnhub content-type: {content_type}")
 
-            if response.status_code != 200:
-                st.warning(f"Finnhub earnings fetch failed with status {response.status_code}")
-                st.warning(f"Response text: {response.text}")
-                st.info("No earnings call data found from Finnhub.")
-                return
-
+            # Check if response is JSON
             if "application/json" not in content_type:
                 st.warning(f"Expected JSON response but got: {content_type}")
                 st.info("No earnings call data found from Finnhub.")
                 return
 
             data = response.json()
+            earnings = data.get("earningsCalendar", [])
+            st.debug(f"Debug: Finnhub earnings calendar entries found: {len(earnings)}")
 
-            if not data:
-                st.info("No earnings call data found from Finnhub.")
+            # Filter for earnings with date <= today (past earnings)
+            past_earnings = [
+                e for e in earnings
+                if "date" in e and datetime.strptime(e["date"], "%Y-%m-%d").date() <= to_date
+            ]
+
+            if not past_earnings:
+                st.info("🗓 Earnings call date not available in the past 60 days.")
+                st.info("No earnings call summary available.")
                 return
 
-            # Assuming the latest earnings call is the first in the list
-            latest_earning = data[0]
-            earnings_date = latest_earning.get("date")
-            if earnings_date:
-                # Convert from ISO 8601 string to readable date
-                dt = datetime.strptime(earnings_date, "%Y-%m-%d")
-                st.markdown(f"🗓 Earnings call date: {dt.strftime('%Y-%m-%d')}")
-            else:
-                st.info("🗓 Earnings call date not available.")
+            # Sort by date descending to get most recent past earnings
+            past_earnings.sort(key=lambda x: x["date"], reverse=True)
+            recent_earnings = past_earnings[0]
+            earnings_date = recent_earnings["date"]
+            st.markdown(f"🗓 Earnings Call Date: **{earnings_date}**")
 
-            summary = latest_earning.get("epsActual")  # or other relevant fields if available
-            if summary:
-                st.markdown(f"**Earnings summary:** EPS Actual: {summary}")
-            else:
-                st.info("No earnings call summary available.")
+            # Get summary text if available (e.g. in 'epsEstimate' or 'epsActual' or other fields)
+            # Finnhub's earningsCalendar doesn't provide textual summary directly,
+            # so fallback to fetching news headlines related to earnings for the ticker.
+
+            # Use NewsAPI or fallback approach here if needed
+            # For demo, just show available numeric info:
+            eps_estimate = recent_earnings.get("epsEstimate", "N/A")
+            eps_actual = recent_earnings.get("epsActual", "N/A")
+            surprise = recent_earnings.get("epsSurpriseDollar", "N/A")
+
+            st.markdown(f"**EPS Estimate:** {eps_estimate}")
+            st.markdown(f"**EPS Actual:** {eps_actual}")
+            st.markdown(f"**EPS Surprise:** {surprise}")
+
+            # You can also link to the official earnings release or news if available
+            # But Finnhub earningsCalendar does not have textual summaries
 
         except Exception as e:
             st.error(f"Section crashed: {e}")
-            raise
+            st.stop()
 
-# Example usage, assuming ticker is defined
+# Example usage inside your app:
+if "ticker" in st.session_state:
+    ticker = st.session_state["ticker"]
+else:
+    ticker = None
+
 if ticker:
+    st.caption(f"✅ Debug – rendering earnings call summary for: {ticker}")
     earnings_call_summary_section(ticker)
+
 
 
 
