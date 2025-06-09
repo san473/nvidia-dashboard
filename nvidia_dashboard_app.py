@@ -1665,24 +1665,23 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
-# ─────────────────────── Helper: get NewsAPI key from st.secrets ───────────────────────
+# ───── Get NewsAPI key from st.secrets ─────
 def _get_newsapi_key():
     for k in ("news_api_key", "NEWS_API_KEY", "newsapi"):
         if k in st.secrets:
             return st.secrets[k]
     return None
 
-# ─────────────────────── Helper: earnings date from calendar or fallback ────────────────
+# ───── Better: Get latest actual earnings date ─────
 def _latest_earnings_date(ticker: str):
     try:
-        cal = yf.Ticker(ticker).calendar
-        if "Earnings Date" in cal.index:
-            return cal.loc["Earnings Date"][0]
+        edf = yf.Ticker(ticker).earnings_dates
+        if edf is not None and not edf.empty:
+            return edf.index[0].to_pydatetime()
     except Exception:
-        pass
-    return None
+        return None
 
-# ─────────────────────── Helper: Yahoo Finance Analysis scraping ────────────────────────
+# ───── Scrape Yahoo Analysis tab ─────
 def _yahoo_earnings_summary(ticker: str):
     try:
         url = f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}"
@@ -1700,14 +1699,16 @@ def _yahoo_earnings_summary(ticker: str):
     except Exception:
         return None
 
-# ─────────────────────── Helper: NewsAPI fallback headlines ─────────────────────────────
+# ───── NewsAPI fallback ─────
 def _newsapi_earnings_headlines(ticker: str, api_key: str):
     if not api_key:
         return None
     try:
+        info = yf.Ticker(ticker).info
+        company_name = info.get("longName") or ticker
         today = datetime.utcnow()
         past = today - timedelta(days=30)
-        query = f'"{ticker}" AND (earnings OR "quarterly results" OR "Q1" OR "Q2" OR "Q3" OR "Q4")'
+        query = f'"{company_name}" AND (earnings OR "quarterly results" OR "Q1" OR "Q2" OR "Q3" OR "Q4")'
         url = (
             "https://newsapi.org/v2/everything?"
             f"q={requests.utils.quote(query)}&"
@@ -1729,29 +1730,26 @@ def _newsapi_earnings_headlines(ticker: str, api_key: str):
     except Exception:
         return None
 
-# ─────────────────────── Main Section: Earnings Call Summary ────────────────────────────
+# ───── Main Block ─────
 def earnings_call_summary_section(ticker: str):
     with st.container():
-        try:
-            st.header("📢 Latest Earnings Call Summary")
+        st.header("📢 Latest Earnings Call Summary")
 
-            # Step 1: Show earnings date
+        try:
             edate = _latest_earnings_date(ticker)
             if edate:
-                st.markdown(f"**Earnings Date:** {edate.strftime('%Y-%m-%d')}")
+                st.markdown(f"**🗓 Earnings Date:** {edate.strftime('%Y-%m-%d')}")
             else:
                 st.info("📆 Earnings date not available.")
 
             st.divider()
 
-            # Step 2: Try Yahoo Finance Summary
             summary = _yahoo_earnings_summary(ticker)
             if summary:
                 st.subheader("📄 Yahoo Finance Summary")
                 st.markdown(summary)
                 return
 
-            # Step 3: Fallback to NewsAPI headlines
             headlines = _newsapi_earnings_headlines(ticker, _get_newsapi_key())
             if headlines:
                 st.subheader("📰 Recent Earnings-Related News")
@@ -1760,15 +1758,12 @@ def earnings_call_summary_section(ticker: str):
                 st.warning("No earnings summary or relevant headlines found.")
 
         except Exception as e:
-            st.error(f"Section crashed: {e}")
-            raise
+            st.error(f"❌ Section error: {e}")
 
-# ======= Usage Example =======
-ticker = st.text_input("Enter Stock Ticker", value="AAPL").upper().strip()
-
+# ───── Usage ─────
 if ticker:
-    st.caption(f"✅ Debug – about to render earnings section for: {ticker}")
     earnings_call_summary_section(ticker)
+
 
 
 
