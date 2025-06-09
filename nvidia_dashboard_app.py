@@ -1661,81 +1661,50 @@ else:
 
 import streamlit as st
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def earnings_call_summary_section(ticker: str):
     with st.container():
         st.header("📢 Latest Earnings Call Summary")
-        st.write(f"Debug: ticker received = {ticker}")
-
-        if not ticker:
-            st.info("Please enter a valid stock ticker.")
-            return
-
-        api_key = st.secrets.get("FINNHUB_API_KEY")
-        if not api_key:
-            st.error("Finnhub API key not found in secrets.")
-            return
-
-        to_date = datetime.utcnow().date()
-        from_date = to_date - timedelta(days=60)
-
-        url = "https://finnhub.io/api/v1/calendar/earnings"
-        params = {
-            "from": from_date.strftime("%Y-%m-%d"),
-            "to": to_date.strftime("%Y-%m-%d"),
-            "symbol": ticker.upper()
-        }
-        headers = {"X-Finnhub-Token": api_key}
+        st.markdown(f"✅ Debug – rendering earnings call summary for: `{ticker}`")
 
         try:
-            response = requests.get(url, headers=headers, params=params, timeout=10)
-            st.write(f"Debug: Finnhub response status: {response.status_code}")
-            content_type = response.headers.get("Content-Type", "")
-            st.write(f"Debug: Finnhub content-type: {content_type}")
+            api_key = st.secrets["FINNHUB_API_KEY"]
+            url = f"https://finnhub.io/api/v1/stock/earnings?symbol={ticker}&token={api_key}"
+            r = requests.get(url, timeout=10)
+            
+            # Log metadata
+            st.caption(f"Debug: Finnhub response status: {r.status_code}")
+            content_type = r.headers.get("content-type", "")
+            st.caption(f"Debug: Finnhub content-type: {content_type}")
+            
+            if not r.ok or "application/json" not in content_type:
+                st.warning("❌ Expected JSON response but got something else.")
+                return
 
-            if "application/json" not in content_type:
-                st.warning(f"Expected JSON response but got: {content_type}")
+            earnings_data = r.json()
+            if not earnings_data:
                 st.info("No earnings call data found from Finnhub.")
                 return
 
-            data = response.json()
-            earnings = data.get("earningsCalendar", [])
-            st.write(f"Debug: Finnhub earnings calendar entries found: {len(earnings)}")
+            # Show the latest earnings summary
+            latest = earnings_data[0]
+            report_date = latest.get("period")
+            actual_eps = latest.get("actual")
+            estimate_eps = latest.get("estimate")
+            surprise = latest.get("surprise")
+            surprise_pct = latest.get("surprisePercent")
 
-            past_earnings = [
-                e for e in earnings
-                if "date" in e and datetime.strptime(e["date"], "%Y-%m-%d").date() <= to_date
-            ]
-
-            if not past_earnings:
-                st.info("🗓 Earnings call date not available in the past 60 days.")
-                st.info("No earnings call summary available.")
-                return
-
-            past_earnings.sort(key=lambda x: x["date"], reverse=True)
-            recent_earnings = past_earnings[0]
-            earnings_date = recent_earnings["date"]
-            st.markdown(f"🗓 Earnings Call Date: **{earnings_date}**")
-
-            eps_estimate = recent_earnings.get("epsEstimate", "N/A")
-            eps_actual = recent_earnings.get("epsActual", "N/A")
-            surprise = recent_earnings.get("epsSurpriseDollar", "N/A")
-
-            st.markdown(f"**EPS Estimate:** {eps_estimate}")
-            st.markdown(f"**EPS Actual:** {eps_actual}")
-            st.markdown(f"**EPS Surprise:** {surprise}")
+            st.markdown(f"🗓 **Earnings Report Date:** {report_date}")
+            st.markdown(f"💰 **Actual EPS:** {actual_eps}")
+            st.markdown(f"🔮 **Estimate EPS:** {estimate_eps}")
+            st.markdown(f"🎯 **Surprise:** {surprise} ({surprise_pct}%)")
 
         except Exception as e:
             st.error(f"Section crashed: {e}")
 
-ticker = st.text_input("Enter Stock Ticker").strip().upper()
-
 if ticker:
-    st.caption(f"✅ Debug – rendering earnings call summary for: {ticker}")
     earnings_call_summary_section(ticker)
-else:
-    st.info("Please enter a valid ticker symbol.")
 
 
 
