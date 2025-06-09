@@ -1663,62 +1663,73 @@ import streamlit as st
 import requests
 from datetime import datetime
 
-FINNHUB_API_KEY = st.secrets.get("FINNHUB_API_KEY")
+def _get_finnhub_api_key():
+    # Fetch from Streamlit secrets
+    for key in ("finnhub_api_key", "FINNHUB_API_KEY", "finnhub"):
+        if key in st.secrets:
+            return st.secrets[key]
+    return None
 
-def fetch_finnhub_earnings(ticker):
-    if not FINNHUB_API_KEY:
-        st.error("Finnhub API key not found in secrets.")
-        return None, None
-
-    url = f"https://finnhub.io/api/v1/earnings?symbol={ticker}&token={FINNHUB_API_KEY}"
-
+def _fetch_earnings_finnhub(ticker: str, api_key: str):
     try:
+        url = f"https://finnhub.io/api/v1/earnings?symbol={ticker}&token={api_key}"
         response = requests.get(url, timeout=10)
+        st.write(f"Debug: Finnhub raw response status: {response.status_code}")
+        st.write(f"Debug: Finnhub raw response text: {response.text[:500]}")  # first 500 chars
+        response.raise_for_status()  # Raise error for bad status codes
         data = response.json()
-        st.write("### 🐞 Finnhub raw earnings response:")
-        st.json(data)  # Show full API response in the app for debugging
-
-        if "earnings" in data and data["earnings"]:
-            # Pick the latest earnings report, sorted by date descending
-            sorted_earnings = sorted(data["earnings"], key=lambda x: x.get("date", ""), reverse=True)
-            latest = sorted_earnings[0]
-            earnings_date = latest.get("date")
-            summary = latest.get("summary") or "No summary field in response."
-
-            if earnings_date:
-                earnings_date = datetime.strptime(earnings_date, "%Y-%m-%d").date()
-
-            return earnings_date, summary
-        else:
-            return None, None
+        return data
     except Exception as e:
         st.error(f"Finnhub earnings fetch failed: {e}")
-        return None, None
+        return None
 
-def earnings_call_summary_section(ticker):
+def earnings_call_summary_section(ticker: str):
     with st.container():
         st.header("📢 Latest Earnings Call Summary")
+        api_key = _get_finnhub_api_key()
+        if not api_key:
+            st.error("Finnhub API key not found in secrets.")
+            return
+
+        if not ticker:
+            st.info("Please enter a ticker symbol.")
+            return
+
         st.caption(f"✅ Debug – rendering earnings call summary for: {ticker}")
 
-        earnings_date, summary = fetch_finnhub_earnings(ticker)
+        data = _fetch_earnings_finnhub(ticker, api_key)
+        if not data:
+            st.info("No earnings call data found from Finnhub.")
+            return
 
-        if earnings_date:
-            st.markdown(f"🗓 Earnings call date: {earnings_date}")
-        else:
-            st.info("🗓 Earnings call date not available.")
+        # Finnhub returns a list of earnings events, sorted by date ascending usually
+        # We'll pick the most recent past earnings call (date <= today)
+        today = datetime.utcnow().date()
+        earnings_events = data if isinstance(data, list) else []
 
-        st.divider()
+        past_earnings = [
+            e for e in earnings_events
+            if "date" in e and datetime.strptime(e["date"], "%Y-%m-%d").date() <= today
+        ]
 
-        if summary and summary != "No summary field in response.":
-            st.markdown(summary)
-        else:
-            st.warning("No earnings call summary available.")
+        if not past_earnings:
+            st.info("🗓 Earnings call date not available or no past earnings found.")
+            return
 
-if ticker:
+        # Sort descending to get latest past earnings
+        past_earnings.sort(key=lambda x: x["date"], reverse=True)
+        latest = past_earnings[0]
+
+        st.markdown(f"🗓 Earnings call date: {latest['date']}")
+
+        # Finnhub does not provide text summary in earnings endpoint.
+        # So fallback: try to get news headlines mentioning earnings for this ticker and date.
+        # For brevity, just mention date and ticker here.
+        st.info("No earnings call summary available from Finnhub API endpoint.")
+
+# ===== USAGE =====
+if "ticker" in locals() and ticker:
     earnings_call_summary_section(ticker)
-
-
-
 
 
 
