@@ -1721,33 +1721,26 @@ wall_street_price_targets(ticker)
 import streamlit as st
 import streamlit.components.v1 as components
 
-def tradingview_analyst_forecast_section(ticker):
-    st.header("📈 Analyst Forecast & Price Chart (TradingView)")
+def tradingview_forecast_and_rating_section(ticker):
+    st.header("🔍 Wall Street Forecast & Analyst Ratings (TradingView)")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("💹 Price Chart")
+        st.subheader("🎯 Analyst Price Targets")
         components.html(
             f"""
             <div class="tradingview-widget-container">
-              <div id="tradingview_8c5b7"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-              <script type="text/javascript">
-              new TradingView.widget({{
-                "width": "100%",
-                "height": 400,
-                "symbol": "NASDAQ:{ticker.upper()}",
-                "interval": "D",
-                "timezone": "Etc/UTC",
-                "theme": "light",
-                "style": "1",
-                "locale": "en",
-                "toolbar_bg": "#f1f3f6",
-                "enable_publishing": false,
-                "allow_symbol_change": true,
-                "container_id": "tradingview_8c5b7"
-              }});
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-analyst-estimates.js">
+              {{
+              "symbol": "NASDAQ:{ticker.upper()}",
+              "width": "100%",
+              "height": "400",
+              "colorTheme": "light",
+              "isTransparent": true,
+              "locale": "en"
+              }}
               </script>
             </div>
             """,
@@ -1755,7 +1748,7 @@ def tradingview_analyst_forecast_section(ticker):
         )
 
     with col2:
-        st.subheader("🧠 Analyst Recommendation")
+        st.subheader("🧠 Analyst Rating Summary")
         components.html(
             f"""
             <div class="tradingview-widget-container">
@@ -1777,11 +1770,14 @@ def tradingview_analyst_forecast_section(ticker):
             height=420,
         )
 
-    st.markdown("🔗 [View Full Analyst Forecast on TradingView](https://www.tradingview.com/symbols/NASDAQ-{}/forecast/)".format(ticker.upper()))
+    st.markdown(
+        f"🔗 [View on TradingView](https://www.tradingview.com/symbols/NASDAQ-{ticker.upper()}/forecast/)"
+    )
 
 
 
-tradingview_analyst_forecast_section(ticker)
+tradingview_forecast_and_rating_section(ticker)
+
 
 
 
