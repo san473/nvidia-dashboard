@@ -1721,40 +1721,68 @@ wall_street_price_targets(ticker)
 import streamlit as st
 import streamlit.components.v1 as components
 
-def tradingview_analyst_section(ticker):
-    st.header("🧠 Analyst Ratings & Technical Sentiment (TradingView)")
+def tradingview_analyst_forecast_section(ticker):
+    st.header("📈 Analyst Forecast & Price Chart (TradingView)")
 
-    # --- TradingView Technical Analysis Widget ---
-    components.html(
-        f"""
-        <div class="tradingview-widget-container">
-          <div class="tradingview-widget-container__widget"></div>
-          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
-          {{
-          "interval": "1D",
-          "width": "100%",
-          "isTransparent": true,
-          "height": "450",
-          "symbol": "NASDAQ:{ticker.upper()}",
-          "showIntervalTabs": true,
-          "displayMode": "regular",
-          "colorTheme": "light"
-          }}
-          </script>
-        </div>
-        """,
-        height=470,
-    )
+    col1, col2 = st.columns(2)
 
-    # --- Link to Full Forecast Page ---
-    st.markdown("### 📊 Full Analyst Forecast & Price Targets")
-    st.markdown(
-        f"[🔗 View on TradingView](https://www.tradingview.com/symbols/NASDAQ-{ticker.upper()}/forecast/)",
-        unsafe_allow_html=True,
-    )
+    with col1:
+        st.subheader("💹 Price Chart")
+        components.html(
+            f"""
+            <div class="tradingview-widget-container">
+              <div id="tradingview_8c5b7"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+              <script type="text/javascript">
+              new TradingView.widget({{
+                "width": "100%",
+                "height": 400,
+                "symbol": "NASDAQ:{ticker.upper()}",
+                "interval": "D",
+                "timezone": "Etc/UTC",
+                "theme": "light",
+                "style": "1",
+                "locale": "en",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "allow_symbol_change": true,
+                "container_id": "tradingview_8c5b7"
+              }});
+              </script>
+            </div>
+            """,
+            height=420,
+        )
+
+    with col2:
+        st.subheader("🧠 Analyst Recommendation")
+        components.html(
+            f"""
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
+              {{
+              "interval": "1D",
+              "width": "100%",
+              "isTransparent": true,
+              "height": "400",
+              "symbol": "NASDAQ:{ticker.upper()}",
+              "showIntervalTabs": true,
+              "displayMode": "regular",
+              "colorTheme": "light"
+              }}
+              </script>
+            </div>
+            """,
+            height=420,
+        )
+
+    st.markdown("🔗 [View Full Analyst Forecast on TradingView](https://www.tradingview.com/symbols/NASDAQ-{}/forecast/)".format(ticker.upper()))
 
 
-tradingview_analyst_section(ticker)
+
+tradingview_analyst_forecast_section(ticker)
+
 
 
 import streamlit as st
