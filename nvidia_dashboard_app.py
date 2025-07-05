@@ -1754,7 +1754,7 @@ def tradingview_analyst_section(ticker):
     )
 
 
-tradingview_price_target_forecast(ticker, sp500_df)
+tradingview_analyst_section(ticker)
 
 
 import streamlit as st
