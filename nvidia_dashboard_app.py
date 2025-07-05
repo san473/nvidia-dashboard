@@ -1721,35 +1721,38 @@ wall_street_price_targets(ticker)
 import streamlit as st
 import streamlit.components.v1 as components
 
-def tradingview_price_target_forecast(ticker, sp500_df):
-    st.header("📊 Wall Street Price Targets & Analyst Forecasts (TradingView)")
+def tradingview_analyst_section(ticker):
+    st.header("🧠 Analyst Ratings & Technical Sentiment (TradingView)")
 
-    # Infer exchange from sp500_df or default to NASDAQ
-    row = sp500_df[sp500_df["symbol"].str.upper() == ticker.upper()]
-    if not row.empty:
-        inferred_exchange = row["exchange"].values[0] if "exchange" in row.columns else "NASDAQ"
-    else:
-        inferred_exchange = "NASDAQ"
-
-    tv_symbol = f"{inferred_exchange}-{ticker.upper()}"
-    forecast_url = f"https://www.tradingview.com/symbols/{tv_symbol}/forecast/"
-
-    st.markdown("##### 🔮 Analyst Forecast & Target Range")
-    st.markdown(
-        f"""<a href="{forecast_url}" target="_blank" style="text-decoration:none">
-        <strong>Click here</strong> to open full forecast page on TradingView</a>""",
-        unsafe_allow_html=True
-    )
-
+    # --- TradingView Technical Analysis Widget ---
     components.html(
         f"""
-        <iframe src="{forecast_url}"
-                style="width: 100%; height: 600px; border: none;"
-                loading="lazy">
-        </iframe>
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
+          {{
+          "interval": "1D",
+          "width": "100%",
+          "isTransparent": true,
+          "height": "450",
+          "symbol": "NASDAQ:{ticker.upper()}",
+          "showIntervalTabs": true,
+          "displayMode": "regular",
+          "colorTheme": "light"
+          }}
+          </script>
+        </div>
         """,
-        height=620
+        height=470,
     )
+
+    # --- Link to Full Forecast Page ---
+    st.markdown("### 📊 Full Analyst Forecast & Price Targets")
+    st.markdown(
+        f"[🔗 View on TradingView](https://www.tradingview.com/symbols/NASDAQ-{ticker.upper()}/forecast/)",
+        unsafe_allow_html=True,
+    )
+
 
 tradingview_price_target_forecast(ticker, sp500_df)
 
