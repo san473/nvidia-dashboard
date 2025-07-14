@@ -15,6 +15,574 @@ import matplotlib.pyplot as plt
 import nltk
 nltk.download('vader_lexicon')
 
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import plotly.graph_objects as go
+import numpy as np
+import requests
+from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
+import plotly.express as px
+from datetime import datetime
+from streamlit.runtime.caching import cache_data
+import requests
+import altair as alt
+import matplotlib.pyplot as plt
+import streamlit.components.v1 as components
+import nltk
+nltk.download('vader_lexicon')
+
+st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
+st.cache_data.clear()
+
+# TradingView Widget Functions
+def tradingview_chart_widget(ticker, height=500):
+    """Advanced TradingView Chart Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js">
+      {{
+      "autosize": true,
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "interval": "D",
+      "timezone": "Etc/UTC",
+      "theme": "light",
+      "style": "1",
+      "locale": "en",
+      "withdateranges": true,
+      "allow_symbol_change": true,
+      "calendar": false,
+      "support_host": "https://www.tradingview.com"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_mini_chart(ticker, height=300):
+    """TradingView Mini Chart Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js">
+      {{
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "width": "100%",
+      "height": "{height}",
+      "locale": "en",
+      "dateRange": "12M",
+      "colorTheme": "light",
+      "trendLineColor": "rgba(41, 98, 255, 1)",
+      "underLineColor": "rgba(41, 98, 255, 0.3)",
+      "underLineBottomColor": "rgba(41, 98, 255, 0)",
+      "isTransparent": false,
+      "autosize": false,
+      "largeChartUrl": ""
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_technical_analysis(ticker, height=400):
+    """TradingView Technical Analysis Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
+      {{
+      "interval": "1D",
+      "width": "100%",
+      "isTransparent": false,
+      "height": "{height}",
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "showIntervalTabs": true,
+      "displayMode": "regular",
+      "colorTheme": "light",
+      "locale": "en"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_financials_widget(ticker, height=400):
+    """TradingView Financials Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js">
+      {{
+      "colorTheme": "light",
+      "isTransparent": false,
+      "largeChartUrl": "",
+      "displayMode": "regular",
+      "width": "100%",
+      "height": "{height}",
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "locale": "en"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_company_profile(ticker, height=400):
+    """TradingView Company Profile Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js">
+      {{
+      "width": "100%",
+      "height": "{height}",
+      "colorTheme": "light",
+      "isTransparent": false,
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "locale": "en"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_market_overview(height=400):
+    """TradingView Market Overview Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js">
+      {{
+      "colorTheme": "light",
+      "dateRange": "12M",
+      "showChart": true,
+      "locale": "en",
+      "width": "100%",
+      "height": "{height}",
+      "largeChartUrl": "",
+      "isTransparent": false,
+      "showSymbolLogo": true,
+      "showFloatingTooltip": false,
+      "plotLineColorGrowing": "rgba(41, 98, 255, 1)",
+      "plotLineColorFalling": "rgba(41, 98, 255, 1)",
+      "gridLineColor": "rgba(240, 243, 250, 0)",
+      "scaleFontColor": "rgba(120, 123, 134, 1)",
+      "belowLineFillColorGrowing": "rgba(41, 98, 255, 0.12)",
+      "belowLineFillColorFalling": "rgba(41, 98, 255, 0.12)",
+      "belowLineFillColorGrowingBottom": "rgba(41, 98, 255, 0)",
+      "belowLineFillColorFallingBottom": "rgba(41, 98, 255, 0)",
+      "symbolActiveColor": "rgba(41, 98, 255, 0.12)",
+      "tabs": [
+        {{
+          "title": "Indices",
+          "symbols": [
+            {{
+              "s": "FOREXCOM:SPXUSD",
+              "d": "S&P 500"
+            }},
+            {{
+              "s": "FOREXCOM:NSXUSD",
+              "d": "US 100"
+            }},
+            {{
+              "s": "FOREXCOM:DJI",
+              "d": "Dow 30"
+            }},
+            {{
+              "s": "INDEX:NKY",
+              "d": "Nikkei 225"
+            }},
+            {{
+              "s": "INDEX:DEU40",
+              "d": "DAX Index"
+            }},
+            {{
+              "s": "FOREXCOM:UKXGBP",
+              "d": "UK 100"
+            }}
+          ],
+          "originalTitle": "Indices"
+        }}
+      ]
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+# Load data functions (keeping original functions)
+@st.cache_data
+def load_sp500_data():
+    df = pd.read_excel("sp500_companies.xlsx")
+    return df
+
+COLUMN_DISPLAY_NAMES = {
+    "symbol": "Symbol",
+    "exchange": "Exchange",
+    "shortname": "Short Name",
+    "longname": "Long Name",
+    "sector": "Sector",
+    "industry": "Industry",
+    "currentprice": "Current Price",
+    "marketcap": "Market Cap",
+    "ebitda": "EBITDA",
+    "revenuegrowth": "Revenue Growth",
+    "state": "State",
+    "country": "Country",
+    "weight": "Weight",
+}
+
+def display_dataframe_pretty(df, columns):
+    return df[columns].rename(columns={col: COLUMN_DISPLAY_NAMES.get(col, col) for col in columns})
+
+sp500_df = load_sp500_data()
+sp500_df = load_sp500_data()
+sp500_df.columns = sp500_df.columns.str.strip().str.lower()
+
+NEWSAPI_KEY = st.secrets.get("NEWSAPI_KEY")
+if not NEWSAPI_KEY:
+    st.warning("Missing NewsAPI key. Using cached/stubbed response.")
+
+# NEWS FUNCTIONS (keeping original)
+def fetch_news(ticker):
+    try:
+        url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWSAPI_KEY}&sortBy=publishedAt&language=en"
+        response = requests.get(url)
+        articles = response.json().get("articles", [])[:5]
+        return articles
+    except Exception as e:
+        st.error(f"Failed to fetch news: {e}")
+        return []
+
+@st.cache_data(ttl=60)
+def get_company_name(ticker):
+    try:
+        return yf.Ticker(ticker).info.get("longName", ticker)
+    except Exception:
+        return ticker
+
+@st.cache_data(ttl=60)
+def fetch_news(company_name):
+    today = datetime.today()
+    last_week = today - timedelta(days=7)
+    params = {
+        "q": company_name,
+        "from": last_week.strftime("%Y-%m-%d"),
+        "sortBy": "relevancy",
+        "language": "en",
+        "apiKey": NEWSAPI_KEY,
+        "pageSize": 10,
+    }
+    response = requests.get("https://newsapi.org/v2/everything", params=params)
+    if response.status_code == 200:
+        return response.json().get("articles", [])
+    return []
+
+def categorize_news(articles):
+    positive, negative, emerging = [], [], []
+    positive_keywords = ["beats", "growth", "record", "surge", "upgrade", "strong", "gain", "boost"]
+    negative_keywords = ["misses", "decline", "drop", "downgrade", "loss", "concern", "crisis", "lawsuit"]
+
+    for article in articles:
+        text = (article.get("title", "") + " " + article.get("description", "")).lower()
+        if any(word in text for word in positive_keywords):
+            positive.append(article)
+        elif any(word in text for word in negative_keywords):
+            negative.append(article)
+        else:
+            emerging.append(article)
+    return positive, negative, emerging
+
+def summarize_section(articles, max_lines=3):
+    if not articles:
+        return "No significant news found."
+    lines = [f"- {art['title']}" for art in articles[:max_lines]]
+    return "\n".join(lines)
+
+# ------------------------ HEADER ------------------------
+st.title("📊 Comprehensive Stock Dashboard with TradingView Integration")
+
+# Market Overview Widget
+with st.expander("📈 Market Overview", expanded=False):
+    st.subheader("🌍 Global Market Overview")
+    tradingview_market_overview(400)
+
+ticker = None
+ticker_obj = None
+
+# Input field for ticker
+ticker_input = st.text_input(
+    "Enter stock ticker (e.g., AAPL, NVDA, MSFT)", value="AAPL"
+).upper()
+if ticker_input:
+    ticker = ticker_input
+
+# Attempt to fetch ticker data
+try:
+    ticker_obj = yf.Ticker(ticker)
+    if ticker_obj.cashflow is None or ticker_obj.cashflow.empty:
+        st.warning("⚠️ Cash flow data not available for this ticker.")
+        ticker_obj = None
+except Exception as e:
+    st.error(f"❌ Failed to load ticker data: {e}")
+    ticker_obj = None
+
+# ENHANCED MAIN CHART SECTION WITH TRADINGVIEW
+if ticker:
+    st.header(f"📈 {ticker} Stock Analysis")
+    
+    # TradingView Advanced Chart
+    with st.container():
+        st.subheader("📊 Advanced Price Chart (TradingView)")
+        tradingview_chart_widget(ticker, 600)
+    
+    # Company Profile Widget
+    with st.container():
+        st.subheader("🏢 Company Profile")
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            tradingview_company_profile(ticker, 400)
+        
+        with col2:
+            st.subheader("📊 Mini Chart")
+            tradingview_mini_chart(ticker, 300)
+
+# Get data functions (keeping original)
+@st.cache_data
+def get_data(ticker):
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    hist = stock.history(period="1y")
+    return info, hist
+
+def get_financial_ratios(ticker):
+    stock = yf.Ticker(ticker)
+    info = stock.info
+    ratios = {
+        "Market Cap": info.get("marketCap"),
+        "Trailing P/E": info.get("trailingPE"),
+        "Forward P/E": info.get("forwardPE"),
+        "PEG Ratio": info.get("pegRatio"),
+        "Price to Book": info.get("priceToBook"),
+        "Enterprise to Revenue": info.get("enterpriseToRevenue"),
+        "Enterprise to EBITDA": info.get("enterpriseToEbitda"),
+        "Return on Assets (ROA)": info.get("returnOnAssets"),
+        "Return on Equity (ROE)": info.get("returnOnEquity"),
+        "Profit Margin": info.get("profitMargins"),
+        "Gross Margins": info.get("grossMargins"),
+        "Operating Margins": info.get("operatingMargins"),
+        "Current Ratio": info.get("currentRatio"),
+        "Quick Ratio": info.get("quickRatio"),
+        "Debt to Equity": info.get("debtToEquity"),
+    }
+    return ratios
+
+def format_large_number(n):
+    if n is None:
+        return "N/A"
+    elif n >= 1_000_000_000:
+        return f"{n/1_000_000_000:.2f}B"
+    elif n >= 1_000_000:
+        return f"{n/1_000_000:.2f}M"
+    else:
+        return str(n)
+
+# Fetch data and display basic info
+try:
+    info, hist = get_data(ticker)
+    ratios = get_financial_ratios(ticker)
+
+    st.subheader(f"{info.get('longName', ticker)} ({ticker})")
+    st.markdown(f"**Sector:** {info.get('sector', 'N/A')}  ")
+    st.markdown(f"**Industry:** {info.get('industry', 'N/A')}  ")
+    st.markdown(f"**Market Cap:** ${info.get('marketCap', 0):,}  ")
+
+except Exception as e:
+    st.error(f"Failed to fetch data for ticker {ticker_input}. Error: {e}")
+
+# TECHNICAL ANALYSIS SECTION WITH TRADINGVIEW
+if ticker:
+    st.header("📊 Technical Analysis")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🔍 Technical Indicators")
+        tradingview_technical_analysis(ticker, 500)
+    
+    with col2:
+        st.subheader("📈 Financial Overview")
+        tradingview_financials_widget(ticker, 500)
+
+# Geographic & Business Overview (keeping original)
+with st.expander("🌍 Geographic & Business Overview"):
+    try:
+        country = info.get("country", "N/A")
+        city = info.get("city", "")
+        state = info.get("state", "")
+        address = f"{city}, {state}, {country}" if city else country
+        st.markdown(f"**Headquarters:** {address}")
+        st.markdown(f"**Sector:** {info.get('sector', 'N/A')}")
+        st.markdown(f"**Industry:** {info.get('industry', 'N/A')}")
+        summary = info.get("longBusinessSummary", "Business description not available.")
+        st.markdown(f"**Business Description:**  \n{summary}")
+    except Exception as e:
+        st.warning("Geographic and company summary data not available.")
+
+# News section (keeping original news functions)
+def news_summary_block(ticker):
+    company_name = get_company_name(ticker)
+    articles = fetch_news(company_name)
+
+    st.markdown(f"### 🧠 News Summary for {company_name}")
+
+    if not articles:
+        st.warning("No recent news found.")
+        return
+
+    pos, neg, emerg = categorize_news(articles)
+
+    st.markdown("#### 📈 Positive Developments")
+    st.markdown(summarize_section(pos))
+
+    st.markdown("#### ⚠️ Risks & Negative Sentiment")
+    st.markdown(summarize_section(neg))
+
+    st.markdown("#### 🧩 Emerging Themes")
+    st.markdown(summarize_section(emerg))
+
+if ticker:
+    news_summary_block(ticker)
+
+# KPI Section (keeping original)
+ticker_obj = yf.Ticker(ticker)
+info = ticker_obj.info
+
+st.subheader("📌 Key Performance Indicators (KPI)")
+
+kpi_options = {
+    "Revenue (TTM)": "revenue",
+    "Net Profit Margin": "net_profit_margin",
+    "EPS (TTM)": "eps",
+    "ROE": "roe",
+    "Earnings Growth (YoY)": "earnings_growth"
+}
+
+selected_kpis = st.multiselect("Select KPIs to display:", list(kpi_options.keys()), default=list(kpi_options.keys()))
+
+revenue = info.get("totalRevenue")
+net_income = info.get("netIncomeToCommon")
+eps = info.get("trailingEps")
+roe = info.get("returnOnEquity")
+earnings_growth = info.get("earningsQuarterlyGrowth")
+
+net_profit_margin = (net_income / revenue) if revenue and net_income else None
+
+kpi_values = {
+    "Revenue (TTM)": f"${revenue / 1e9:.2f}B" if revenue else "N/A",
+    "Net Profit Margin": f"{net_profit_margin:.2%}" if net_profit_margin is not None else "N/A",
+    "EPS (TTM)": f"${eps:.2f}" if eps else "N/A",
+    "ROE": f"{roe:.2%}" if roe else "N/A",
+    "Earnings Growth (YoY)": f"{earnings_growth:.2%}" if earnings_growth else "N/A"
+}
+
+cols = st.columns(len(selected_kpis))
+for i, kpi in enumerate(selected_kpis):
+    with cols[i]:
+        st.metric(label=kpi, value=kpi_values[kpi])
+
+# [Continue with all your other sections - DCF, Investment Thesis, etc.]
+# I'll include the key sections but keep the response manageable
+
+# ENHANCED FINANCIAL VISUALIZATIONS WITH TRADINGVIEW
+st.header("📈 Enhanced Financial Visualizations")
+
+with st.container():
+    st.subheader("📊 Interactive Financial Charts")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### TradingView Financials")
+        tradingview_financials_widget(ticker, 400)
+    
+    with col2:
+        st.markdown("#### Technical Analysis")
+        tradingview_technical_analysis(ticker, 400)
+
+# Wall Street Forecast & Analyst Ratings with TradingView
+def tradingview_forecast_and_rating_section(ticker):
+    st.header("🔍 Wall Street Forecast & Analyst Ratings (TradingView)")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("🎯 Analyst Price Targets")
+        components.html(
+            f"""
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-analyst-estimates.js">
+              {{
+              "symbol": "NASDAQ:{ticker.upper()}",
+              "width": "100%",
+              "height": "400",
+              "colorTheme": "light",
+              "isTransparent": true,
+              "locale": "en"
+              }}
+              </script>
+            </div>
+            """,
+            height=420,
+        )
+
+    with col2:
+        st.subheader("🧠 Analyst Rating Summary")
+        components.html(
+            f"""
+            <div class="tradingview-widget-container">
+              <div class="tradingview-widget-container__widget"></div>
+              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
+              {{
+              "interval": "1D",
+              "width": "100%",
+              "isTransparent": true,
+              "height": "400",
+              "symbol": "NASDAQ:{ticker.upper()}",
+              "showIntervalTabs": true,
+              "displayMode": "regular",
+              "colorTheme": "light"
+              }}
+              </script>
+            </div>
+            """,
+            height=420,
+        )
+
+    st.markdown(
+        f"🔗 [View on TradingView](https://www.tradingview.com/symbols/NASDAQ-{ticker.upper()}/forecast/)"
+    )
+
+if ticker:
+    tradingview_forecast_and_rating_section(ticker)
+
+# [The rest of your original code continues here...]
+# I'm including the key TradingView integrations. Your existing sections like:
+# - DCF Valuation
+# - Investment Thesis
+# - Peer Analysis
+# - Profitability Overview
+# - Free Cash Flow Analysis
+# - Earnings Waterfall
+# - Solvency Analysis
+# - Insider/Institutional Ownership
+# All remain the same and should be included after these TradingView sections.
+
+
 
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 st.cache_data.clear()
@@ -1856,3 +2424,7 @@ def insider_institutional_section(ticker: str):
 # --- Call the function after ticker is defined ---
 if ticker:
     insider_institutional_section(ticker)
+
+st.markdown("---")
+st.markdown("### 📊 Dashboard powered by TradingView & Yahoo Finance")
+st.markdown("*Real-time data and advanced charting capabilities integrated for comprehensive stock analysis.*")
