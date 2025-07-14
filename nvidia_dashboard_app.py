@@ -649,8 +649,7 @@ def alphaspread_wall_street_estimates(ticker, height=500):
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
-                scrolling="yes"
-                style="border: 1px solid #e0e0e0; border-radius: 8px;">
+                scrolling="yes">
         </iframe>
     </div>
     """
@@ -664,8 +663,7 @@ def alphaspread_financial_ratios(ticker, height=500):
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
-                scrolling="yes"
-                style="border: 1px solid #e0e0e0; border-radius: 8px;">
+                scrolling="yes">
         </iframe>
     </div>
     """
@@ -679,8 +677,7 @@ def alphaspread_financials_overview(ticker, height=500):
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
-                scrolling="yes"
-                style="border: 1px solid #e0e0e0; border-radius: 8px;">
+                scrolling="yes">
         </iframe>
     </div>
     """
@@ -694,8 +691,7 @@ def alphaspread_investor_relations(ticker, height=500):
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
-                scrolling="yes"
-                style="border: 1px solid #e0e0e0; border-radius: 8px;">
+                scrolling="yes">
         </iframe>
     </div>
     """
@@ -709,8 +705,7 @@ def alphaspread_earnings_calendar(ticker, height=500):
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
-                scrolling="yes"
-                style="border: 1px solid #e0e0e0; border-radius: 8px;">
+                scrolling="yes">
         </iframe>
     </div>
     """
@@ -724,8 +719,7 @@ def alphaspread_analyst_coverage(ticker, height=500):
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
-                scrolling="yes"
-                style="border: 1px solid #e0e0e0; border-radius: 8px;">
+                scrolling="yes">
         </iframe>
     </div>
     """
@@ -956,7 +950,7 @@ def enhanced_financial_dashboard(ticker):
 # ================= USAGE =================
 
 # REPLACE your existing problematic sections with:
-# enhanced_financial_dashboard(ticker)   
+# enhanced_financial_dashboard(ticker)
 
 import yfinance as yf
 import pandas as pd
