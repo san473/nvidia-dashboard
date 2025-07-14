@@ -634,18 +634,18 @@ try:
 except NameError:
     st.warning("Please enter a ticker symbol first.")
 
-# ================= ALPHASPREAD REPLACEMENTS FOR FAILED TRADINGVIEW WIDGETS =================
+# ================= CORRECTED ALPHASPREAD WIDGETS WITH PROPER URLs =================
 
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ================= ALPHASPREAD REPLACEMENT WIDGETS =================
+# ================= WORKING ALPHASPREAD WIDGET FUNCTIONS =================
 
-def alphaspread_wall_street_estimates(ticker, height=500):
-    """AlphaSpread Wall Street Estimates - Replaces TradingView analyst estimates"""
+def alphaspread_company_overview(ticker, height=500):
+    """AlphaSpread Company Overview - WORKING URL"""
     html_code = f"""
     <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/estimates" 
+        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}" 
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
@@ -655,11 +655,11 @@ def alphaspread_wall_street_estimates(ticker, height=500):
     """
     return components.html(html_code, height=height)
 
-def alphaspread_financial_ratios(ticker, height=500):
-    """AlphaSpread Financial Ratios - Replaces TradingView fundamental data"""
+def alphaspread_financial_statements(ticker, height=500):
+    """AlphaSpread Financial Statements - CORRECTED URL"""
     html_code = f"""
     <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/ratios" 
+        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}/statement/income" 
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
@@ -669,11 +669,11 @@ def alphaspread_financial_ratios(ticker, height=500):
     """
     return components.html(html_code, height=height)
 
-def alphaspread_financials_overview(ticker, height=500):
-    """AlphaSpread Financials Overview - Replaces TradingView financials widget"""
+def alphaspread_balance_sheet(ticker, height=500):
+    """AlphaSpread Balance Sheet - CORRECTED URL"""
     html_code = f"""
     <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/financials" 
+        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}/statement/balance-sheet" 
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
@@ -683,11 +683,11 @@ def alphaspread_financials_overview(ticker, height=500):
     """
     return components.html(html_code, height=height)
 
-def alphaspread_investor_relations(ticker, height=500):
-    """AlphaSpread Investor Relations Section - NEW ADDITION"""
+def alphaspread_cash_flow(ticker, height=500):
+    """AlphaSpread Cash Flow Statement - CORRECTED URL"""
     html_code = f"""
     <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/investor-relations" 
+        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}/statement/cash-flow" 
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
@@ -697,11 +697,11 @@ def alphaspread_investor_relations(ticker, height=500):
     """
     return components.html(html_code, height=height)
 
-def alphaspread_earnings_calendar(ticker, height=500):
-    """AlphaSpread Earnings Calendar - Additional IR feature"""
+def alphaspread_key_metrics(ticker, height=500):
+    """AlphaSpread Key Metrics - CORRECTED URL"""
     html_code = f"""
     <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/earnings" 
+        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}/key-metrics" 
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
@@ -711,11 +711,13 @@ def alphaspread_earnings_calendar(ticker, height=500):
     """
     return components.html(html_code, height=height)
 
-def alphaspread_analyst_coverage(ticker, height=500):
-    """AlphaSpread Analyst Coverage - Additional estimates feature"""
+# ================= ALTERNATIVE FINANCIAL DATA SOURCES =================
+
+def yahoo_finance_summary(ticker, height=500):
+    """Yahoo Finance Summary Page"""
     html_code = f"""
     <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/coverage" 
+        <iframe src="https://finance.yahoo.com/quote/{ticker.upper()}" 
                 width="100%" 
                 height="{height}" 
                 frameborder="0" 
@@ -725,232 +727,272 @@ def alphaspread_analyst_coverage(ticker, height=500):
     """
     return components.html(html_code, height=height)
 
-# ================= REPLACEMENT SECTIONS =================
+def yahoo_finance_financials(ticker, height=500):
+    """Yahoo Finance Financials Page"""
+    html_code = f"""
+    <div style="width: 100%; height: {height}px;">
+        <iframe src="https://finance.yahoo.com/quote/{ticker.upper()}/financials" 
+                width="100%" 
+                height="{height}" 
+                frameborder="0" 
+                scrolling="yes">
+        </iframe>
+    </div>
+    """
+    return components.html(html_code, height=height)
 
-# REPLACE YOUR EXISTING FAILED TRADINGVIEW SECTIONS WITH THESE:
+def yahoo_finance_analysis(ticker, height=500):
+    """Yahoo Finance Analysis Page with Analyst Estimates"""
+    html_code = f"""
+    <div style="width: 100%; height: {height}px;">
+        <iframe src="https://finance.yahoo.com/quote/{ticker.upper()}/analysis" 
+                width="100%" 
+                height="{height}" 
+                frameborder="0" 
+                scrolling="yes">
+        </iframe>
+    </div>
+    """
+    return components.html(html_code, height=height)
 
-# 1. REPLACE: Valuations Analysis Section
-if 'ticker' in locals() and ticker:
-    
-    # VALUATIONS SECTION - ALPHASPREAD REPLACEMENT
-    st.header("💰 Valuations Analysis")
-    with st.container():
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📊 Financial Ratios")
-            alphaspread_financial_ratios(ticker, 500)
-        
-        with col2:
-            st.subheader("📈 Valuation Metrics")
-            # Keep TradingView advanced chart if it works, otherwise use AlphaSpread
-            try:
-                tradingview_advanced_chart(ticker, 500)
-            except:
-                alphaspread_financials_overview(ticker, 500)
+def marketwatch_financials(ticker, height=500):
+    """MarketWatch Financials"""
+    html_code = f"""
+    <div style="width: 100%; height: {height}px;">
+        <iframe src="https://www.marketwatch.com/investing/stock/{ticker.lower()}/financials" 
+                width="100%" 
+                height="{height}" 
+                frameborder="0" 
+                scrolling="yes">
+        </iframe>
+    </div>
+    """
+    return components.html(html_code, height=height)
 
-    # 2. REPLACE: Growth & Profitability Section
-    st.header("📈 Growth & Profitability")
-    with st.container():
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📊 Financial Statements")
-            alphaspread_financials_overview(ticker, 500)
-        
-        with col2:
-            st.subheader("🔍 Technical Analysis")
-            # Keep working TradingView technical analysis or replace
-            try:
-                tradingview_technical_analysis_widget(ticker, 500)
-            except:
-                alphaspread_financial_ratios(ticker, 500)
+def finviz_overview(ticker, height=500):
+    """Finviz Stock Overview"""
+    html_code = f"""
+    <div style="width: 100%; height: {height}px;">
+        <iframe src="https://finviz.com/quote.ashx?t={ticker.upper()}" 
+                width="100%" 
+                height="{height}" 
+                frameborder="0" 
+                scrolling="yes">
+        </iframe>
+    </div>
+    """
+    return components.html(html_code, height=height)
 
-    # 3. REPLACE: Analyst Estimates Section
-    st.header("🎯 Wall Street Estimates & Analyst Coverage")
-    with st.container():
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📊 Wall Street Estimates")
-            alphaspread_wall_street_estimates(ticker, 500)
-        
-        with col2:
-            st.subheader("👥 Analyst Coverage")
-            alphaspread_analyst_coverage(ticker, 500)
+# ================= MIXED APPROACH WITH MULTIPLE SOURCES =================
 
-    # 4. NEW: Investor Relations Section
-    st.header("🏢 Investor Relations")
-    with st.container():
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📈 Investor Relations Hub")
-            alphaspread_investor_relations(ticker, 500)
-        
-        with col2:
-            st.subheader("📅 Earnings Calendar")
-            alphaspread_earnings_calendar(ticker, 500)
-
-    # 5. ENHANCED: Financial Health Section
-    st.header("🏦 Financial Health & Performance")
-    with st.container():
-        # Create tabs for better organization
-        tab1, tab2, tab3 = st.tabs(["📊 Financial Ratios", "💹 Financials", "🎯 Estimates"])
-        
-        with tab1:
-            st.subheader("Key Financial Ratios")
-            alphaspread_financial_ratios(ticker, 600)
-        
-        with tab2:
-            st.subheader("Financial Statements Overview")
-            alphaspread_financials_overview(ticker, 600)
-        
-        with tab3:
-            st.subheader("Wall Street Estimates")
-            alphaspread_wall_street_estimates(ticker, 600)
-
-else:
-    st.info("Please enter a ticker symbol above to view AlphaSpread financial analysis.")
-
-# ================= SPECIFIC REPLACEMENT FUNCTIONS =================
-
-def replace_failed_tradingview_widgets(ticker):
-    """Replace specific failed TradingView widgets with AlphaSpread alternatives"""
+def reliable_financial_widgets(ticker):
+    """Use multiple reliable sources for financial data"""
     
     if not ticker:
         st.info("Please enter a ticker symbol to view financial analysis.")
         return
     
-    # Replace fundamental valuation metrics (if TradingView fails)
-    def safe_fundamental_widget():
-        try:
-            # Try TradingView first
-            tradingview_fundamental_data(ticker, 500)
-        except:
-            # Fallback to AlphaSpread
-            st.warning("TradingView widget unavailable. Loading AlphaSpread alternative...")
-            alphaspread_financial_ratios(ticker, 500)
+    # VALUATIONS SECTION - Using Yahoo Finance + Finviz
+    st.header("💰 Valuations Analysis")
+    with st.container():
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Yahoo Finance Overview")
+            yahoo_finance_summary(ticker, 500)
+        
+        with col2:
+            st.subheader("📈 Finviz Overview")
+            finviz_overview(ticker, 500)
+
+    st.markdown("---")
+
+    # FINANCIAL STATEMENTS - Using Yahoo Finance + MarketWatch
+    st.header("📈 Financial Statements")
+    with st.container():
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Yahoo Finance Financials")
+            yahoo_finance_financials(ticker, 500)
+        
+        with col2:
+            st.subheader("📈 MarketWatch Financials")
+            marketwatch_financials(ticker, 500)
+
+    st.markdown("---")
+
+    # ANALYST ESTIMATES - Using Yahoo Finance Analysis
+    st.header("🎯 Wall Street Estimates")
+    with st.container():
+        st.subheader("📊 Yahoo Finance Analysis & Estimates")
+        yahoo_finance_analysis(ticker, 600)
+
+    st.markdown("---")
+
+    # ALTERNATIVE: Try AlphaSpread with corrected URLs
+    st.header("📊 AlphaSpread Analysis")
+    with st.container():
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📈 Company Overview")
+            alphaspread_company_overview(ticker, 500)
+        
+        with col2:
+            st.subheader("📊 Key Metrics")
+            alphaspread_key_metrics(ticker, 500)
+
+# ================= CUSTOM BUILT WIDGETS USING YFINANCE =================
+
+def custom_analyst_estimates_table(ticker):
+    """Create custom analyst estimates using yfinance data"""
+    try:
+        import yfinance as yf
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        st.subheader("🎯 Analyst Price Targets")
+        
+        # Create metrics display
+        col1, col2, col3, col4 = st.columns(4)
+        
+        current_price = info.get('currentPrice', 0)
+        target_mean = info.get('targetMeanPrice', None)
+        target_high = info.get('targetHighPrice', None)
+        target_low = info.get('targetLowPrice', None)
+        
+        with col1:
+            st.metric("Current Price", f"${current_price:.2f}")
+        
+        with col2:
+            if target_mean:
+                upside = ((target_mean - current_price) / current_price) * 100
+                st.metric("Mean Target", f"${target_mean:.2f}", f"{upside:+.1f}%")
+            else:
+                st.metric("Mean Target", "N/A")
+        
+        with col3:
+            if target_high:
+                upside_high = ((target_high - current_price) / current_price) * 100
+                st.metric("High Target", f"${target_high:.2f}", f"{upside_high:+.1f}%")
+            else:
+                st.metric("High Target", "N/A")
+        
+        with col4:
+            if target_low:
+                downside = ((target_low - current_price) / current_price) * 100
+                st.metric("Low Target", f"${target_low:.2f}", f"{downside:+.1f}%")
+            else:
+                st.metric("Low Target", "N/A")
+        
+        # Additional metrics
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            num_analysts = info.get('numberOfAnalystOpinions', None)
+            if num_analysts:
+                st.metric("Number of Analysts", num_analysts)
+        
+        with col2:
+            recommendation = info.get('recommendationKey', 'N/A')
+            if recommendation != 'N/A':
+                st.metric("Recommendation", recommendation.upper())
+        
+        with col3:
+            rec_mean = info.get('recommendationMean', None)
+            if rec_mean:
+                st.metric("Recommendation Score", f"{rec_mean:.1f}/5")
     
-    # Replace analyst estimates (if TradingView fails)
-    def safe_analyst_estimates():
-        try:
-            # Try TradingView first
-            tradingview_analyst_estimates(ticker, 500)
-        except:
-            # Fallback to AlphaSpread
-            st.warning("TradingView widget unavailable. Loading AlphaSpread alternative...")
-            alphaspread_wall_street_estimates(ticker, 500)
+    except Exception as e:
+        st.error(f"Error loading analyst data: {e}")
+
+def custom_financial_ratios_table(ticker):
+    """Create custom financial ratios table"""
+    try:
+        import yfinance as yf
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        st.subheader("📊 Key Financial Ratios")
+        
+        # Valuation ratios
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**Valuation Ratios**")
+            ratios = {
+                "P/E Ratio": info.get('trailingPE', None),
+                "Forward P/E": info.get('forwardPE', None),
+                "P/B Ratio": info.get('priceToBook', None),
+                "P/S Ratio": info.get('priceToSalesTrailing12Months', None),
+                "PEG Ratio": info.get('pegRatio', None)
+            }
+            
+            for ratio_name, value in ratios.items():
+                if value:
+                    st.metric(ratio_name, f"{value:.2f}")
+                else:
+                    st.metric(ratio_name, "N/A")
+        
+        with col2:
+            st.markdown("**Profitability Ratios**")
+            profit_ratios = {
+                "ROE": info.get('returnOnEquity', None),
+                "ROA": info.get('returnOnAssets', None),
+                "Profit Margin": info.get('profitMargins', None),
+                "Operating Margin": info.get('operatingMargins', None),
+                "Gross Margin": info.get('grossMargins', None)
+            }
+            
+            for ratio_name, value in profit_ratios.items():
+                if value:
+                    if ratio_name in ["ROE", "ROA", "Profit Margin", "Operating Margin", "Gross Margin"]:
+                        st.metric(ratio_name, f"{value*100:.1f}%")
+                    else:
+                        st.metric(ratio_name, f"{value:.2f}")
+                else:
+                    st.metric(ratio_name, "N/A")
     
-    # Replace earnings estimates (if TradingView fails)
-    def safe_earnings_estimates():
-        try:
-            # Try TradingView first
-            tradingview_earnings_estimates(ticker, 500)
-        except:
-            # Fallback to AlphaSpread
-            st.warning("TradingView widget unavailable. Loading AlphaSpread alternative...")
-            alphaspread_financials_overview(ticker, 500)
-    
-    return safe_fundamental_widget, safe_analyst_estimates, safe_earnings_estimates
+    except Exception as e:
+        st.error(f"Error loading financial ratios: {e}")
 
-# ================= INTEGRATION INSTRUCTIONS =================
+# ================= REPLACEMENT SECTIONS =================
 
-"""
-INTEGRATION STEPS:
-
-1. FIND these sections in your existing code and REPLACE them:
-
-   # REPLACE: Valuations Analysis section
-   # OLD: tradingview_fundamental_data(ticker, 500)
-   # NEW: alphaspread_financial_ratios(ticker, 500)
-
-   # REPLACE: Analyst Estimates section  
-   # OLD: tradingview_analyst_estimates(ticker, 500)
-   # NEW: alphaspread_wall_street_estimates(ticker, 500)
-
-   # REPLACE: Earnings Estimates section
-   # OLD: tradingview_earnings_estimates(ticker, 500) 
-   # NEW: alphaspread_financials_overview(ticker, 500)
-
-2. ADD the new Investor Relations section:
-   # Copy the "Investor Relations" section code above
-
-3. ENHANCE existing sections with tabs:
-   # Use the tabbed "Financial Health & Performance" section
-
-4. TEST each widget:
-   # AlphaSpread widgets should load reliably
-"""
-
-# ================= COMPLETE MIXED APPROACH =================
-
-def enhanced_financial_dashboard(ticker):
-    """Complete dashboard mixing working TradingView widgets with AlphaSpread replacements"""
+def corrected_financial_sections(ticker):
+    """Corrected financial sections using reliable sources"""
     
     if not ticker:
-        st.info("Please enter a ticker symbol to view comprehensive financial analysis.")
+        st.info("Please enter a ticker symbol to view financial analysis.")
         return
     
-    # 1. PRICE CHART - Keep TradingView (works well)
-    st.header("📈 Advanced Price Chart")
-    tradingview_advanced_chart(ticker, 700)
+    # 1. CUSTOM ANALYST ESTIMATES (using yfinance)
+    st.header("🎯 Wall Street Estimates")
+    custom_analyst_estimates_table(ticker)
     
     st.markdown("---")
     
-    # 2. FINANCIAL ANALYSIS - Use AlphaSpread
-    st.header("💰 Financial Analysis")
+    # 2. CUSTOM FINANCIAL RATIOS (using yfinance)
+    st.header("💰 Financial Ratios")
+    custom_financial_ratios_table(ticker)
     
-    # Create comprehensive tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📊 Ratios", 
-        "💹 Financials", 
-        "🎯 Estimates", 
-        "🏢 Investor Relations",
-        "📈 Technical"
-    ])
+    st.markdown("---")
+    
+    # 3. EXTERNAL FINANCIAL DATA (Yahoo Finance)
+    st.header("📊 Detailed Financial Analysis")
+    
+    tab1, tab2, tab3 = st.tabs(["📈 Summary", "💹 Financials", "🎯 Analysis"])
     
     with tab1:
-        st.subheader("Financial Ratios & Metrics")
-        alphaspread_financial_ratios(ticker, 600)
+        yahoo_finance_summary(ticker, 600)
     
     with tab2:
-        st.subheader("Financial Statements")
-        alphaspread_financials_overview(ticker, 600)
+        yahoo_finance_financials(ticker, 600)
     
     with tab3:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Wall Street Estimates")
-            alphaspread_wall_street_estimates(ticker, 500)
-        with col2:
-            st.subheader("Analyst Coverage")
-            alphaspread_analyst_coverage(ticker, 500)
-    
-    with tab4:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Investor Relations")
-            alphaspread_investor_relations(ticker, 500)
-        with col2:
-            st.subheader("Earnings Calendar")
-            alphaspread_earnings_calendar(ticker, 500)
-    
-    with tab5:
-        st.subheader("Technical Analysis")
-        # Keep TradingView for technical analysis if it works
-        try:
-            tradingview_technical_analysis_widget(ticker, 600)
-        except:
-            st.warning("Technical analysis widget unavailable")
-    
-    # Add link to full analysis
-    st.markdown(f"🔗 [View Complete Analysis on AlphaSpread](https://www.alphaspread.com/security/nasdaq/{ticker.lower()})")
+        yahoo_finance_analysis(ticker, 600)
 
-# ================= USAGE =================
-
-# REPLACE your existing problematic sections with:
-# enhanced_financial_dashboard(ticker)
 
 import yfinance as yf
 import pandas as pd
