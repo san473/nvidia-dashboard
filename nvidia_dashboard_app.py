@@ -634,364 +634,319 @@ try:
 except NameError:
     st.warning("Please enter a ticker symbol first.")
 
-# ================= CORRECTED ALPHASPREAD WIDGETS WITH PROPER URLs =================
+# ================= OFFICIAL TRADINGVIEW WIDGET EMBED CODES =================
 
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ================= WORKING ALPHASPREAD WIDGET FUNCTIONS =================
+# ================= TRADINGVIEW OFFICIAL WIDGETS =================
 
-def alphaspread_company_overview(ticker, height=500):
-    """AlphaSpread Company Overview - WORKING URL"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
+def tradingview_symbol_overview_widget(ticker, height=400):
+    """Official TradingView Symbol Overview Widget"""
+    widget_html = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+      {{
+      "symbols": [
+        [
+          "NASDAQ:{ticker.upper()}"
+        ]
+      ],
+      "chartOnly": false,
+      "width": "100%",
+      "height": "{height}",
+      "locale": "en",
+      "colorTheme": "light",
+      "autosize": true,
+      "showVolume": false,
+      "showMA": false,
+      "hideDateRanges": false,
+      "hideMarketStatus": false,
+      "hideSymbolLogo": false,
+      "scalePosition": "right",
+      "scaleMode": "Normal",
+      "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+      "fontSize": "10",
+      "noTimeScale": false,
+      "valuesTracking": "1",
+      "changeMode": "price-and-percent",
+      "chartType": "area"
+      }}
+      </script>
     </div>
+    <!-- TradingView Widget END -->
     """
-    return components.html(html_code, height=height)
+    return components.html(widget_html, height=height + 50)
 
-def alphaspread_financial_statements(ticker, height=500):
-    """AlphaSpread Financial Statements - CORRECTED URL"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}/statement/income" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
+def tradingview_advanced_real_time_chart(ticker, height=600):
+    """Official TradingView Advanced Real Time Chart Widget"""
+    widget_html = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container" style="height:{height}px;width:100%">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+      {{
+      "autosize": true,
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "interval": "D",
+      "timezone": "Etc/UTC",
+      "theme": "light",
+      "style": "1",
+      "locale": "en",
+      "withdateranges": true,
+      "allow_symbol_change": true,
+      "calendar": false,
+      "support_host": "https://www.tradingview.com"
+      }}
+      </script>
     </div>
+    <!-- TradingView Widget END -->
     """
-    return components.html(html_code, height=height)
+    return components.html(widget_html, height=height + 50)
 
-def alphaspread_balance_sheet(ticker, height=500):
-    """AlphaSpread Balance Sheet - CORRECTED URL"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}/statement/balance-sheet" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
+def tradingview_company_profile_widget(ticker, height=400):
+    """Official TradingView Company Profile Widget"""
+    widget_html = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js" async>
+      {{
+      "width": "100%",
+      "height": "{height}",
+      "colorTheme": "light",
+      "isTransparent": false,
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "locale": "en"
+      }}
+      </script>
     </div>
+    <!-- TradingView Widget END -->
     """
-    return components.html(html_code, height=height)
+    return components.html(widget_html, height=height + 50)
 
-def alphaspread_cash_flow(ticker, height=500):
-    """AlphaSpread Cash Flow Statement - CORRECTED URL"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}/statement/cash-flow" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
+def tradingview_fundamental_data_widget(ticker, height=400):
+    """Official TradingView Fundamental Data Widget"""
+    widget_html = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-fundamental-data.js" async>
+      {{
+      "colorTheme": "light",
+      "isTransparent": false,
+      "largeChartUrl": "",
+      "displayMode": "regular",
+      "width": "100%",
+      "height": "{height}",
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "locale": "en"
+      }}
+      </script>
     </div>
+    <!-- TradingView Widget END -->
     """
-    return components.html(html_code, height=height)
+    return components.html(widget_html, height=height + 50)
 
-def alphaspread_key_metrics(ticker, height=500):
-    """AlphaSpread Key Metrics - CORRECTED URL"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.upper()}/key-metrics" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
+def tradingview_financials_widget(ticker, height=400):
+    """Official TradingView Financials Widget"""
+    widget_html = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
+      {{
+      "colorTheme": "light",
+      "isTransparent": false,
+      "largeChartUrl": "",
+      "displayMode": "regular",
+      "width": "100%",
+      "height": "{height}",
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "locale": "en"
+      }}
+      </script>
     </div>
+    <!-- TradingView Widget END -->
     """
-    return components.html(html_code, height=height)
+    return components.html(widget_html, height=height + 50)
 
-# ================= ALTERNATIVE FINANCIAL DATA SOURCES =================
-
-def yahoo_finance_summary(ticker, height=500):
-    """Yahoo Finance Summary Page"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://finance.yahoo.com/quote/{ticker.upper()}" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
+def tradingview_technical_analysis_widget(ticker, height=400):
+    """Official TradingView Technical Analysis Widget"""
+    widget_html = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+      {{
+      "interval": "1D",
+      "width": "100%",
+      "isTransparent": false,
+      "height": "{height}",
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "showIntervalTabs": true,
+      "displayMode": "regular",
+      "colorTheme": "light",
+      "locale": "en"
+      }}
+      </script>
     </div>
+    <!-- TradingView Widget END -->
     """
-    return components.html(html_code, height=height)
+    return components.html(widget_html, height=height + 50)
 
-def yahoo_finance_financials(ticker, height=500):
-    """Yahoo Finance Financials Page"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://finance.yahoo.com/quote/{ticker.upper()}/financials" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
+def tradingview_market_overview_widget(height=400):
+    """Official TradingView Market Overview Widget"""
+    widget_html = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
+      {{
+      "colorTheme": "light",
+      "dateRange": "12M",
+      "showChart": true,
+      "locale": "en",
+      "width": "100%",
+      "height": "{height}",
+      "largeChartUrl": "",
+      "isTransparent": false,
+      "showSymbolLogo": true,
+      "showFloatingTooltip": false,
+      "plotLineColorGrowing": "rgba(41, 98, 255, 1)",
+      "plotLineColorFalling": "rgba(41, 98, 255, 1)",
+      "gridLineColor": "rgba(240, 243, 250, 0)",
+      "scaleFontColor": "rgba(120, 123, 134, 1)",
+      "belowLineFillColorGrowing": "rgba(41, 98, 255, 0.12)",
+      "belowLineFillColorFalling": "rgba(41, 98, 255, 0.12)",
+      "belowLineFillColorGrowingBottom": "rgba(41, 98, 255, 0)",
+      "belowLineFillColorFallingBottom": "rgba(41, 98, 255, 0)",
+      "symbolActiveColor": "rgba(41, 98, 255, 0.12)",
+      "tabs": [
+        {{
+          "title": "Indices",
+          "symbols": [
+            {{
+              "s": "FOREXCOM:SPXUSD",
+              "d": "S&P 500"
+            }},
+            {{
+              "s": "FOREXCOM:NSXUSD",
+              "d": "US 100"
+            }},
+            {{
+              "s": "FOREXCOM:DJI",
+              "d": "Dow 30"
+            }},
+            {{
+              "s": "INDEX:NKY",
+              "d": "Nikkei 225"
+            }},
+            {{
+              "s": "INDEX:DEU40",
+              "d": "DAX Index"
+            }},
+            {{
+              "s": "FOREXCOM:UKXGBP",
+              "d": "UK 100"
+            }}
+          ],
+          "originalTitle": "Indices"
+        }}
+      ]
+      }}
+      </script>
     </div>
+    <!-- TradingView Widget END -->
     """
-    return components.html(html_code, height=height)
+    return components.html(widget_html, height=height + 50)
 
-def yahoo_finance_analysis(ticker, height=500):
-    """Yahoo Finance Analysis Page with Analyst Estimates"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://finance.yahoo.com/quote/{ticker.upper()}/analysis" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
+def tradingview_symbol_info_widget(ticker, height=400):
+    """Official TradingView Symbol Info Widget"""
+    widget_html = f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js" async>
+      {{
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "width": "100%",
+      "locale": "en",
+      "colorTheme": "light",
+      "isTransparent": false,
+      "height": "{height}"
+      }}
+      </script>
     </div>
+    <!-- TradingView Widget END -->
     """
-    return components.html(html_code, height=height)
+    return components.html(widget_html, height=height + 50)
 
-def marketwatch_financials(ticker, height=500):
-    """MarketWatch Financials"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://www.marketwatch.com/investing/stock/{ticker.lower()}/financials" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
-    </div>
-    """
-    return components.html(html_code, height=height)
+# ================= OFFICIAL TRADINGVIEW SECTIONS =================
 
-def finviz_overview(ticker, height=500):
-    """Finviz Stock Overview"""
-    html_code = f"""
-    <div style="width: 100%; height: {height}px;">
-        <iframe src="https://finviz.com/quote.ashx?t={ticker.upper()}" 
-                width="100%" 
-                height="{height}" 
-                frameborder="0" 
-                scrolling="yes">
-        </iframe>
-    </div>
-    """
-    return components.html(html_code, height=height)
-
-# ================= MIXED APPROACH WITH MULTIPLE SOURCES =================
-
-def reliable_financial_widgets(ticker):
-    """Use multiple reliable sources for financial data"""
+def official_tradingview_dashboard(ticker):
+    """Complete dashboard using official TradingView widgets"""
     
     if not ticker:
-        st.info("Please enter a ticker symbol to view financial analysis.")
+        st.info("Please enter a ticker symbol to view TradingView analysis.")
         return
     
-    # VALUATIONS SECTION - Using Yahoo Finance + Finviz
-    st.header("💰 Valuations Analysis")
-    with st.container():
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📊 Yahoo Finance Overview")
-            yahoo_finance_summary(ticker, 500)
-        
-        with col2:
-            st.subheader("📈 Finviz Overview")
-            finviz_overview(ticker, 500)
-
-    st.markdown("---")
-
-    # FINANCIAL STATEMENTS - Using Yahoo Finance + MarketWatch
-    st.header("📈 Financial Statements")
-    with st.container():
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📊 Yahoo Finance Financials")
-            yahoo_finance_financials(ticker, 500)
-        
-        with col2:
-            st.subheader("📈 MarketWatch Financials")
-            marketwatch_financials(ticker, 500)
-
-    st.markdown("---")
-
-    # ANALYST ESTIMATES - Using Yahoo Finance Analysis
-    st.header("🎯 Wall Street Estimates")
-    with st.container():
-        st.subheader("📊 Yahoo Finance Analysis & Estimates")
-        yahoo_finance_analysis(ticker, 600)
-
-    st.markdown("---")
-
-    # ALTERNATIVE: Try AlphaSpread with corrected URLs
-    st.header("📊 AlphaSpread Analysis")
-    with st.container():
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📈 Company Overview")
-            alphaspread_company_overview(ticker, 500)
-        
-        with col2:
-            st.subheader("📊 Key Metrics")
-            alphaspread_key_metrics(ticker, 500)
-
-# ================= CUSTOM BUILT WIDGETS USING YFINANCE =================
-
-def custom_analyst_estimates_table(ticker):
-    """Create custom analyst estimates using yfinance data"""
-    try:
-        import yfinance as yf
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        st.subheader("🎯 Analyst Price Targets")
-        
-        # Create metrics display
-        col1, col2, col3, col4 = st.columns(4)
-        
-        current_price = info.get('currentPrice', 0)
-        target_mean = info.get('targetMeanPrice', None)
-        target_high = info.get('targetHighPrice', None)
-        target_low = info.get('targetLowPrice', None)
-        
-        with col1:
-            st.metric("Current Price", f"${current_price:.2f}")
-        
-        with col2:
-            if target_mean:
-                upside = ((target_mean - current_price) / current_price) * 100
-                st.metric("Mean Target", f"${target_mean:.2f}", f"{upside:+.1f}%")
-            else:
-                st.metric("Mean Target", "N/A")
-        
-        with col3:
-            if target_high:
-                upside_high = ((target_high - current_price) / current_price) * 100
-                st.metric("High Target", f"${target_high:.2f}", f"{upside_high:+.1f}%")
-            else:
-                st.metric("High Target", "N/A")
-        
-        with col4:
-            if target_low:
-                downside = ((target_low - current_price) / current_price) * 100
-                st.metric("Low Target", f"${target_low:.2f}", f"{downside:+.1f}%")
-            else:
-                st.metric("Low Target", "N/A")
-        
-        # Additional metrics
-        st.markdown("---")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            num_analysts = info.get('numberOfAnalystOpinions', None)
-            if num_analysts:
-                st.metric("Number of Analysts", num_analysts)
-        
-        with col2:
-            recommendation = info.get('recommendationKey', 'N/A')
-            if recommendation != 'N/A':
-                st.metric("Recommendation", recommendation.upper())
-        
-        with col3:
-            rec_mean = info.get('recommendationMean', None)
-            if rec_mean:
-                st.metric("Recommendation Score", f"{rec_mean:.1f}/5")
-    
-    except Exception as e:
-        st.error(f"Error loading analyst data: {e}")
-
-def custom_financial_ratios_table(ticker):
-    """Create custom financial ratios table"""
-    try:
-        import yfinance as yf
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        
-        st.subheader("📊 Key Financial Ratios")
-        
-        # Valuation ratios
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Valuation Ratios**")
-            ratios = {
-                "P/E Ratio": info.get('trailingPE', None),
-                "Forward P/E": info.get('forwardPE', None),
-                "P/B Ratio": info.get('priceToBook', None),
-                "P/S Ratio": info.get('priceToSalesTrailing12Months', None),
-                "PEG Ratio": info.get('pegRatio', None)
-            }
-            
-            for ratio_name, value in ratios.items():
-                if value:
-                    st.metric(ratio_name, f"{value:.2f}")
-                else:
-                    st.metric(ratio_name, "N/A")
-        
-        with col2:
-            st.markdown("**Profitability Ratios**")
-            profit_ratios = {
-                "ROE": info.get('returnOnEquity', None),
-                "ROA": info.get('returnOnAssets', None),
-                "Profit Margin": info.get('profitMargins', None),
-                "Operating Margin": info.get('operatingMargins', None),
-                "Gross Margin": info.get('grossMargins', None)
-            }
-            
-            for ratio_name, value in profit_ratios.items():
-                if value:
-                    if ratio_name in ["ROE", "ROA", "Profit Margin", "Operating Margin", "Gross Margin"]:
-                        st.metric(ratio_name, f"{value*100:.1f}%")
-                    else:
-                        st.metric(ratio_name, f"{value:.2f}")
-                else:
-                    st.metric(ratio_name, "N/A")
-    
-    except Exception as e:
-        st.error(f"Error loading financial ratios: {e}")
-
-# ================= REPLACEMENT SECTIONS =================
-
-def corrected_financial_sections(ticker):
-    """Corrected financial sections using reliable sources"""
-    
-    if not ticker:
-        st.info("Please enter a ticker symbol to view financial analysis.")
-        return
-    
-    # 1. CUSTOM ANALYST ESTIMATES (using yfinance)
-    st.header("🎯 Wall Street Estimates")
-    custom_analyst_estimates_table(ticker)
+    # 1. ADVANCED PRICE CHART
+    st.header("📈 Advanced Price Chart")
+    tradingview_advanced_real_time_chart(ticker, 700)
     
     st.markdown("---")
     
-    # 2. CUSTOM FINANCIAL RATIOS (using yfinance)
-    st.header("💰 Financial Ratios")
-    custom_financial_ratios_table(ticker)
+    # 2. SYMBOL OVERVIEW & COMPANY PROFILE
+    st.header("📊 Company Overview")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📈 Symbol Overview")
+        tradingview_symbol_overview_widget(ticker, 400)
+    
+    with col2:
+        st.subheader("🏢 Company Profile")
+        tradingview_company_profile_widget(ticker, 400)
     
     st.markdown("---")
     
-    # 3. EXTERNAL FINANCIAL DATA (Yahoo Finance)
-    st.header("📊 Detailed Financial Analysis")
+    # 3. FUNDAMENTAL DATA & FINANCIALS
+    st.header("💰 Financial Analysis")
+    col1, col2 = st.columns(2)
     
-    tab1, tab2, tab3 = st.tabs(["📈 Summary", "💹 Financials", "🎯 Analysis"])
+    with col1:
+        st.subheader("📊 Fundamental Data")
+        tradingview_fundamental_data_widget(ticker, 500)
     
-    with tab1:
-        yahoo_finance_summary(ticker, 600)
+    with col2:
+        st.subheader("💹 Financials")
+        tradingview_financials_widget(ticker, 500)
     
-    with tab2:
-        yahoo_finance_financials(ticker, 600)
+    st.markdown("---")
     
-    with tab3:
-        yahoo_finance_analysis(ticker, 600)
+    # 4. TECHNICAL ANALYSIS & SYMBOL INFO
+    st.header("🔍 Technical & Market Data")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📈 Technical Analysis")
+        tradingview_technical_analysis_widget(ticker, 500)
+    
+    with col2:
+        st.subheader("📊 Symbol Information")
+        tradingview_symbol_info_widget(ticker, 500)
+
 
 
 import yfinance as yf
