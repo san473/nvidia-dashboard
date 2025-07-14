@@ -36,252 +36,7 @@ nltk.download('vader_lexicon')
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 st.cache_data.clear()
 
-# ================= ADD THIS IMPORT TO YOUR EXISTING IMPORTS =================
-import streamlit.components.v1 as components
 
-# ================= ADD THESE TRADINGVIEW FUNCTIONS AFTER YOUR EXISTING FUNCTIONS =================
-
-def tradingview_advanced_chart(ticker, height=700):
-    """Enhanced TradingView Advanced Chart Widget with larger size"""
-    html_code = f"""
-    <div class="tradingview-widget-container" style="height:{height}px;width:100%">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js">
-      {{
-      "autosize": true,
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "interval": "D",
-      "timezone": "Etc/UTC",
-      "theme": "light",
-      "style": "1",
-      "locale": "en",
-      "withdateranges": true,
-      "allow_symbol_change": true,
-      "calendar": false,
-      "support_host": "https://www.tradingview.com",
-      "width": "100%",
-      "height": "{height}"
-      }}
-      </script>
-    </div>
-    """
-    return components.html(html_code, height=height)
-
-def tradingview_financials_overview(ticker, height=500):
-    """TradingView Financials Overview Widget"""
-    html_code = f"""
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js">
-      {{
-      "colorTheme": "light",
-      "isTransparent": false,
-      "largeChartUrl": "",
-      "displayMode": "regular",
-      "width": "100%",
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "locale": "en"
-      }}
-      </script>
-    </div>
-    """
-    return components.html(html_code, height=height)
-
-def tradingview_fundamental_data(ticker, height=500):
-    """TradingView Fundamental Data Widget for Valuations"""
-    html_code = f"""
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-fundamental-data.js">
-      {{
-      "colorTheme": "light",
-      "isTransparent": false,
-      "largeChartUrl": "",
-      "displayMode": "regular",
-      "width": "100%",
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "locale": "en"
-      }}
-      </script>
-    </div>
-    """
-    return components.html(html_code, height=height)
-
-def tradingview_earnings_estimates(ticker, height=500):
-    """TradingView Earnings Estimates Widget"""
-    html_code = f"""
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-earnings.js">
-      {{
-      "colorTheme": "light",
-      "isTransparent": false,
-      "largeChartUrl": "",
-      "displayMode": "regular",
-      "width": "100%",
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "locale": "en"
-      }}
-      </script>
-    </div>
-    """
-    return components.html(html_code, height=height)
-
-def tradingview_dividends(ticker, height=400):
-    """TradingView Dividends Widget"""
-    html_code = f"""
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js">
-      {{
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "width": "100%",
-      "locale": "en",
-      "colorTheme": "light",
-      "isTransparent": false,
-      "height": "{height}"
-      }}
-      </script>
-    </div>
-    """
-    return components.html(html_code, height=height)
-
-def tradingview_analyst_estimates(ticker, height=500):
-    """TradingView Analyst Estimates Widget"""
-    html_code = f"""
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-analyst-estimates.js">
-      {{
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "width": "100%",
-      "height": "{height}",
-      "colorTheme": "light",
-      "isTransparent": false,
-      "locale": "en"
-      }}
-      </script>
-    </div>
-    """
-    return components.html(html_code, height=height)
-
-def tradingview_technical_analysis_widget(ticker, height=500):
-    """TradingView Technical Analysis Widget"""
-    html_code = f"""
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
-      {{
-      "interval": "1D",
-      "width": "100%",
-      "isTransparent": false,
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "showIntervalTabs": true,
-      "displayMode": "regular",
-      "colorTheme": "light",
-      "locale": "en"
-      }}
-      </script>
-    </div>
-    """
-    return components.html(html_code, height=height)
-
-# ================= REPLACE YOUR EXISTING PRICE CHART SECTION WITH THIS =================
-# Find your existing price chart section and replace it with:
-
-# Enhanced Price Chart - Replace your existing fig = go.Figure() price chart with this:
-if ticker:
-    st.header("📈 Advanced Price Chart")
-    tradingview_advanced_chart(ticker, 700)
-
-# ================= ADD THESE NEW SECTIONS AFTER YOUR INVESTMENT THESIS SECTION =================
-
-# VALUATIONS SECTION
-st.header("💰 Valuations Analysis")
-with st.container():
-    st.subheader("📊 Fundamental Valuation Metrics")
-    tradingview_fundamental_data(ticker, 500)
-
-# GROWTH & PROFITABILITY SECTION
-st.header("📈 Growth & Profitability")
-with st.container():
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📊 Financial Overview")
-        tradingview_financials_overview(ticker, 500)
-    
-    with col2:
-        st.subheader("🔍 Technical Analysis")
-        tradingview_technical_analysis_widget(ticker, 500)
-
-# ESTIMATES SECTION
-st.header("🎯 Analyst Estimates")
-with st.container():
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📊 Earnings Estimates")
-        tradingview_earnings_estimates(ticker, 500)
-    
-    with col2:
-        st.subheader("🧠 Analyst Price Targets")
-        tradingview_analyst_estimates(ticker, 500)
-
-# DIVIDENDS SECTION
-st.header("💵 Dividend Information")
-with st.container():
-    st.subheader("📊 Dividend Analysis")
-    tradingview_dividends(ticker, 400)
-
-# ================= ENHANCED FINANCIAL VISUALIZATIONS SECTION =================
-# ADD THIS SECTION AFTER YOUR EXISTING "Interactive Financial Visualizations" SECTION
-
-st.header("📊 Enhanced Financial Analysis with TradingView")
-
-with st.container():
-    st.subheader("📈 Professional Financial Charts")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### Revenue & Growth Analysis")
-        tradingview_financials_overview(ticker, 400)
-    
-    with col2:
-        st.markdown("#### Valuation Metrics")
-        tradingview_fundamental_data(ticker, 400)
-
-# ================= ENHANCED ANALYST SECTION =================
-# REPLACE YOUR EXISTING tradingview_forecast_and_rating_section WITH THIS:
-
-def enhanced_analyst_section(ticker):
-    st.header("🔍 Wall Street Forecast & Analyst Ratings")
-
-    # Create tabs for better organization
-    tab1, tab2, tab3 = st.tabs(["📊 Price Targets", "🎯 Earnings Estimates", "📈 Technical Analysis"])
-    
-    with tab1:
-        st.subheader("🎯 Analyst Price Targets")
-        tradingview_analyst_estimates(ticker, 500)
-    
-    with tab2:
-        st.subheader("📊 Earnings Forecasts")
-        tradingview_earnings_estimates(ticker, 500)
-    
-    with tab3:
-        st.subheader("🔍 Technical Signals")
-        tradingview_technical_analysis_widget(ticker, 500)
-
-    st.markdown(f"🔗 [View Full Analysis on TradingView](https://www.tradingview.com/symbols/NASDAQ-{ticker.upper()}/financials-overview/)")
-
-# Call the enhanced analyst section
-if ticker:
-    enhanced_analyst_section(ticker)
 
 
 
@@ -529,6 +284,33 @@ try:
 except Exception as e:
     st.error(f"Failed to fetch data for ticker {ticker_input}. Error: {e}")
 
+# ================= ADD THESE TRADINGVIEW FUNCTIONS AFTER YOUR EXISTING FUNCTIONS =================
+
+def tradingview_advanced_chart(ticker, height=700):
+    """Enhanced TradingView Advanced Chart Widget with larger size"""
+    html_code = f"""
+    <div class="tradingview-widget-container" style="height:{height}px;width:100%">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js">
+      {{
+      "autosize": true,
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "interval": "D",
+      "timezone": "Etc/UTC",
+      "theme": "light",
+      "style": "1",
+      "locale": "en",
+      "withdateranges": true,
+      "allow_symbol_change": true,
+      "calendar": false,
+      "support_host": "https://www.tradingview.com",
+      "width": "100%",
+      "height": "{height}"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
 
 
     # ------------------------ GEOGRAPHIC REVENUE / HQ INFO ------------------------
@@ -717,7 +499,231 @@ for point in risk_points:
     st.markdown(f"- {point}")
 
 
-   
+ def tradingview_financials_overview(ticker, height=500):
+    """TradingView Financials Overview Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js">
+      {{
+      "colorTheme": "light",
+      "isTransparent": false,
+      "largeChartUrl": "",
+      "displayMode": "regular",
+      "width": "100%",
+      "height": "{height}",
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "locale": "en"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_fundamental_data(ticker, height=500):
+    """TradingView Fundamental Data Widget for Valuations"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-fundamental-data.js">
+      {{
+      "colorTheme": "light",
+      "isTransparent": false,
+      "largeChartUrl": "",
+      "displayMode": "regular",
+      "width": "100%",
+      "height": "{height}",
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "locale": "en"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_earnings_estimates(ticker, height=500):
+    """TradingView Earnings Estimates Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-earnings.js">
+      {{
+      "colorTheme": "light",
+      "isTransparent": false,
+      "largeChartUrl": "",
+      "displayMode": "regular",
+      "width": "100%",
+      "height": "{height}",
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "locale": "en"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_dividends(ticker, height=400):
+    """TradingView Dividends Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js">
+      {{
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "width": "100%",
+      "locale": "en",
+      "colorTheme": "light",
+      "isTransparent": false,
+      "height": "{height}"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_analyst_estimates(ticker, height=500):
+    """TradingView Analyst Estimates Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-analyst-estimates.js">
+      {{
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "width": "100%",
+      "height": "{height}",
+      "colorTheme": "light",
+      "isTransparent": false,
+      "locale": "en"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def tradingview_technical_analysis_widget(ticker, height=500):
+    """TradingView Technical Analysis Widget"""
+    html_code = f"""
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
+      {{
+      "interval": "1D",
+      "width": "100%",
+      "isTransparent": false,
+      "height": "{height}",
+      "symbol": "NASDAQ:{ticker.upper()}",
+      "showIntervalTabs": true,
+      "displayMode": "regular",
+      "colorTheme": "light",
+      "locale": "en"
+      }}
+      </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+# ================= REPLACE YOUR EXISTING PRICE CHART SECTION WITH THIS =================
+# Find your existing price chart section and replace it with:
+
+# Enhanced Price Chart - Replace your existing fig = go.Figure() price chart with this:
+# IMPORTANT: Only add this AFTER your ticker input section where ticker is defined
+try:
+    if ticker:
+        st.header("📈 Advanced Price Chart")
+        tradingview_advanced_chart(ticker, 700)
+except NameError:
+    st.warning("Please enter a ticker symbol first.")
+
+# ================= ADD THESE NEW SECTIONS AFTER YOUR INVESTMENT THESIS SECTION =================
+# IMPORTANT: Only add these sections AFTER your ticker input and data fetching sections
+
+# Check if ticker is defined before using TradingView widgets
+if 'ticker' in locals() and ticker:
+    
+    # VALUATIONS SECTION
+    st.header("💰 Valuations Analysis")
+    with st.container():
+        st.subheader("📊 Fundamental Valuation Metrics")
+        tradingview_fundamental_data(ticker, 500)
+
+    # GROWTH & PROFITABILITY SECTION
+    st.header("📈 Growth & Profitability")
+    with st.container():
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Financial Overview")
+            tradingview_financials_overview(ticker, 500)
+        
+        with col2:
+            st.subheader("🔍 Technical Analysis")
+            tradingview_technical_analysis_widget(ticker, 500)
+
+    # ESTIMATES SECTION
+    st.header("🎯 Analyst Estimates")
+    with st.container():
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Earnings Estimates")
+            tradingview_earnings_estimates(ticker, 500)
+        
+        with col2:
+            st.subheader("🧠 Analyst Price Targets")
+            tradingview_analyst_estimates(ticker, 500)
+
+    # DIVIDENDS SECTION
+    st.header("💵 Dividend Information")
+    with st.container():
+        st.subheader("📊 Dividend Analysis")
+        tradingview_dividends(ticker, 400)
+
+    # ================= ENHANCED FINANCIAL VISUALIZATIONS SECTION =================
+    # ADD THIS SECTION AFTER YOUR EXISTING "Interactive Financial Visualizations" SECTION
+
+    st.header("📊 Enhanced Financial Analysis with TradingView")
+
+    with st.container():
+        st.subheader("📈 Professional Financial Charts")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### Revenue & Growth Analysis")
+            tradingview_financials_overview(ticker, 400)
+        
+        with col2:
+            st.markdown("#### Valuation Metrics")
+            tradingview_fundamental_data(ticker, 400)
+
+    # ================= ENHANCED ANALYST SECTION =================
+    # REPLACE YOUR EXISTING tradingview_forecast_and_rating_section WITH THIS:
+
+    def enhanced_analyst_section(ticker):
+        st.header("🔍 Wall Street Forecast & Analyst Ratings")
+
+        # Create tabs for better organization
+        tab1, tab2, tab3 = st.tabs(["📊 Price Targets", "🎯 Earnings Estimates", "📈 Technical Analysis"])
+        
+        with tab1:
+            st.subheader("🎯 Analyst Price Targets")
+            tradingview_analyst_estimates(ticker, 500)
+        
+        with tab2:
+            st.subheader("📊 Earnings Forecasts")
+            tradingview_earnings_estimates(ticker, 500)
+        
+        with tab3:
+            st.subheader("🔍 Technical Signals")
+            tradingview_technical_analysis_widget(ticker, 500)
+
+        st.markdown(f"🔗 [View Full Analysis on TradingView](https://www.tradingview.com/symbols/NASDAQ-{ticker.upper()}/financials-overview/)")
+
+    # Call the enhanced analyst section
+    enhanced_analyst_section(ticker)
+
+else:
+    st.info("Please enter a ticker symbol above to view TradingView analysis.")  
 
 
 import yfinance as yf
