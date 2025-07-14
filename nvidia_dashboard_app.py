@@ -499,7 +499,7 @@ for point in risk_points:
     st.markdown(f"- {point}")
 
 
- def tradingview_financials_overview(ticker, height=500):
+def tradingview_financials_overview(ticker, height=500):
     """TradingView Financials Overview Widget"""
     html_code = f"""
     <div class="tradingview-widget-container">
@@ -723,8 +723,7 @@ if 'ticker' in locals() and ticker:
     enhanced_analyst_section(ticker)
 
 else:
-    st.info("Please enter a ticker symbol above to view TradingView analysis.")  
-
+    st.info("Please enter a ticker symbol above to view TradingView analysis.")
 
 import yfinance as yf
 import pandas as pd
