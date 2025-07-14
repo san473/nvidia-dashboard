@@ -678,52 +678,74 @@ if 'ticker' in locals() and ticker:
         st.subheader("📊 Dividend Analysis")
         tradingview_dividends(ticker, 400)
 
-    # ================= ENHANCED FINANCIAL VISUALIZATIONS SECTION =================
-    # ADD THIS SECTION AFTER YOUR EXISTING "Interactive Financial Visualizations" SECTION
+# ================= UPDATED SECTIONS WITH WORKING WIDGETS =================
 
-    st.header("📊 Enhanced Financial Analysis with TradingView")
+# Replace your existing TradingView sections with these corrected versions:
 
+if 'ticker' in locals() and ticker:
+    
+    # VALUATIONS SECTION - UPDATED
+    st.header("💰 Valuations Analysis")
     with st.container():
-        st.subheader("📈 Professional Financial Charts")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Fundamental Overview")
+            tradingview_fundamental_data(ticker, 400)
+        
+        with col2:
+            st.subheader("📈 Financial Overview")
+            tradingview_financial_overview(ticker, 400)
+
+    # GROWTH & PROFITABILITY SECTION - UPDATED
+    st.header("📈 Growth & Profitability")
+    with st.container():
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Company Financials")
+            tradingview_company_financials(ticker, 500)
+        
+        with col2:
+            st.subheader("🔍 Technical Analysis")
+            tradingview_technical_analysis_widget(ticker, 500)
+
+    # ESTIMATES SECTION - UPDATED
+    st.header("🎯 Analyst Estimates & Price Targets")
+    with st.container():
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📊 Company Profile & Targets")
+            tradingview_price_targets(ticker, 500)
+        
+        with col2:
+            st.subheader("📈 Market Timeline")
+            tradingview_analyst_estimates(ticker, 500)
+
+    # DIVIDENDS SECTION - UPDATED
+    st.header("💵 Stock Information")
+    with st.container():
+        st.subheader("📊 Comprehensive Stock Data")
+        tradingview_earnings_estimates(ticker, 400)
+
+    # ENHANCED FINANCIAL VISUALIZATIONS SECTION - UPDATED
+    st.header("📊 Enhanced Financial Analysis")
+    with st.container():
+        st.subheader("📈 Professional Charts")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### Revenue & Growth Analysis")
-            tradingview_financials_overview(ticker, 400)
+            st.markdown("#### Company Financial Data")
+            tradingview_company_financials(ticker, 400)
         
         with col2:
-            st.markdown("#### Valuation Metrics")
-            tradingview_fundamental_data(ticker, 400)
-
-    # ================= ENHANCED ANALYST SECTION =================
-    # REPLACE YOUR EXISTING tradingview_forecast_and_rating_section WITH THIS:
-
-    def enhanced_analyst_section(ticker):
-        st.header("🔍 Wall Street Forecast & Analyst Ratings")
-
-        # Create tabs for better organization
-        tab1, tab2, tab3 = st.tabs(["📊 Price Targets", "🎯 Earnings Estimates", "📈 Technical Analysis"])
-        
-        with tab1:
-            st.subheader("🎯 Analyst Price Targets")
-            tradingview_analyst_estimates(ticker, 500)
-        
-        with tab2:
-            st.subheader("📊 Earnings Forecasts")
-            tradingview_earnings_estimates(ticker, 500)
-        
-        with tab3:
-            st.subheader("🔍 Technical Signals")
-            tradingview_technical_analysis_widget(ticker, 500)
-
-        st.markdown(f"🔗 [View Full Analysis on TradingView](https://www.tradingview.com/symbols/NASDAQ-{ticker.upper()}/financials-overview/)")
-
-    # Call the enhanced analyst section
-    enhanced_analyst_section(ticker)
+            st.markdown("#### Stock Overview")
+            tradingview_financial_overview(ticker, 400)
 
 else:
-    st.info("Please enter a ticker symbol above to view TradingView analysis.")
+    st.info("Please enter a ticker symbol above to view TradingView analysis.")    
 
 import yfinance as yf
 import pandas as pd
