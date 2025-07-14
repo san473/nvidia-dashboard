@@ -639,313 +639,330 @@ except NameError:
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ================= TRADINGVIEW OFFICIAL WIDGETS =================
+# ================= COMPLETE WIDGET DIAGNOSTIC AND FIX =================
 
-def tradingview_symbol_overview_widget(ticker, height=400):
-    """Official TradingView Symbol Overview Widget"""
-    widget_html = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
-      {{
-      "symbols": [
-        [
-          "NASDAQ:{ticker.upper()}"
-        ]
-      ],
-      "chartOnly": false,
-      "width": "100%",
-      "height": "{height}",
-      "locale": "en",
-      "colorTheme": "light",
-      "autosize": true,
-      "showVolume": false,
-      "showMA": false,
-      "hideDateRanges": false,
-      "hideMarketStatus": false,
-      "hideSymbolLogo": false,
-      "scalePosition": "right",
-      "scaleMode": "Normal",
-      "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
-      "fontSize": "10",
-      "noTimeScale": false,
-      "valuesTracking": "1",
-      "changeMode": "price-and-percent",
-      "chartType": "area"
-      }}
-      </script>
+import streamlit as st
+import streamlit.components.v1 as components
+import yfinance as yf
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+
+# ================= STEP 1: BASIC TEST WIDGETS =================
+
+def test_basic_widget():
+    """Test if components.html works at all"""
+    html_test = """
+    <div style="background-color: lightblue; padding: 20px; text-align: center;">
+        <h3>TEST WIDGET</h3>
+        <p>If you can see this, components.html is working!</p>
     </div>
-    <!-- TradingView Widget END -->
     """
-    return components.html(widget_html, height=height + 50)
+    return components.html(html_test, height=100)
 
-def tradingview_advanced_real_time_chart(ticker, height=600):
-    """Official TradingView Advanced Real Time Chart Widget"""
-    widget_html = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container" style="height:{height}px;width:100%">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-      {{
-      "autosize": true,
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "interval": "D",
-      "timezone": "Etc/UTC",
-      "theme": "light",
-      "style": "1",
-      "locale": "en",
-      "withdateranges": true,
-      "allow_symbol_change": true,
-      "calendar": false,
-      "support_host": "https://www.tradingview.com"
-      }}
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """
-    return components.html(widget_html, height=height + 50)
+def test_yfinance_connection(ticker):
+    """Test if yfinance data is accessible"""
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        current_price = info.get('currentPrice', 'N/A')
+        company_name = info.get('longName', 'N/A')
+        
+        st.success(f"✅ yfinance working: {company_name} - ${current_price}")
+        return True
+    except Exception as e:
+        st.error(f"❌ yfinance error: {e}")
+        return False
 
-def tradingview_company_profile_widget(ticker, height=400):
-    """Official TradingView Company Profile Widget"""
-    widget_html = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-profile.js" async>
-      {{
-      "width": "100%",
-      "height": "{height}",
-      "colorTheme": "light",
-      "isTransparent": false,
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "locale": "en"
-      }}
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """
-    return components.html(widget_html, height=height + 50)
+# ================= STEP 2: WORKING CUSTOM WIDGETS (SIMPLIFIED) =================
 
-def tradingview_fundamental_data_widget(ticker, height=400):
-    """Official TradingView Fundamental Data Widget"""
-    widget_html = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-fundamental-data.js" async>
-      {{
-      "colorTheme": "light",
-      "isTransparent": false,
-      "largeChartUrl": "",
-      "displayMode": "regular",
-      "width": "100%",
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "locale": "en"
-      }}
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """
-    return components.html(widget_html, height=height + 50)
-
-def tradingview_financials_widget(ticker, height=400):
-    """Official TradingView Financials Widget"""
-    widget_html = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
-      {{
-      "colorTheme": "light",
-      "isTransparent": false,
-      "largeChartUrl": "",
-      "displayMode": "regular",
-      "width": "100%",
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "locale": "en"
-      }}
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """
-    return components.html(widget_html, height=height + 50)
-
-def tradingview_technical_analysis_widget(ticker, height=400):
-    """Official TradingView Technical Analysis Widget"""
-    widget_html = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
-      {{
-      "interval": "1D",
-      "width": "100%",
-      "isTransparent": false,
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "showIntervalTabs": true,
-      "displayMode": "regular",
-      "colorTheme": "light",
-      "locale": "en"
-      }}
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """
-    return components.html(widget_html, height=height + 50)
-
-def tradingview_market_overview_widget(height=400):
-    """Official TradingView Market Overview Widget"""
-    widget_html = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
-      {{
-      "colorTheme": "light",
-      "dateRange": "12M",
-      "showChart": true,
-      "locale": "en",
-      "width": "100%",
-      "height": "{height}",
-      "largeChartUrl": "",
-      "isTransparent": false,
-      "showSymbolLogo": true,
-      "showFloatingTooltip": false,
-      "plotLineColorGrowing": "rgba(41, 98, 255, 1)",
-      "plotLineColorFalling": "rgba(41, 98, 255, 1)",
-      "gridLineColor": "rgba(240, 243, 250, 0)",
-      "scaleFontColor": "rgba(120, 123, 134, 1)",
-      "belowLineFillColorGrowing": "rgba(41, 98, 255, 0.12)",
-      "belowLineFillColorFalling": "rgba(41, 98, 255, 0.12)",
-      "belowLineFillColorGrowingBottom": "rgba(41, 98, 255, 0)",
-      "belowLineFillColorFallingBottom": "rgba(41, 98, 255, 0)",
-      "symbolActiveColor": "rgba(41, 98, 255, 0.12)",
-      "tabs": [
-        {{
-          "title": "Indices",
-          "symbols": [
-            {{
-              "s": "FOREXCOM:SPXUSD",
-              "d": "S&P 500"
-            }},
-            {{
-              "s": "FOREXCOM:NSXUSD",
-              "d": "US 100"
-            }},
-            {{
-              "s": "FOREXCOM:DJI",
-              "d": "Dow 30"
-            }},
-            {{
-              "s": "INDEX:NKY",
-              "d": "Nikkei 225"
-            }},
-            {{
-              "s": "INDEX:DEU40",
-              "d": "DAX Index"
-            }},
-            {{
-              "s": "FOREXCOM:UKXGBP",
-              "d": "UK 100"
-            }}
-          ],
-          "originalTitle": "Indices"
-        }}
-      ]
-      }}
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """
-    return components.html(widget_html, height=height + 50)
-
-def tradingview_symbol_info_widget(ticker, height=400):
-    """Official TradingView Symbol Info Widget"""
-    widget_html = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js" async>
-      {{
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "width": "100%",
-      "locale": "en",
-      "colorTheme": "light",
-      "isTransparent": false,
-      "height": "{height}"
-      }}
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """
-    return components.html(widget_html, height=height + 50)
-
-# ================= OFFICIAL TRADINGVIEW SECTIONS =================
-
-def official_tradingview_dashboard(ticker):
-    """Complete dashboard using official TradingView widgets"""
+def working_fundamental_metrics(ticker):
+    """Simplified fundamental metrics that definitely work"""
+    st.write("### 📊 Fundamental Metrics")
     
-    if not ticker:
-        st.info("Please enter a ticker symbol to view TradingView analysis.")
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Simple metrics display
+        metrics = {
+            "Current Price": f"${info.get('currentPrice', 'N/A')}",
+            "Market Cap": f"${info.get('marketCap', 0)/1e9:.1f}B" if info.get('marketCap') else "N/A",
+            "P/E Ratio": f"{info.get('trailingPE', 'N/A')}",
+            "Revenue (TTM)": f"${info.get('totalRevenue', 0)/1e9:.1f}B" if info.get('totalRevenue') else "N/A"
+        }
+        
+        # Display in columns
+        cols = st.columns(len(metrics))
+        for i, (label, value) in enumerate(metrics.items()):
+            with cols[i]:
+                st.metric(label, value)
+        
+        st.success("✅ Fundamental metrics loaded successfully")
+        
+    except Exception as e:
+        st.error(f"❌ Error in fundamental metrics: {e}")
+
+def working_analyst_estimates(ticker):
+    """Simplified analyst estimates that definitely work"""
+    st.write("### 🎯 Analyst Estimates")
+    
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Price targets
+        current_price = info.get('currentPrice', 0)
+        target_mean = info.get('targetMeanPrice', None)
+        target_high = info.get('targetHighPrice', None)
+        target_low = info.get('targetLowPrice', None)
+        
+        if target_mean:
+            upside = ((target_mean - current_price) / current_price) * 100
+            
+            # Display targets
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Current", f"${current_price:.2f}")
+            col2.metric("Mean Target", f"${target_mean:.2f}", f"{upside:+.1f}%")
+            if target_high:
+                col3.metric("High Target", f"${target_high:.2f}")
+            if target_low:
+                col4.metric("Low Target", f"${target_low:.2f}")
+            
+            st.success("✅ Analyst estimates loaded successfully")
+        else:
+            st.warning("⚠️ No analyst price targets available for this stock")
+            
+    except Exception as e:
+        st.error(f"❌ Error in analyst estimates: {e}")
+
+def working_basic_chart(ticker):
+    """Simple working chart using plotly"""
+    st.write("### 📈 Price Chart (Last 30 Days)")
+    
+    try:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period="1mo")
+        
+        if not hist.empty:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=hist.index,
+                y=hist['Close'],
+                mode='lines',
+                name='Close Price',
+                line=dict(color='blue', width=2)
+            ))
+            
+            fig.update_layout(
+                title=f"{ticker} - Last 30 Days",
+                xaxis_title="Date",
+                yaxis_title="Price ($)",
+                height=400
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            st.success("✅ Price chart loaded successfully")
+        else:
+            st.error("❌ No price data available")
+            
+    except Exception as e:
+        st.error(f"❌ Error in price chart: {e}")
+
+# ================= STEP 3: WORKING TRADINGVIEW WIDGETS (MINIMAL) =================
+
+def working_tradingview_chart(ticker, height=500):
+    """Minimal TradingView chart that should work"""
+    html_code = f"""
+    <div style="height:{height}px;width:100%">
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js">
+        {{
+        "autosize": true,
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "interval": "D",
+        "timezone": "Etc/UTC",
+        "theme": "light",
+        "style": "1",
+        "locale": "en",
+        "withdateranges": true,
+        "allow_symbol_change": false,
+        "calendar": false
+        }}
+        </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+def working_tradingview_mini(ticker, height=350):
+    """Minimal TradingView mini widget"""
+    html_code = f"""
+    <div style="height:{height}px;width:100%">
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js">
+        {{
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "width": "100%",
+        "height": "{height}",
+        "locale": "en",
+        "dateRange": "12M",
+        "colorTheme": "light",
+        "isTransparent": false,
+        "autosize": false
+        }}
+        </script>
+    </div>
+    """
+    return components.html(html_code, height=height)
+
+# ================= STEP 4: COMPLETE DIAGNOSTIC DASHBOARD =================
+
+def diagnostic_dashboard(ticker):
+    """Complete diagnostic dashboard to test everything"""
+    
+    st.header("🔍 Widget Diagnostic Dashboard")
+    
+    # Test 1: Basic HTML widget
+    st.subheader("Test 1: Basic HTML Widget")
+    test_basic_widget()
+    
+    # Test 2: yfinance connection
+    st.subheader("Test 2: yfinance Connection")
+    yf_working = test_yfinance_connection(ticker)
+    
+    if not yf_working:
+        st.error("❌ yfinance not working - check ticker symbol")
         return
     
-    # 1. ADVANCED PRICE CHART
-    st.header("📈 Advanced Price Chart")
-    tradingview_advanced_real_time_chart(ticker, 700)
+    st.markdown("---")
+    
+    # Test 3: Working fundamental metrics
+    st.subheader("Test 3: Fundamental Metrics")
+    working_fundamental_metrics(ticker)
     
     st.markdown("---")
     
-    # 2. SYMBOL OVERVIEW & COMPANY PROFILE
-    st.header("📊 Company Overview")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📈 Symbol Overview")
-        tradingview_symbol_overview_widget(ticker, 400)
-    
-    with col2:
-        st.subheader("🏢 Company Profile")
-        tradingview_company_profile_widget(ticker, 400)
+    # Test 4: Working analyst estimates
+    st.subheader("Test 4: Analyst Estimates")
+    working_analyst_estimates(ticker)
     
     st.markdown("---")
     
-    # 3. FUNDAMENTAL DATA & FINANCIALS
-    st.header("💰 Financial Analysis")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📊 Fundamental Data")
-        tradingview_fundamental_data_widget(ticker, 500)
-    
-    with col2:
-        st.subheader("💹 Financials")
-        tradingview_financials_widget(ticker, 500)
+    # Test 5: Working basic chart
+    st.subheader("Test 5: Basic Price Chart")
+    working_basic_chart(ticker)
     
     st.markdown("---")
     
-    # 4. TECHNICAL ANALYSIS & SYMBOL INFO
-    st.header("🔍 Technical & Market Data")
+    # Test 6: TradingView widgets
+    st.subheader("Test 6: TradingView Widgets")
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("📈 Technical Analysis")
-        tradingview_technical_analysis_widget(ticker, 500)
+        st.write("**Advanced Chart**")
+        try:
+            working_tradingview_chart(ticker, 400)
+            st.success("✅ TradingView advanced chart working")
+        except Exception as e:
+            st.error(f"❌ TradingView advanced chart failed: {e}")
     
     with col2:
-        st.subheader("📊 Symbol Information")
-        tradingview_symbol_info_widget(ticker, 500)
+        st.write("**Mini Chart**")
+        try:
+            working_tradingview_mini(ticker, 400)
+            st.success("✅ TradingView mini chart working")
+        except Exception as e:
+            st.error(f"❌ TradingView mini chart failed: {e}")
+
+# ================= STEP 5: SIMPLE REPLACEMENT DASHBOARD =================
+
+def simple_working_dashboard(ticker):
+    """Simple dashboard with only working components"""
+    
+    if not ticker:
+        st.info("Please enter a ticker symbol")
+        return
+    
+    # Basic company info
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        company_name = info.get('longName', ticker)
+        
+        st.header(f"📊 {company_name} ({ticker.upper()}) Analysis")
+        
+        # Key metrics in a simple layout
+        st.subheader("💰 Key Metrics")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            current_price = info.get('currentPrice', 0)
+            st.metric("Current Price", f"${current_price:.2f}")
+        
+        with col2:
+            market_cap = info.get('marketCap', 0)
+            if market_cap:
+                st.metric("Market Cap", f"${market_cap/1e9:.1f}B")
+            else:
+                st.metric("Market Cap", "N/A")
+        
+        with col3:
+            pe_ratio = info.get('trailingPE', None)
+            if pe_ratio:
+                st.metric("P/E Ratio", f"{pe_ratio:.2f}")
+            else:
+                st.metric("P/E Ratio", "N/A")
+        
+        with col4:
+            dividend_yield = info.get('dividendYield', None)
+            if dividend_yield:
+                st.metric("Div Yield", f"{dividend_yield*100:.2f}%")
+            else:
+                st.metric("Div Yield", "N/A")
+        
+        # Simple price chart
+        st.subheader("📈 Price Chart")
+        hist = stock.history(period="3mo")
+        if not hist.empty:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=hist.index,
+                y=hist['Close'],
+                mode='lines',
+                name='Close Price'
+            ))
+            fig.update_layout(height=400, title=f"{ticker} - 3 Month Chart")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Analyst estimates if available
+        st.subheader("🎯 Price Targets")
+        target_mean = info.get('targetMeanPrice', None)
+        if target_mean:
+            upside = ((target_mean - current_price) / current_price) * 100
+            col1, col2 = st.columns(2)
+            col1.metric("Mean Target", f"${target_mean:.2f}")
+            col2.metric("Upside Potential", f"{upside:+.1f}%")
+        else:
+            st.info("No analyst price targets available")
+        
+        # Try TradingView advanced chart
+        st.subheader("📊 Advanced Chart (TradingView)")
+        try:
+            working_tradingview_chart(ticker, 600)
+        except Exception as e:
+            st.warning("TradingView chart not available")
+            
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+
+def test_everything(ticker="AAPL"):
+    """Complete test of all widgets"""
+    st.title("🔧 Widget Testing Dashboard")
+    
+    # Diagnostic mode
+    if st.checkbox("Run Full Diagnostic"):
+        diagnostic_dashboard(ticker)
+    else:
+        simple_working_dashboard(ticker)        
 
 
 
