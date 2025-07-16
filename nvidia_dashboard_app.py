@@ -641,8 +641,13 @@ import yfinance as yf
 import plotly.graph_objects as go
 
 # -----------------------
-# TRADINGVIEW EMBEDS
-# -----------------------
+import streamlit as st
+import streamlit.components.v1 as components
+import yfinance as yf
+import pandas as pd
+from finvizfinance.quote import finvizfinance
+
+# ========== TRADINGVIEW PRICE CHARTS ==========
 
 def tv_advanced_chart(ticker, height=500):
     html = f"""
@@ -665,20 +670,24 @@ def tv_advanced_chart(ticker, height=500):
     """
     components.html(html, height=height)
 
-def tv_symbol_info(ticker):
+def tv_mini_chart(ticker, height=300):
     html = f"""
-    <div style="width:100%">
-      <script src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js">
+    <div style="height:{height}px;width:100%">
+      <script src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js">
       {{
         "symbol": "NASDAQ:{ticker.upper()}",
+        "width": "100%",
+        "height": "{height}",
         "locale": "en",
+        "dateRange": "12M",
         "colorTheme": "light",
-        "isTransparent": true
+        "isTransparent": false,
+        "autosize": false
       }}
       </script>
     </div>
     """
-    components.html(html, height=200)
+    components.html(html, height=height)
 
 # ========== FINVIZ FUNDAMENTALS & RATINGS ==========
 
@@ -688,7 +697,8 @@ def finviz_fundamentals_widget(ticker):
         fund = stock.ticker_fundament()
         df = pd.DataFrame(list(fund.items()), columns=["Metric", "Value"])
         st.subheader("📊 Finviz Fundamentals")
-        st.table(df)
+        with st.expander("Click to view detailed fundamentals"):
+            st.dataframe(df, use_container_width=True)
     except Exception as e:
         st.error(f"Error loading Finviz fundamentals: {e}")
 
@@ -696,27 +706,32 @@ def finviz_analyst_widget(ticker):
     try:
         stock = finvizfinance(ticker)
         ratings = stock.ticker_outer_ratings()
-        if ratings is None or ratings.empty:
+        if ratings is not None and not ratings.empty:
+            st.subheader("🎯 Finviz Analyst Ratings & Price Targets")
+            with st.expander("Click to view analyst activity"):
+                st.dataframe(ratings, use_container_width=True)
+        else:
             st.info("No analyst ratings data available on Finviz.")
-            return
-        st.subheader("🎯 Finviz Analyst Ratings & Price Targets")
-        st.table(ratings)
     except Exception as e:
         st.error(f"Error loading Finviz analyst ratings: {e}")
 
 # ========== ALPHA SPREAD SUMMARY IFRAME ==========
 
 def alpha_spread_summary(ticker):
-    html = f"""
-    <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/summary"
-        width="100%" height="600" frameborder="0" scrolling="no"></iframe>
-    """
-    components.html(html, height=600)
+    try:
+        html = f"""
+        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/summary"
+            width="100%" height="600" frameborder="0" scrolling="no"></iframe>
+        """
+        components.html(html, height=600)
+    except Exception as e:
+        st.warning(f"Alpha Spread widget failed: {e}")
+        st.markdown(f"[View Alpha Spread Summary](https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/summary)")
 
 # ========== MAIN DASHBOARD ==========
 
 def equities_dashboard(ticker):
-    st.title(f"📊 {ticker.upper()} Financial Dashboard")
+    st.markdown(f"<h3 style='font-size:24px'>{ticker.upper()} Financial Dashboard</h3>", unsafe_allow_html=True)
 
     # TradingView Price Chart
     st.subheader("📈 Price Chart (TradingView)")
