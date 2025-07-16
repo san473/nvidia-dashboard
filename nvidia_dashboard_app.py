@@ -881,7 +881,7 @@ import plotly.graph_objects as go
 def show_dcf_widget():
     st.subheader("💸 Discounted Cash Flow (DCF) Valuation Summary")
     
-    # Static DCF data for demo - replace with your GPT output values
+    # Static example data (replace with your real GPT output)
     wacc = 9
     forecast_years = [2025, 2026, 2027, 2028, 2029]
     fcff_values = [90e9, 95e9, 100e9, 105e9, 110e9]  # in dollars
@@ -890,17 +890,14 @@ def show_dcf_widget():
     shares_outstanding = 15.5e9
     market_price = 189
     
-    # Calculate intrinsic value per share
     intrinsic_per_share = intrinsic_value_total / shares_outstanding
     delta_pct = (intrinsic_per_share - market_price) / market_price * 100
     
-    # Show key summary metrics
     col1, col2, col3 = st.columns(3)
     col1.metric("WACC", f"{wacc}%")
     col2.metric("Intrinsic Value / Share", f"${intrinsic_per_share:,.2f}")
     col3.metric("Market Price", f"${market_price}", delta=f"{delta_pct:.2f}%")
     
-    # Show FCFF projections in a table
     df_fcff = pd.DataFrame({
         "Year": forecast_years,
         "FCFF ($B)": [round(v/1e9, 2) for v in fcff_values]
@@ -909,7 +906,6 @@ def show_dcf_widget():
     
     st.table(df_fcff)
     
-    # Plot bar chart of FCFF + Terminal Value
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=[*map(str, forecast_years), "Terminal Value"],
@@ -925,6 +921,17 @@ def show_dcf_widget():
     )
     st.plotly_chart(fig, use_container_width=True)
 
+
+def main_dashboard():
+    st.title("📈 Equities Dashboard")
+    
+    # Other dashboard widgets here...
+    
+    show_dcf_widget()
+
+
+if __name__ == "__main__":
+    main_dashboard()
 
 
 
