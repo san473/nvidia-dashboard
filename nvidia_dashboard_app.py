@@ -874,6 +874,19 @@ with st.container():
     except Exception as e:
         st.error(f"Error in DCF block: {e}")
 
+import streamlit as st
+
+def show_dcf_summary(ticker):
+    st.subheader("💸 Discounted Cash Flow (DCF) Valuation Summary")
+    
+    try:
+        with open(f"dcf_summaries/{ticker.lower()}_dcf.md", "r") as f:
+            dcf_text = f.read()
+        st.markdown(dcf_text)
+    except FileNotFoundError:
+        st.warning(f"No DCF summary found for {ticker.upper()}.")
+
+show_dcf_summary(ticker)
 
 
 
