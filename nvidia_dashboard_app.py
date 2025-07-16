@@ -14,6 +14,7 @@ import altair as alt
 import matplotlib.pyplot as plt
 import nltk
 nltk.download('vader_lexicon')
+from finvizfinance.quote import finvizfinance
 
 import streamlit as st
 import yfinance as yf
@@ -679,107 +680,69 @@ def tv_symbol_info(ticker):
     """
     components.html(html, height=200)
 
-def tv_fundamental_data(ticker):
+# ========== FINVIZ FUNDAMENTALS & RATINGS ==========
+
+def finviz_fundamentals_widget(ticker):
+    try:
+        stock = finvizfinance(ticker)
+        fund = stock.ticker_fundament()
+        df = pd.DataFrame(list(fund.items()), columns=["Metric", "Value"])
+        st.subheader("📊 Finviz Fundamentals")
+        st.table(df)
+    except Exception as e:
+        st.error(f"Error loading Finviz fundamentals: {e}")
+
+def finviz_analyst_widget(ticker):
+    try:
+        stock = finvizfinance(ticker)
+        ratings = stock.ticker_outer_ratings()
+        if ratings is None or ratings.empty:
+            st.info("No analyst ratings data available on Finviz.")
+            return
+        st.subheader("🎯 Finviz Analyst Ratings & Price Targets")
+        st.table(ratings)
+    except Exception as e:
+        st.error(f"Error loading Finviz analyst ratings: {e}")
+
+# ========== ALPHA SPREAD SUMMARY IFRAME ==========
+
+def alpha_spread_summary(ticker):
     html = f"""
-    <div style="width:100%">
-      <script src="https://s3.tradingview.com/external-embedding/embed-widget-fundamental-data.js">
-      {{
-        "symbol": "NASDAQ:{ticker.upper()}",
-        "locale": "en",
-        "colorTheme": "light",
-        "width": "100%",
-        "isTransparent": true
-      }}
-      </script>
-    </div>
+    <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/summary"
+        width="100%" height="600" frameborder="0" scrolling="no"></iframe>
     """
-    components.html(html, height=500)
+    components.html(html, height=600)
 
-def tv_forecast_widget(ticker):
-    html = f"""
-    <div style="width:100%">
-      <script src="https://s3.tradingview.com/external-embedding/embed-widget-forecast.js">
-      {{
-        "symbol": "NASDAQ:{ticker.upper()}",
-        "width": "100%",
-        "height": "400",
-        "locale": "en",
-        "colorTheme": "light",
-        "isTransparent": true
-      }}
-      </script>
-    </div>
-    """
-    components.html(html, height=420)
-
-# -----------------------
-# FALLBACK PLOTLY PRICE CHART
-# -----------------------
-
-def fallback_price_chart(ticker):
-    st.write("### 📈 Price Chart (3M)")
-    stock = yf.Ticker(ticker)
-    hist = stock.history(period="3mo")
-    if hist.empty:
-        st.error("No price history available.")
-        return
-    fig = go.Figure(go.Scatter(x=hist.index, y=hist.Close, line=dict(color="blue")))
-    fig.update_layout(height=400, xaxis_title="Date", yaxis_title="Price ($)")
-    st.plotly_chart(fig, use_container_width=True)
-
-# -----------------------
-# MAIN DASHBOARD
-# -----------------------
+# ========== MAIN DASHBOARD ==========
 
 def equities_dashboard(ticker):
     st.title(f"📊 {ticker.upper()} Financial Dashboard")
-    stock = yf.Ticker(ticker)
-    info = stock.info
 
-    # Basic Symbol Info
-    st.subheader("🔍 Summary")
-    tv_symbol_info(ticker)
-
-    # Price Chart
-    st.subheader("📈 Price Chart")
+    # TradingView Price Chart
+    st.subheader("📈 Price Chart (TradingView)")
     try:
         tv_advanced_chart(ticker)
-    except:
-        fallback_price_chart(ticker)
+        tv_mini_chart(ticker)
+    except Exception as e:
+        st.warning(f"TradingView price chart not available: {e}")
 
-    # Forecast & Analyst Ratings
-    st.subheader("🎯 Analyst Forecast & Ratings")
-    try:
-        tv_forecast_widget(ticker)
-    except:
-        st.warning("Forecast widget unavailable.")
+    # Finviz Fundamentals
+    finviz_fundamentals_widget(ticker)
 
-    # Fundamentals Overview
-    st.subheader("🏦 Financial Overview")
-    try:
-        tv_fundamental_data(ticker)
-    except:
-        st.warning("Fundamental data widget unavailable.")
+    # Finviz Analyst Ratings
+    finviz_analyst_widget(ticker)
 
-    # Basic Metrics (fallback)
-    st.subheader("💡 Quick Metrics (fallback)")
-    st.write({
-        "Market Cap": f"${info.get('marketCap', 'N/A'):,}",
-        "P/E Ratio": info.get('trailingPE', 'N/A'),
-        "Dividend Yield": f"{info.get('dividendYield', 0)*100:.2f}%"
-    })
+    # Alpha Spread Summary Widget
+    st.subheader("🔍 Alpha Spread Financial Summary")
+    alpha_spread_summary(ticker)
 
-# -----------------------
-# ENTRY POINT
-# -----------------------
+# ========== ENTRY POINT ==========
 
-# Remove sidebar → use direct input
 ticker = st.text_input("Enter Ticker Symbol", value="AAPL", key="ticker_input")
 if ticker:
     equities_dashboard(ticker)
 else:
-    st.info("Please enter a stock ticker to view its dashboard.")
-
+    st.info("Please enter a stock ticker symbol.")
 
 
 
