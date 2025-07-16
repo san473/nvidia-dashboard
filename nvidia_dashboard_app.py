@@ -875,18 +875,57 @@ with st.container():
         st.error(f"Error in DCF block: {e}")
 
 import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
 
-def show_dcf_summary(ticker):
+def show_dcf_widget():
     st.subheader("💸 Discounted Cash Flow (DCF) Valuation Summary")
     
-    try:
-        with open(f"dcf_summaries/{ticker.lower()}_dcf.md", "r") as f:
-            dcf_text = f.read()
-        st.markdown(dcf_text)
-    except FileNotFoundError:
-        st.warning(f"No DCF summary found for {ticker.upper()}.")
+    # Static DCF data for demo - replace with your GPT output values
+    wacc = 9
+    forecast_years = [2025, 2026, 2027, 2028, 2029]
+    fcff_values = [90e9, 95e9, 100e9, 105e9, 110e9]  # in dollars
+    terminal_value = 1.4e12
+    intrinsic_value_total = 3.2e12
+    shares_outstanding = 15.5e9
+    market_price = 189
+    
+    # Calculate intrinsic value per share
+    intrinsic_per_share = intrinsic_value_total / shares_outstanding
+    delta_pct = (intrinsic_per_share - market_price) / market_price * 100
+    
+    # Show key summary metrics
+    col1, col2, col3 = st.columns(3)
+    col1.metric("WACC", f"{wacc}%")
+    col2.metric("Intrinsic Value / Share", f"${intrinsic_per_share:,.2f}")
+    col3.metric("Market Price", f"${market_price}", delta=f"{delta_pct:.2f}%")
+    
+    # Show FCFF projections in a table
+    df_fcff = pd.DataFrame({
+        "Year": forecast_years,
+        "FCFF ($B)": [round(v/1e9, 2) for v in fcff_values]
+    })
+    df_fcff.loc[len(df_fcff.index)] = ["Terminal Value", round(terminal_value/1e9, 2)]
+    
+    st.table(df_fcff)
+    
+    # Plot bar chart of FCFF + Terminal Value
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=[*map(str, forecast_years), "Terminal Value"],
+        y=[*map(lambda x: x/1e9, fcff_values), terminal_value/1e9],
+        name="FCFF & Terminal Value",
+        marker_color='royalblue'
+    ))
+    fig.update_layout(
+        title="FCFF Projections + Terminal Value (in $Billions)",
+        yaxis_title="Value ($B)",
+        height=350,
+        margin=dict(l=40, r=40, t=50, b=30)
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
-show_dcf_summary(ticker)
+
 
 
 
