@@ -634,32 +634,20 @@ try:
 except NameError:
     st.warning("Please enter a ticker symbol first.")
 
-# ================= OFFICIAL TRADINGVIEW WIDGET EMBED CODES =================
-
-import streamlit as st
-import streamlit.components.v1 as components
-
 import streamlit as st
 import streamlit.components.v1 as components
 import yfinance as yf
-import pandas as pd
 import plotly.graph_objects as go
-import plotly.express as px
 
-# ============================
-# WIDGET HELPERS
-# ============================
+# -----------------------
+# TRADINGVIEW EMBEDS
+# -----------------------
 
-def is_tradingview_supported(ticker):
-    """Assume support if NASDAQ or NYSE prefix"""
-    return any(prefix in ticker.upper() for prefix in ['NASDAQ:', 'NYSE:'])
-
-def working_tradingview_chart(ticker, height=600):
-    """Advanced TradingView Chart"""
-    html_code = f"""
+def tv_advanced_chart(ticker, height=500):
+    html = f"""
     <div style="height:{height}px;width:100%">
-        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js">
-        {{
+      <script src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js">
+      {{
         "autosize": true,
         "symbol": "NASDAQ:{ticker.upper()}",
         "interval": "D",
@@ -670,164 +658,128 @@ def working_tradingview_chart(ticker, height=600):
         "withdateranges": true,
         "allow_symbol_change": false,
         "calendar": false
-        }}
-        </script>
+      }}
+      </script>
     </div>
     """
-    components.html(html_code, height=height)
+    components.html(html, height=height)
 
-def working_tradingview_mini(ticker, height=350):
-    """Mini TradingView Overview"""
-    html_code = f"""
-    <div style="height:{height}px;width:100%">
-        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js">
-        {{
+def tv_symbol_info(ticker):
+    html = f"""
+    <div style="width:100%">
+      <script src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js">
+      {{
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "locale": "en",
+        "colorTheme": "light",
+        "isTransparent": true
+      }}
+      </script>
+    </div>
+    """
+    components.html(html, height=200)
+
+def tv_fundamental_data(ticker):
+    html = f"""
+    <div style="width:100%">
+      <script src="https://s3.tradingview.com/external-embedding/embed-widget-fundamental-data.js">
+      {{
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "locale": "en",
+        "colorTheme": "light",
+        "width": "100%",
+        "isTransparent": true
+      }}
+      </script>
+    </div>
+    """
+    components.html(html, height=500)
+
+def tv_forecast_widget(ticker):
+    html = f"""
+    <div style="width:100%">
+      <script src="https://s3.tradingview.com/external-embedding/embed-widget-forecast.js">
+      {{
         "symbol": "NASDAQ:{ticker.upper()}",
         "width": "100%",
-        "height": "{height}",
+        "height": "400",
         "locale": "en",
-        "dateRange": "12M",
         "colorTheme": "light",
-        "isTransparent": false,
-        "autosize": false
-        }}
-        </script>
+        "isTransparent": true
+      }}
+      </script>
     </div>
     """
-    components.html(html_code, height=height)
+    components.html(html, height=420)
 
-def render_alpha_spread_summary(ticker):
-    html_code = f"""
-    <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/summary"
-            width="100%" height="600px" frameborder="0"></iframe>
-    """
-    components.html(html_code, height=600)
+# -----------------------
+# FALLBACK PLOTLY PRICE CHART
+# -----------------------
 
-def render_alpha_spread_financials(ticker):
-    html_code = f"""
-    <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/financials/income_statement"
-            width="100%" height="600px" frameborder="0"></iframe>
-    """
-    components.html(html_code, height=600)
-
-def render_alpha_spread_valuation(ticker):
-    html_code = f"""
-    <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/valuation/dcf-model"
-            width="100%" height="600px" frameborder="0"></iframe>
-    """
-    components.html(html_code, height=600)
-
-def working_basic_chart(ticker):
-    """Fallback Plotly chart"""
-    st.write("### 📈 Price Chart (Last 3 Months)")
-    try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="3mo")
-        if not hist.empty:
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=hist.index,
-                y=hist['Close'],
-                mode='lines',
-                name='Close Price',
-                line=dict(color='blue', width=2)
-            ))
-            fig.update_layout(
-                title=f"{ticker} - 3 Month Price",
-                xaxis_title="Date",
-                yaxis_title="Price ($)",
-                height=400
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("No historical data available.")
-    except Exception as e:
-        st.error(f"Price chart error: {e}")
-
-# ============================
-# MAIN DASHBOARD
-# ============================
-
-def simple_working_dashboard(ticker):
-    """📊 Core equities dashboard with integrated widgets"""
-
-    if not ticker:
-        st.info("Please enter a ticker symbol.")
+def fallback_price_chart(ticker):
+    st.write("### 📈 Price Chart (3M)")
+    stock = yf.Ticker(ticker)
+    hist = stock.history(period="3mo")
+    if hist.empty:
+        st.error("No price history available.")
         return
+    fig = go.Figure(go.Scatter(x=hist.index, y=hist.Close, line=dict(color="blue")))
+    fig.update_layout(height=400, xaxis_title="Date", yaxis_title="Price ($)")
+    st.plotly_chart(fig, use_container_width=True)
 
+# -----------------------
+# MAIN DASHBOARD
+# -----------------------
+
+def equities_dashboard(ticker):
+    st.title(f"📊 {ticker.upper()} Financial Dashboard")
+    stock = yf.Ticker(ticker)
+    info = stock.info
+
+    # Basic Symbol Info
+    st.subheader("🔍 Summary")
+    tv_symbol_info(ticker)
+
+    # Price Chart
+    st.subheader("📈 Price Chart")
     try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        company_name = info.get('longName', ticker)
+        tv_advanced_chart(ticker)
+    except:
+        fallback_price_chart(ticker)
 
-        st.header(f"📊 {company_name} ({ticker.upper()}) Dashboard")
+    # Forecast & Analyst Ratings
+    st.subheader("🎯 Analyst Forecast & Ratings")
+    try:
+        tv_forecast_widget(ticker)
+    except:
+        st.warning("Forecast widget unavailable.")
 
-        # Key Metrics
-        st.subheader("💰 Key Metrics")
-        col1, col2, col3, col4 = st.columns(4)
-        current_price = info.get('currentPrice', 0)
-        market_cap = info.get('marketCap', None)
-        pe_ratio = info.get('trailingPE', None)
-        dividend_yield = info.get('dividendYield', None)
+    # Fundamentals Overview
+    st.subheader("🏦 Financial Overview")
+    try:
+        tv_fundamental_data(ticker)
+    except:
+        st.warning("Fundamental data widget unavailable.")
 
-        with col1:
-            st.metric("Current Price", f"${current_price:.2f}")
-        with col2:
-            st.metric("Market Cap", f"${market_cap/1e9:.1f}B" if market_cap else "N/A")
-        with col3:
-            st.metric("P/E Ratio", f"{pe_ratio:.2f}" if pe_ratio else "N/A")
-        with col4:
-            st.metric("Dividend Yield", f"{dividend_yield*100:.2f}%" if dividend_yield else "N/A")
+    # Basic Metrics (fallback)
+    st.subheader("💡 Quick Metrics (fallback)")
+    st.write({
+        "Market Cap": f"${info.get('marketCap', 'N/A'):,}",
+        "P/E Ratio": info.get('trailingPE', 'N/A'),
+        "Dividend Yield": f"{info.get('dividendYield', 0)*100:.2f}%"
+    })
 
-        # Analyst Targets
-        st.subheader("🎯 Price Targets")
-        target_mean = info.get('targetMeanPrice', None)
-        if target_mean:
-            upside = ((target_mean - current_price) / current_price) * 100
-            col1, col2 = st.columns(2)
-            col1.metric("Mean Target", f"${target_mean:.2f}")
-            col2.metric("Upside Potential", f"{upside:+.1f}%")
-        else:
-            st.info("No analyst target data available.")
-
-        # Widget Section
-        st.subheader("📊 Charts & Widgets")
-        if is_tradingview_supported(f"NASDAQ:{ticker}"):
-            st.markdown("**TradingView Widgets**")
-            working_tradingview_chart(ticker)
-            working_tradingview_mini(ticker)
-        else:
-            st.markdown("**Fallback: Alpha Spread + Custom Widgets**")
-            try:
-                render_alpha_spread_summary(ticker)
-                render_alpha_spread_financials(ticker)
-                render_alpha_spread_valuation(ticker)
-            except:
-                st.warning("Alpha Spread widget load failed.")
-            working_basic_chart(ticker)
-
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-
-# ============================
+# -----------------------
 # ENTRY POINT
-# ============================
+# -----------------------
 
-def test_everything(ticker="AAPL"):
-    st.title("🔧 Equities Dashboard (Auto Widget Selection)")
-    simple_working_dashboard(ticker)
-
-# ============================
-# MAIN APP STARTS HERE
-# ============================
-
-st.sidebar.title("Equity Dashboard")
-ticker = st.sidebar.text_input("Enter Ticker Symbol", value="AAPL")
-
+# Remove sidebar → use direct input
+ticker = st.text_input("Enter Ticker Symbol", value="AAPL", key="ticker_input")
 if ticker:
-    test_everything(ticker)
+    equities_dashboard(ticker)
 else:
-    st.info("🔍 Please enter a ticker to begin.")
+    st.info("Please enter a stock ticker to view its dashboard.")
+
 
 
 
