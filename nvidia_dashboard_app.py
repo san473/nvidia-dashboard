@@ -1,6 +1,3 @@
-StreamlitSetPageConfigMustBeFirstCommandError
-
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -10,42 +7,20 @@ import requests
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import plotly.express as px
-from datetime import datetime
 from streamlit.runtime.caching import cache_data
-import requests
-import altair as alt
-import matplotlib.pyplot as plt
-import nltk
-nltk.download('vader_lexicon')
-from finvizfinance.quote import finvizfinance
-
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-import plotly.graph_objects as go
-import numpy as np
-import requests
-from datetime import datetime, timedelta
-from bs4 import BeautifulSoup
-import plotly.express as px
-from datetime import datetime
-from streamlit.runtime.caching import cache_data
-import requests
 import altair as alt
 import matplotlib.pyplot as plt
 import streamlit.components.v1 as components
 import nltk
+from finvizfinance.quote import finvizfinance
+
 nltk.download('vader_lexicon')
 
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
+
 st.cache_data.clear()
 
 
-
-
-
-st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
-st.cache_data.clear()
 
 # REMOVE cache temporarily to force reload
 # @st.cache_data
