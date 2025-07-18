@@ -8,4 +8,5 @@ plotly
 openpyxl
 nltk
 finvizfinance>=0.14
+openai
 
