@@ -769,7 +769,7 @@ def dcf_valuation_module():
         with st.spinner("Calling GPT model..."):
             gpt_dcf_prompt(ticker, revenue_growth, ebit_margin, tax_rate, capex, wacc, terminal_growth)
 
-from openai import RateLimitError, APIError, Timeout
+from openai import RateLimitError, APIError
 
 def gpt_dcf_prompt(ticker, revenue_growth, ebit_margin, tax_rate, capex, wacc, terminal_growth):
     prompt = f"""
@@ -797,7 +797,7 @@ Stick to public company sources only. Output should be professional.
 Please begin:
 """
 
-        try:
+    try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
