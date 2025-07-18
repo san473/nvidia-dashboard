@@ -720,6 +720,10 @@ def tv_mini_chart(ticker, height=300):
     """
     components.html(html, height=height)
 
+def render_price_charts(ticker):
+    st.markdown("### 📈 Price Chart (TradingView)")
+    tv_advanced_chart(ticker)
+    tv_mini_chart(ticker)
 
 
 
@@ -728,29 +732,30 @@ def tv_mini_chart(ticker, height=300):
 def equities_dashboard(ticker):
     st.markdown(f"<h3 style='font-size:24px'>{ticker.upper()} Financial Dashboard</h3>", unsafe_allow_html=True)
 
-render_price_charts(ticker)
+    # TradingView Financials widget
+    st.markdown("## 🧾 Financials Overview (TradingView)")
+    components.html(f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
+      {{
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "colorTheme": "dark",
+        "displayMode": "regular",
+        "isTransparent": false,
+        "locale": "en",
+        "width": "100%",
+        "height": 550
+      }}
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """, height=600)
 
-    
-st.markdown("## 🧾 Financials Overview (TradingView)")
+    # Add price charts just below financials
+    render_price_charts(ticker)
 
-components.html(f"""
-<!-- TradingView Widget BEGIN -->
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
-  {{
-    "symbol": "NASDAQ:{ticker.upper()}",
-    "colorTheme": "dark",
-    "displayMode": "regular",
-    "isTransparent": false,
-    "locale": "en",
-    "width": "100%",
-    "height": 550
-  }}
-  </script>
-</div>
-<!-- TradingView Widget END -->
-""", height=600)
 
 
 # ========== ENTRY POINT ==========
