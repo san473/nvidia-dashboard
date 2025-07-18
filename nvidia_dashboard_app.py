@@ -2119,6 +2119,9 @@ wall_street_price_targets(ticker)
 import streamlit as st
 import streamlit.components.v1 as components
 
+def equities_dashboard(ticker):
+    st.markdown(f"<h3 style='font-size:24px'>{ticker.upper()} Financial Dashboard</h3>", unsafe_allow_html=True)
+
     # Wall Street Forecast & Technical Rating (TradingView)
     st.markdown("## 📊 Wall Street Forecast & Technical Rating (TradingView)")
     components.html(f"""
@@ -2146,6 +2149,8 @@ import streamlit.components.v1 as components
     </div>
     <!-- TradingView Widget END -->
     """, height=500)
+
+    # [Continue with other dashboard sections like financials, charts, etc.]
 
 
 
