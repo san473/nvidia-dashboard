@@ -997,66 +997,6 @@ with st.container():
     except Exception as e:
         st.error(f"Error in DCF block: {e}")
 
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-
-def show_dcf_widget():
-    st.subheader("💸 Discounted Cash Flow (DCF) Valuation Summary")
-    
-    # Static example data (replace with your real GPT output)
-    wacc = 9
-    forecast_years = [2025, 2026, 2027, 2028, 2029]
-    fcff_values = [90e9, 95e9, 100e9, 105e9, 110e9]  # in dollars
-    terminal_value = 1.4e12
-    intrinsic_value_total = 3.2e12
-    shares_outstanding = 15.5e9
-    market_price = 189
-    
-    intrinsic_per_share = intrinsic_value_total / shares_outstanding
-    delta_pct = (intrinsic_per_share - market_price) / market_price * 100
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("WACC", f"{wacc}%")
-    col2.metric("Intrinsic Value / Share", f"${intrinsic_per_share:,.2f}")
-    col3.metric("Market Price", f"${market_price}", delta=f"{delta_pct:.2f}%")
-    
-    df_fcff = pd.DataFrame({
-        "Year": forecast_years,
-        "FCFF ($B)": [round(v/1e9, 2) for v in fcff_values]
-    })
-    df_fcff.loc[len(df_fcff.index)] = ["Terminal Value", round(terminal_value/1e9, 2)]
-    
-    st.table(df_fcff)
-    
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=[*map(str, forecast_years), "Terminal Value"],
-        y=[*map(lambda x: x/1e9, fcff_values), terminal_value/1e9],
-        name="FCFF & Terminal Value",
-        marker_color='royalblue'
-    ))
-    fig.update_layout(
-        title="FCFF Projections + Terminal Value (in $Billions)",
-        yaxis_title="Value ($B)",
-        height=350,
-        margin=dict(l=40, r=40, t=50, b=30)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-
-def main_dashboard():
-    st.title("📈 Equities Dashboard")
-    
-    # Other dashboard widgets here...
-    
-    show_dcf_widget()
-
-
-if __name__ == "__main__":
-    main_dashboard()
-
-
 
 
 
@@ -2214,62 +2154,36 @@ wall_street_price_targets(ticker)
 import streamlit as st
 import streamlit.components.v1 as components
 
-def tradingview_forecast_and_rating_section(ticker):
-    st.header("🔍 Wall Street Forecast & Analyst Ratings (TradingView)")
+st.markdown("## 🧠 Wall Street Forecast & Technical Rating (TradingView)")
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("🎯 Analyst Price Targets")
-        components.html(
-            f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-analyst-estimates.js">
-              {{
-              "symbol": "NASDAQ:{ticker.upper()}",
-              "width": "100%",
-              "height": "400",
-              "colorTheme": "light",
-              "isTransparent": true,
-              "locale": "en"
-              }}
-              </script>
-            </div>
-            """,
-            height=420,
-        )
-
-    with col2:
-        st.subheader("🧠 Analyst Rating Summary")
-        components.html(
-            f"""
-            <div class="tradingview-widget-container">
-              <div class="tradingview-widget-container__widget"></div>
-              <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
-              {{
-              "interval": "1D",
-              "width": "100%",
-              "isTransparent": true,
-              "height": "400",
-              "symbol": "NASDAQ:{ticker.upper()}",
-              "showIntervalTabs": true,
-              "displayMode": "regular",
-              "colorTheme": "light"
-              }}
-              </script>
-            </div>
-            """,
-            height=420,
-        )
-
-    st.markdown(
-        f"🔗 [View on TradingView](https://www.tradingview.com/symbols/NASDAQ-{ticker.upper()}/forecast/)"
-    )
+components.html("""
+<!-- TradingView Widget BEGIN -->
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <div class="tradingview-widget-copyright">
+    <a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank">
+      <span class="blue-text">Track all markets on TradingView</span>
+    </a>
+  </div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+  {
+  "interval": "1h",
+  "width": "100%",
+  "isTransparent": false,
+  "height": "450",
+  "symbol": "NASDAQ:NVDA",
+  "showIntervalTabs": true,
+  "displayMode": "multiple",
+  "locale": "en",
+  "colorTheme": "light"
+  }
+  </script>
+</div>
+<!-- TradingView Widget END -->
+""", height=500)
 
 
 
-tradingview_forecast_and_rating_section(ticker)
 
 
 
