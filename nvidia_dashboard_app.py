@@ -874,10 +874,14 @@ Please begin:
         st.error(f"❌ Unexpected error during DCF generation: {e}")
 
 
-section = st.sidebar.selectbox("Select Section", ["Overview", "DCF", "Financials", "News"])
+# Replace this:
+# if section == "DCF":
+#     dcf_valuation_module()
 
-if section == "DCF":
-    dcf_valuation_module()
+# With this:
+st.markdown("## 🧮 Discounted Cash Flow Valuation")
+dcf_valuation_module()
+
 
 
 
