@@ -822,6 +822,8 @@ Present outputs in structured tables: Projections, DCF Summary, Sensitivity.
     except Exception as e:
         st.error(f"❌ Unexpected error occurred: {str(e)}")
 
+section = st.sidebar.selectbox("Select Section", ["Overview", "DCF", "Financials", "News"])
+
 if section == "DCF":
     dcf_valuation_module()
 
