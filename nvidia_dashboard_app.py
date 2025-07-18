@@ -20,6 +20,11 @@ st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
 st.cache_data.clear()
 
+import openai
+import streamlit as st
+
+openai.api_key = st.secrets["openai"]["key"]
+
 
 
 # REMOVE cache temporarily to force reload
@@ -737,6 +742,91 @@ if ticker:
 else:
     st.info("Please enter a stock ticker symbol.")
 
+import openai
+import streamlit as st
+
+def dcf_valuation_module():
+    st.header("💸 Discounted Cash Flow (DCF) Valuation (GPT-Powered)")
+    st.markdown("Fill in your assumptions below. We'll use GPT to perform the valuation.")
+
+    ticker = st.text_input("Company Ticker (e.g., AAPL)", value="AAPL")
+
+    revenue_growth = st.text_area(
+        "10-Year Revenue Growth Forecast (%)",
+        value="5,5,4.5,4,3.5,3,2.5,2,2,2"
+    )
+
+    ebit_margin = st.text_area(
+        "10-Year EBIT Margin Forecast (%)",
+        value="25,25,24.5,24,23.5,23,22.5,22,22,22"
+    )
+
+    tax_rate = st.number_input("Effective Tax Rate (%)", value=15.0, min_value=0.0, max_value=50.0)
+    capex = st.text_area("CapEx Forecast (% of Revenue)", value="3,3,3,2.5,2.5,2.5,2,2,2,2")
+    wacc = st.number_input("Discount Rate (WACC) (%)", value=8.0, min_value=0.0)
+    terminal_growth = st.number_input("Terminal Growth Rate (%)", value=2.5, min_value=0.0)
+
+    if st.button("Run DCF"):
+        with st.spinner("Calling GPT model..."):
+            gpt_dcf_prompt(ticker, revenue_growth, ebit_margin, tax_rate, capex, wacc, terminal_growth)
+
+def gpt_dcf_prompt(ticker, growth, margin, tax, capex, wacc, tg):
+    try:
+        prompt = f"""
+You are a financial modeling expert who performs equity valuation using only the Discounted Cash Flow (DCF) method, specifically for public companies.
+
+Use only the unlevered free cash flow to firm (FCFF) method:
+FCFF = EBIT × (1 - tax rate) + Depreciation & Amortization - Capex - Change in Working Capital
+
+Forecast period: 10 years.
+
+Company: {ticker}
+Revenue Growth (%): {growth}
+EBIT Margin (%): {margin}
+Tax Rate: {tax}%
+CapEx Forecast: {capex}
+WACC: {wacc}%
+Terminal Growth Rate: {tg}%
+
+Calculate:
+1. Revenue → EBIT → NOPAT → FCFF table for each year
+2. Terminal Value using Gordon Growth Model
+3. Enterprise Value, Net Debt, Equity Value
+4. Value per Share using outstanding shares from filings
+5. Sensitivity grid for WACC and Terminal Growth
+
+Present outputs in structured tables: Projections, DCF Summary, Sensitivity.
+"""
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+            max_tokens=3000,
+            timeout=30,
+        )
+
+        content = response.choices[0].message["content"]
+
+        st.success("✅ DCF successfully generated!")
+        st.markdown(content)
+
+    except openai.error.RateLimitError:
+        st.error("🚫 Rate limit reached. Please wait before trying again.")
+
+    except openai.error.AuthenticationError:
+        st.error("🔐 Invalid OpenAI API Key. Please check your Streamlit secrets.")
+
+    except openai.error.Timeout:
+        st.error("⏳ Request timed out. Try again in a few moments.")
+
+    except openai.error.APIError as e:
+        st.error(f"⚠️ OpenAI API error: {str(e)}")
+
+    except Exception as e:
+        st.error(f"❌ Unexpected error occurred: {str(e)}")
+
+if section == "DCF":
+    dcf_valuation_module()
 
 
 
