@@ -27,7 +27,9 @@ st.cache_data.clear()
 nltk.download("vader_lexicon", quiet=True)
 
 # Load OpenAI API key from secrets
-openai.api_key = st.secrets["openai"]["key"]
+from openai import OpenAI
+client = OpenAI(api_key=st.secrets["openai"]["key"])
+
 
 
 def load_sp500_data():
@@ -769,7 +771,13 @@ def dcf_valuation_module():
         with st.spinner("Calling GPT model..."):
             gpt_dcf_prompt(ticker, revenue_growth, ebit_margin, tax_rate, capex, wacc, terminal_growth)
 
+
+
+from openai import OpenAI
+from openai.types.chat import ChatCompletion
 from openai import RateLimitError, APIError
+
+client = OpenAI(api_key=st.secrets["openai"]["key"])
 
 def gpt_dcf_prompt(ticker, revenue_growth, ebit_margin, tax_rate, capex, wacc, terminal_growth):
     prompt = f"""
@@ -796,9 +804,8 @@ Stick to public company sources only. Output should be professional.
 
 Please begin:
 """
-
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are a valuation expert."},
@@ -817,7 +824,6 @@ Please begin:
         st.error(f"OpenAI API error: {e}")
     except Exception as e:
         st.error(f"❌ Unexpected error during DCF generation: {e}")
-
 
 
 section = st.sidebar.selectbox("Select Section", ["Overview", "DCF", "Financials", "News"])
