@@ -14,7 +14,8 @@ import streamlit.components.v1 as components
 from finvizfinance.quote import finvizfinance
 import nltk
 import openai
-from openai import RateLimitError, APIError, Timeout
+from openai import RateLimitError, APIError
+
 
 # Set page config BEFORE anything else
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
@@ -796,7 +797,7 @@ Stick to public company sources only. Output should be professional.
 Please begin:
 """
 
-    try:
+        try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
@@ -814,10 +815,9 @@ Please begin:
         st.error("⚠️ OpenAI API rate limit reached. Please wait and try again.")
     except APIError as e:
         st.error(f"OpenAI API error: {e}")
-    except Timeout:
-        st.error("OpenAI API request timed out.")
     except Exception as e:
         st.error(f"❌ Unexpected error during DCF generation: {e}")
+
 
 
 section = st.sidebar.selectbox("Select Section", ["Overview", "DCF", "Financials", "News"])
