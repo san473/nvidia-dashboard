@@ -14,6 +14,7 @@ import streamlit.components.v1 as components
 from finvizfinance.quote import finvizfinance
 import nltk
 import openai
+from openai import RateLimitError, APIError, Timeout
 
 # Set page config BEFORE anything else
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
@@ -767,60 +768,57 @@ def dcf_valuation_module():
         with st.spinner("Calling GPT model..."):
             gpt_dcf_prompt(ticker, revenue_growth, ebit_margin, tax_rate, capex, wacc, terminal_growth)
 
-def gpt_dcf_prompt(ticker, growth, margin, tax, capex, wacc, tg):
-    try:
-        prompt = f"""
-You are a financial modeling expert who performs equity valuation using only the Discounted Cash Flow (DCF) method, specifically for public companies.
+from openai import RateLimitError, APIError, Timeout
 
-Use only the unlevered free cash flow to firm (FCFF) method:
-FCFF = EBIT × (1 - tax rate) + Depreciation & Amortization - Capex - Change in Working Capital
+def gpt_dcf_prompt(ticker, revenue_growth, ebit_margin, tax_rate, capex, wacc, terminal_growth):
+    prompt = f"""
+You are a financial modeling expert who performs equity valuation using only the Discounted Cash Flow (DCF) method.
 
-Forecast period: 10 years.
+- Ticker: {ticker}
+- Revenue growth for next 10 years: {revenue_growth}
+- EBIT margin for next 10 years: {ebit_margin}
+- Tax rate: {tax_rate}
+- Capex: {capex}
+- WACC: {wacc}
+- Terminal growth rate: {terminal_growth}
 
-Company: {ticker}
-Revenue Growth (%): {growth}
-EBIT Margin (%): {margin}
-Tax Rate: {tax}%
-CapEx Forecast: {capex}
-WACC: {wacc}%
-Terminal Growth Rate: {tg}%
+Please build a DCF model using the unlevered free cash flow to firm (FCFF) method:
+FCFF = EBIT × (1 - tax rate) + D&A - Capex - Change in Working Capital
 
-Calculate:
-1. Revenue → EBIT → NOPAT → FCFF table for each year
-2. Terminal Value using Gordon Growth Model
-3. Enterprise Value, Net Debt, Equity Value
-4. Value per Share using outstanding shares from filings
-5. Sensitivity grid for WACC and Terminal Growth
+Assume D&A and change in working capital as a % of revenue, using reasonable benchmarks.
+Use a 10-year projection, Gordon Growth model for terminal value, and calculate per-share intrinsic value by subtracting net debt and dividing by shares outstanding (pulled from filings).
+Present results as:
+- 📊 Revenue, EBIT, NOPAT, FCFF tables
+- 📈 Summary DCF output
+- 🔁 Sensitivity table for WACC and terminal growth (Python-style)
+Stick to public company sources only. Output should be professional.
 
-Present outputs in structured tables: Projections, DCF Summary, Sensitivity.
+Please begin:
 """
+
+    try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=3000,
-            timeout=30,
+            messages=[
+                {"role": "system", "content": "You are a valuation expert."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=3000
         )
+        result = response.choices[0].message.content
+        st.subheader("📊 DCF Valuation Summary")
+        st.markdown(result)
 
-        content = response.choices[0].message["content"]
-
-        st.success("✅ DCF successfully generated!")
-        st.markdown(content)
-
-    except openai.error.RateLimitError:
-        st.error("🚫 Rate limit reached. Please wait before trying again.")
-
-    except openai.error.AuthenticationError:
-        st.error("🔐 Invalid OpenAI API Key. Please check your Streamlit secrets.")
-
-    except openai.error.Timeout:
-        st.error("⏳ Request timed out. Try again in a few moments.")
-
-    except openai.error.APIError as e:
-        st.error(f"⚠️ OpenAI API error: {str(e)}")
-
+    except RateLimitError:
+        st.error("⚠️ OpenAI API rate limit reached. Please wait and try again.")
+    except APIError as e:
+        st.error(f"OpenAI API error: {e}")
+    except Timeout:
+        st.error("OpenAI API request timed out.")
     except Exception as e:
-        st.error(f"❌ Unexpected error occurred: {str(e)}")
+        st.error(f"❌ Unexpected error during DCF generation: {e}")
+
 
 section = st.sidebar.selectbox("Select Section", ["Overview", "DCF", "Financials", "News"])
 
