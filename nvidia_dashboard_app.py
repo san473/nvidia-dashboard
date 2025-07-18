@@ -2223,4 +2223,27 @@ def insider_institutional_section(ticker: str):
 if ticker:
     insider_institutional_section(ticker)
 
+st.markdown("## 🗓️ Global Economic Events (TradingView)")
+
+components.html("""
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <div class="tradingview-widget-copyright">
+    <a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank">
+      <span class="blue-text">Track all markets on TradingView</span>
+    </a>
+  </div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+  {
+    "colorTheme": "dark",
+    "isTransparent": false,
+    "locale": "en",
+    "countryFilter": "ar,au,br,ca,cn,fr,de,in,id,it,jp,kr,mx,ru,sa,za,tr,gb,us,eu",
+    "importanceFilter": "-1,0,1",
+    "width": "100%",
+    "height": 550
+  }
+  </script>
+</div>
+""", height=600)
 
