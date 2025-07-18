@@ -20,6 +20,53 @@ from openai import RateLimitError, APIError
 # Set page config BEFORE anything else
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
+import streamlit.components.v1 as components
+
+def render_ticker_widget():
+    ticker_html = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container" style="margin-bottom: 20px;">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+      {
+        "symbols": [
+          {
+            "proName": "FOREXCOM:SPXUSD",
+            "title": "S&P 500 Index"
+          },
+          {
+            "proName": "FOREXCOM:NSXUSD",
+            "title": "US 100 Cash CFD"
+          },
+          {
+            "proName": "FX_IDC:EURUSD",
+            "title": "EUR to USD"
+          },
+          {
+            "proName": "BITSTAMP:BTCUSD",
+            "title": "Bitcoin"
+          },
+          {
+            "proName": "BITSTAMP:ETHUSD",
+            "title": "Ethereum"
+          }
+        ],
+        "colorTheme": "dark",
+        "locale": "en",
+        "largeChartUrl": "",
+        "isTransparent": false,
+        "showSymbolLogo": true,
+        "displayMode": "adaptive"
+      }
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    components.html(ticker_html, height=100)
+
+# Place it right after page config and title
+render_ticker_widget()
+
 # Clear cache (optional - usually used for dev only)
 st.cache_data.clear()
 
