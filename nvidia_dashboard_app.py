@@ -654,17 +654,6 @@ def tradingview_technical_analysis_widget(ticker, height=500):
     """
     return components.html(html_code, height=height)
 
-# ================= REPLACE YOUR EXISTING PRICE CHART SECTION WITH THIS =================
-# Find your existing price chart section and replace it with:
-
-# Enhanced Price Chart - Replace your existing fig = go.Figure() price chart with this:
-# IMPORTANT: Only add this AFTER your ticker input section where ticker is defined
-try:
-    if ticker:
-        st.header("📈 Advanced Price Chart")
-        tradingview_advanced_chart(ticker, 700)
-except NameError:
-    st.warning("Please enter a ticker symbol first.")
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -2130,37 +2119,33 @@ wall_street_price_targets(ticker)
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.markdown("## 🧠 Wall Street Forecast & Technical Rating (TradingView)")
-
-components.html("""
-<!-- TradingView Widget BEGIN -->
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <div class="tradingview-widget-copyright">
-    <a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank">
-      <span class="blue-text">Track all markets on TradingView</span>
-    </a>
-  </div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
-  {
-  "interval": "1h",
-  "width": "100%",
-  "isTransparent": false,
-  "height": "450",
-  "symbol": "NASDAQ:NVDA",
-  "showIntervalTabs": true,
-  "displayMode": "multiple",
-  "locale": "en",
-  "colorTheme": "light"
-  }
-  </script>
-</div>
-<!-- TradingView Widget END -->
-""", height=500)
-
-
-
-
+    # Wall Street Forecast & Technical Rating (TradingView)
+    st.markdown("## 📊 Wall Street Forecast & Technical Rating (TradingView)")
+    components.html(f"""
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright">
+        <a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank">
+          <span class="blue-text">Track all markets on TradingView</span>
+        </a>
+      </div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+      {{
+        "interval": "1h",
+        "width": "100%",
+        "isTransparent": false,
+        "height": "100%",
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "showIntervalTabs": true,
+        "displayMode": "multiple",
+        "locale": "en",
+        "colorTheme": "light"
+      }}
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """, height=500)
 
 
 
