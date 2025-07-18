@@ -720,67 +720,28 @@ def tv_mini_chart(ticker, height=300):
     """
     components.html(html, height=height)
 
-# ========== FINVIZ FUNDAMENTALS & RATINGS ==========
+    
+st.markdown("## 🧾 Financials Overview (TradingView)")
 
-def finviz_fundamentals_widget(ticker):
-    try:
-        stock = finvizfinance(ticker)
-        fund = stock.ticker_fundament()
-        df = pd.DataFrame(list(fund.items()), columns=["Metric", "Value"])
-        st.subheader("📊 Finviz Fundamentals")
-        with st.expander("Click to view detailed fundamentals"):
-            st.dataframe(df, use_container_width=True)
-    except Exception as e:
-        st.error(f"Error loading Finviz fundamentals: {e}")
+components.html(f"""
+<!-- TradingView Widget BEGIN -->
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
+  {{
+    "symbol": "NASDAQ:{ticker.upper()}",
+    "colorTheme": "dark",
+    "displayMode": "regular",
+    "isTransparent": false,
+    "locale": "en",
+    "width": "100%",
+    "height": 550
+  }}
+  </script>
+</div>
+<!-- TradingView Widget END -->
+""", height=600)
 
-def finviz_analyst_widget(ticker):
-    try:
-        stock = finvizfinance(ticker)
-        ratings = stock.ticker_outer_ratings()
-        if ratings is not None and not ratings.empty:
-            st.subheader("🎯 Finviz Analyst Ratings & Price Targets")
-            with st.expander("Click to view analyst activity"):
-                st.dataframe(ratings, use_container_width=True)
-        else:
-            st.info("No analyst ratings data available on Finviz.")
-    except Exception as e:
-        st.error(f"Error loading Finviz analyst ratings: {e}")
-
-# ========== ALPHA SPREAD SUMMARY IFRAME ==========
-
-def alpha_spread_summary(ticker):
-    try:
-        html = f"""
-        <iframe src="https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/summary"
-            width="100%" height="600" frameborder="0" scrolling="no"></iframe>
-        """
-        components.html(html, height=600)
-    except Exception as e:
-        st.warning(f"Alpha Spread widget failed: {e}")
-        st.markdown(f"[View Alpha Spread Summary](https://www.alphaspread.com/security/nasdaq/{ticker.lower()}/summary)")
-
-# ========== MAIN DASHBOARD ==========
-
-def equities_dashboard(ticker):
-    st.markdown(f"<h3 style='font-size:24px'>{ticker.upper()} Financial Dashboard</h3>", unsafe_allow_html=True)
-
-    # TradingView Price Chart
-    st.subheader("📈 Price Chart (TradingView)")
-    try:
-        tv_advanced_chart(ticker)
-        tv_mini_chart(ticker)
-    except Exception as e:
-        st.warning(f"TradingView price chart not available: {e}")
-
-    # Finviz Fundamentals
-    finviz_fundamentals_widget(ticker)
-
-    # Finviz Analyst Ratings
-    finviz_analyst_widget(ticker)
-
-    # Alpha Spread Summary Widget
-    st.subheader("🔍 Alpha Spread Financial Summary")
-    alpha_spread_summary(ticker)
 
 # ========== ENTRY POINT ==========
 
