@@ -2119,38 +2119,31 @@ wall_street_price_targets(ticker)
 import streamlit as st
 import streamlit.components.v1 as components
 
-def equities_dashboard(ticker):
-    st.markdown(f"<h3 style='font-size:24px'>{ticker.upper()} Financial Dashboard</h3>", unsafe_allow_html=True)
+st.markdown("## 📊 Wall Street Forecast & Technical Rating (TradingView)")
 
-    # Wall Street Forecast & Technical Rating (TradingView)
-    st.markdown("## 📊 Wall Street Forecast & Technical Rating (TradingView)")
-    components.html(f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright">
-        <a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank">
-          <span class="blue-text">Track all markets on TradingView</span>
-        </a>
-      </div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
-      {{
-        "interval": "1h",
-        "width": "100%",
-        "isTransparent": false,
-        "height": "100%",
-        "symbol": "NASDAQ:{ticker.upper()}",
-        "showIntervalTabs": true,
-        "displayMode": "multiple",
-        "locale": "en",
-        "colorTheme": "light"
-      }}
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """, height=500)
-
-    # [Continue with other dashboard sections like financials, charts, etc.]
+components.html(f"""
+<div class="tradingview-widget-container">
+  <div class="tradingview-widget-container__widget"></div>
+  <div class="tradingview-widget-copyright">
+    <a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank">
+      <span class="blue-text">Track all markets on TradingView</span>
+    </a>
+  </div>
+  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js" async>
+  {{
+    "interval": "1h",
+    "width": "100%",
+    "isTransparent": false,
+    "height": "500",
+    "symbol": "NASDAQ:{ticker.upper()}",
+    "showIntervalTabs": true,
+    "displayMode": "multiple",
+    "locale": "en",
+    "colorTheme": "light"
+  }}
+  </script>
+</div>
+""", height=500)
 
 
 
