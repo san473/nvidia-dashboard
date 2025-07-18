@@ -11,24 +11,21 @@ from streamlit.runtime.caching import cache_data
 import altair as alt
 import matplotlib.pyplot as plt
 import streamlit.components.v1 as components
-import nltk
 from finvizfinance.quote import finvizfinance
+import nltk
+import openai
 
-nltk.download('vader_lexicon')
-
+# Set page config BEFORE anything else
 st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
+# Clear cache (optional - usually used for dev only)
 st.cache_data.clear()
 
-import openai
-import streamlit as st
+# Download NLTK data (only once, should ideally be outside app or cached)
+nltk.download("vader_lexicon", quiet=True)
 
+# Load OpenAI API key from secrets
 openai.api_key = st.secrets["openai"]["key"]
-
-
-
-# REMOVE cache temporarily to force reload
-# @st.cache_data
 
 
 def load_sp500_data():
