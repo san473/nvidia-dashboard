@@ -720,6 +720,22 @@ def tv_mini_chart(ticker, height=300):
     """
     components.html(html, height=height)
 
+
+
+
+# ========== MAIN DASHBOARD ==========
+
+def equities_dashboard(ticker):
+    st.markdown(f"<h3 style='font-size:24px'>{ticker.upper()} Financial Dashboard</h3>", unsafe_allow_html=True)
+
+    # TradingView Price Chart
+    st.subheader("📈 Price Chart (TradingView)")
+    try:
+        tv_advanced_chart(ticker)
+        tv_mini_chart(ticker)
+    except Exception as e:
+        st.warning(f"TradingView price chart not available: {e}")
+
     
 st.markdown("## 🧾 Financials Overview (TradingView)")
 
