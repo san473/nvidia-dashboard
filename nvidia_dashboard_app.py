@@ -2116,6 +2116,66 @@ def wall_street_price_targets(ticker: str):
 # Insert this line at the end of any logical section (e.g., scenario modeling)
 wall_street_price_targets(ticker)
 
+import yfinance as yf
+import plotly.graph_objects as go
+
+def render_price_target_chart(ticker):
+    stock = yf.Ticker(ticker)
+    try:
+        target_data = stock.info
+        current_price = target_data.get("currentPrice")
+        target_mean = target_data.get("targetMeanPrice")
+        target_low = target_data.get("targetLowPrice")
+        target_high = target_data.get("targetHighPrice")
+
+        if None in [current_price, target_mean, target_low, target_high]:
+            st.warning("⚠️ Analyst price target data not available for this stock.")
+            return
+
+        # Create bar chart
+        fig = go.Figure()
+
+        fig.add_trace(go.Bar(
+            x=["Low", "Average", "High"],
+            y=[target_low, target_mean, target_high],
+            name="Analyst Price Targets",
+            marker_color='indianred'
+        ))
+
+        # Add current price line
+        fig.add_shape(
+            type="line",
+            x0=-0.5,
+            x1=2.5,
+            y0=current_price,
+            y1=current_price,
+            line=dict(color="blue", dash="dash"),
+            name="Current Price"
+        )
+        fig.add_annotation(
+            x=2,
+            y=current_price,
+            text=f"Current Price: ${current_price:.2f}",
+            showarrow=False,
+            font=dict(color="blue")
+        )
+
+        fig.update_layout(
+            title=f"{ticker.upper()} Wall Street Analyst Price Targets",
+            yaxis_title="Price (USD)",
+            xaxis_title="Target Type",
+            height=400,
+            plot_bgcolor="white"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"❌ Error loading price target data: {e}")
+
+st.markdown("## 🎯 Analyst Price Target Forecast")
+render_price_target_chart(ticker)
+
 import streamlit as st
 import streamlit.components.v1 as components
 
