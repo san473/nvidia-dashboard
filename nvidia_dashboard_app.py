@@ -2122,67 +2122,72 @@ import yfinance as yf
 import streamlit as st
 import plotly.graph_objects as go
 
-def render_stockanalysis_forecast(ticker_symbol: str):
+def render_price_target_chart(ticker_symbol: str):
     # 1) Fetch data
-    t = yf.Ticker(ticker_symbol)
-    info = t.info
+    info = yf.Ticker(ticker_symbol).info
     current = info.get("currentPrice")
     low     = info.get("targetLowPrice")
     mean    = info.get("targetMeanPrice")
-    median  = info.get("targetMedianPrice", mean)  # fallback to mean
     high    = info.get("targetHighPrice")
 
     if None in (current, low, mean, high):
         st.warning(f"No price‑target data available for {ticker_symbol.upper()}.")
         return
 
-    # 2) Show top‑line metric (mean target vs current)
-    pct = (mean - current) / current * 100
-    st.metric(
-        label="📈 Price Target Forecast",
-        value=f"${mean:,.2f}",
-        delta=f"{pct:+.2f}%"
+    # 2) Build figure
+    fig = go.Figure()
+
+    # a) range band as a filled rectangle
+    fig.add_shape(
+        type="rect",
+        x0=low, x1=high,
+        y0=-0.1, y1=0.1,
+        fillcolor="lightblue",
+        line_width=0,
+        opacity=0.5
     )
 
-    # 3) Build table data
-    labels  = ["Target Low", "Average", "Median", "Target High"]
-    prices  = [low, mean, median, high]
-    changes = [(p - current) / current * 100 for p in prices]
+    # b) mean target marker
+    fig.add_trace(go.Scatter(
+        x=[mean], y=[0],
+        mode="markers+text",
+        marker=dict(color="green", symbol="diamond", size=16),
+        text=["Mean"],
+        textposition="bottom center",
+        hovertemplate="Mean Target: $%{x:.2f}<extra></extra>"
+    ))
 
-    # 4) Render Plotly Table
-    fig = go.Figure(data=[go.Table(
-        header=dict(
-            values=["", "Price (USD)", "Change (%)"],
-            fill_color="darkblue",
-            font=dict(color="white", size=14),
-            align="center"
-        ),
-        cells=dict(
-            values=[
-                labels,
-                [f"${p:,.2f}" for p in prices],
-                [f"{chg:+.2f}%" for chg in changes]
-            ],
-            fill_color=[["#f0f8ff", "#ffffff"] * 2],  # alternating row colors
-            font=dict(color="black", size=12),
-            align="center"
-        )
-    )])
+    # c) current price marker
+    fig.add_trace(go.Scatter(
+        x=[current], y=[0],
+        mode="markers+text",
+        marker=dict(color="red", symbol="x", size=16),
+        text=["Current"],
+        textposition="top center",
+        hovertemplate="Current Price: $%{x:.2f}<extra></extra>"
+    ))
 
+    # 3) Layout styling
+    fig.update_yaxes(visible=False, range=[-0.5, 0.5])
+    fig.update_xaxes(
+        title="Price (USD)",
+        range=[min(low, current) * 0.9, max(high, current) * 1.1],
+        showgrid=True,
+        gridcolor="lightgray"
+    )
     fig.update_layout(
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=250,
-        paper_bgcolor="white"
+        title=f"{ticker_symbol.upper()} Analyst Price Target Range",
+        plot_bgcolor="white",
+        height=300,
+        margin=dict(l=40, r=40, t=60, b=40),
+        showlegend=False
     )
 
+    # 4) Render in Streamlit
     st.plotly_chart(fig, use_container_width=True)
+st.markdown("## 🎯 Analyst Price Target Chart")
+render_price_target_chart(ticker)
 
-
-# — Usage in your app —
-st.markdown("## 🔮 Stock Price Forecast (StockAnalysis‑style)")
-ticker = st.text_input("Enter Ticker", "AAPL")
-if ticker:
-    render_stockanalysis_forecast(ticker)
 
 
 
