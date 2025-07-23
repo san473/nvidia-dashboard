@@ -745,6 +745,11 @@ from finvizfinance.quote import finvizfinance
 
 # ========== TRADINGVIEW PRICE CHARTS ==========
 
+import streamlit as st
+import streamlit.components.v1 as components
+from openai import OpenAI, RateLimitError, APIError
+
+# — TradingView Price Charts Functions — 
 def tv_advanced_chart(ticker, height=500):
     html = f"""
     <div style="height:{height}px;width:100%">
@@ -786,24 +791,29 @@ def tv_mini_chart(ticker, height=300):
     components.html(html, height=height)
 
 def render_price_charts(ticker):
-    st.markdown("### 📈 Price Chart (TradingView)")
+    st.markdown(
+        '<div class="section-title">📈 Price Chart (TradingView)</div>',
+        unsafe_allow_html=True
+    )
     tv_advanced_chart(ticker)
     tv_mini_chart(ticker)
 
-
-
-# ========== MAIN DASHBOARD ==========
-
+# — Main Equities Dashboard — 
 def equities_dashboard(ticker):
-    st.markdown(f"<h3 style='font-size:24px'>{ticker.upper()} Financial Dashboard</h3>", unsafe_allow_html=True)
+    st.markdown(
+        f"<h3 style='font-size:24px'>{ticker.upper()} Financial Dashboard</h3>",
+        unsafe_allow_html=True
+    )
 
-    # TradingView Financials widget
-    st.markdown("## 🧾 Financials Overview (TradingView)")
+    # 🧾 Financials Overview
+    st.markdown(
+        '<div class="section-title">🧾 Financials Overview (TradingView)</div>',
+        unsafe_allow_html=True
+    )
     components.html(f"""
-    <!-- TradingView Widget BEGIN -->
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
+      <script src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js" async>
       {{
         "symbol": "NASDAQ:{ticker.upper()}",
         "colorTheme": "dark",
@@ -815,114 +825,129 @@ def equities_dashboard(ticker):
       }}
       </script>
     </div>
-    <!-- TradingView Widget END -->
     """, height=600)
 
-    # Add price charts just below financials
+    # 📈 Price Charts
     render_price_charts(ticker)
 
-
-
-# ========== ENTRY POINT ==========
-
+# — Entry Point — 
 ticker = st.text_input("Enter Ticker Symbol", value="AAPL", key="ticker_input")
 if ticker:
     equities_dashboard(ticker)
 else:
     st.info("Please enter a stock ticker symbol.")
 
-import openai
+from openai import OpenAI, RateLimitError, APIError
 import streamlit as st
 
-def dcf_valuation_module():
-    st.header("💸 Discounted Cash Flow (DCF) Valuation (GPT-Powered)")
-    st.markdown("Fill in your assumptions below. We'll use GPT to perform the valuation.")
-
-    ticker = st.text_input("Company Ticker (e.g., AAPL)", value="AAPL")
-
-    revenue_growth = st.text_area(
-        "10-Year Revenue Growth Forecast (%)",
-        value="5,5,4.5,4,3.5,3,2.5,2,2,2"
-    )
-
-    ebit_margin = st.text_area(
-        "10-Year EBIT Margin Forecast (%)",
-        value="25,25,24.5,24,23.5,23,22.5,22,22,22"
-    )
-
-    tax_rate = st.number_input("Effective Tax Rate (%)", value=15.0, min_value=0.0, max_value=50.0)
-    capex = st.text_area("CapEx Forecast (% of Revenue)", value="3,3,3,2.5,2.5,2.5,2,2,2,2")
-    wacc = st.number_input("Discount Rate (WACC) (%)", value=8.0, min_value=0.0)
-    terminal_growth = st.number_input("Terminal Growth Rate (%)", value=2.5, min_value=0.0)
-
-    if st.button("Run DCF"):
-        with st.spinner("Calling GPT model..."):
-            gpt_dcf_prompt(ticker, revenue_growth, ebit_margin, tax_rate, capex, wacc, terminal_growth)
-
-
-
-from openai import OpenAI
-from openai.types.chat import ChatCompletion
-from openai import RateLimitError, APIError
-
+# — Initialize OpenAI client once, using your stored secret key —
 client = OpenAI(api_key=st.secrets["openai"]["key"])
 
-def gpt_dcf_prompt(ticker, revenue_growth, ebit_margin, tax_rate, capex, wacc, terminal_growth):
+def gpt_dcf_prompt(ticker, rev_growth, ebit_margin, tax_rate, capex, wacc, term_growth):
     prompt = f"""
 You are a financial modeling expert who performs equity valuation using only the Discounted Cash Flow (DCF) method.
 
 - Ticker: {ticker}
-- Revenue growth for next 10 years: {revenue_growth}
+- Revenue growth for next 10 years: {rev_growth}
 - EBIT margin for next 10 years: {ebit_margin}
-- Tax rate: {tax_rate}
-- Capex: {capex}
-- WACC: {wacc}
-- Terminal growth rate: {terminal_growth}
+- Tax rate: {tax_rate}%
+- CapEx as % of revenue: {capex}
+- WACC: {wacc}%
+- Terminal growth rate: {term_growth}%
 
-Please build a DCF model using the unlevered free cash flow to firm (FCFF) method:
-FCFF = EBIT × (1 - tax rate) + D&A - Capex - Change in Working Capital
+Build a DCF model (FCFF), use a 10‑year projection, Gordon Growth for terminal value,
+subtract net debt, divide by shares outstanding to get per‑share value.
+Present:
+• Projection table (Revenue, EBIT, NOPAT, FCFF each year)
+• Summary DCF output
+• Sensitivity table for WACC × terminal growth
 
-Assume D&A and change in working capital as a % of revenue, using reasonable benchmarks.
-Use a 10-year projection, Gordon Growth model for terminal value, and calculate per-share intrinsic value by subtracting net debt and dividing by shares outstanding (pulled from filings).
-Present results as:
-- 📊 Revenue, EBIT, NOPAT, FCFF tables
-- 📈 Summary DCF output
-- 🔁 Sensitivity table for WACC and terminal growth (Python-style)
-Stick to public company sources only. Output should be professional.
-
-Please begin:
+Respond professionally.
 """
     try:
-        response = client.chat.completions.create(
+        resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            
             messages=[
                 {"role": "system", "content": "You are a valuation expert."},
-                {"role": "user", "content": prompt}
+                {"role": "user",   "content": prompt}
             ],
             temperature=0.2,
-            max_tokens=3000
+            max_tokens=2000,
         )
-        result = response.choices[0].message.content
         st.subheader("📊 DCF Valuation Summary")
-        st.markdown(result)
+        st.markdown(resp.choices[0].message.content)
 
     except RateLimitError:
         st.error("⚠️ OpenAI API rate limit reached. Please wait and try again.")
     except APIError as e:
-        st.error(f"OpenAI API error: {e}")
+        st.error(f"❌ OpenAI API error: {e}")
     except Exception as e:
         st.error(f"❌ Unexpected error during DCF generation: {e}")
 
+def dcf_valuation_module():
+    st.markdown(
+        '<div class="section-title">💸 Discounted Cash Flow (DCF) Valuation</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown("Fill in your assumptions below. We'll run the DCF model automatically:")
 
-# Replace this:
-# if section == "DCF":
-#     dcf_valuation_module()
+    # Collect assumptions
+    dcf_ticker = st.text_input("Company Ticker (e.g., AAPL)", value="AAPL", key="dcf_ticker")
 
-# With this:
-st.markdown("## 🧮 Discounted Cash Flow Valuation")
+    rev_growth = st.text_area(
+        "10‑Year Revenue Growth Forecast (%)",
+        value="5,5,4.5,4,3.5,3,2.5,2,2,2",
+        help="Comma‑separated annual % growth rates"
+    )
+
+    ebit_margin = st.text_area(
+        "10‑Year EBIT Margin Forecast (%)",
+        value="25,25,24.5,24,23.5,23,22.5,22,22,22",
+        help="Comma‑separated EBIT margin % for each of the next 10 years"
+    )
+
+    tax_rate = st.number_input(
+        "Effective Tax Rate (%)",
+        min_value=0.0,
+        max_value=50.0,
+        value=15.0,
+        step=0.1
+    )
+
+    capex = st.text_area(
+        "CapEx Forecast (% of Revenue)",
+        value="3,3,3,2.5,2.5,2.5,2,2,2,2",
+        help="Comma‑separated CapEx as % of revenue for each of 10 years"
+    )
+
+    wacc = st.number_input(
+        "Discount Rate (WACC) (%)",
+        min_value=0.0,
+        value=8.0,
+        step=0.1
+    )
+
+    term_growth = st.number_input(
+        "Terminal Growth Rate (%)",
+        min_value=0.0,
+        value=2.5,
+        step=0.1
+    )
+
+    if st.button("Run DCF"):
+        with st.spinner("Running DCF valuation via GPT…"):
+            gpt_dcf_prompt(
+                dcf_ticker,
+                rev_growth,
+                ebit_margin,
+                tax_rate,
+                capex,
+                wacc,
+                term_growth
+            )
+
+# — Call the DCF module inline in your app —
 dcf_valuation_module()
-
 
 
 
