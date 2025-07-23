@@ -2217,7 +2217,9 @@ def render_price_target_widget(ticker_symbol: str):
 
     st.plotly_chart(fig, use_container_width=True)
 
-
+# 🎯 Analyst Price Target Section
+    st.markdown("## 🎯 Analyst Price Target Forecast")
+    render_price_target_widget(ticker)
 
 
 import streamlit as st
