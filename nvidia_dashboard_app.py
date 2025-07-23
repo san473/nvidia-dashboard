@@ -1234,6 +1234,7 @@ import numpy as np
 import requests
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
+import plotly.express as px
 import altair as alt
 
 # — Profitability Overview —
@@ -1243,28 +1244,27 @@ with st.container():
         unsafe_allow_html=True
     )
     try:
-        yf_tkr         = yf.Ticker(ticker)
-        info           = yf_tkr.info
-        income_stmt    = yf_tkr.income_stmt.fillna(0)
-        balance_sheet  = yf_tkr.balance_sheet.fillna(0)
+        yf_tkr        = yf.Ticker(ticker)
+        income_stmt   = yf_tkr.income_stmt.fillna(0)
+        balance_sheet = yf_tkr.balance_sheet.fillna(0)
         income_stmt.index     = income_stmt.index.str.lower()
         balance_sheet.index   = balance_sheet.index.str.lower()
 
-        # — Margin Profile —
+        # 🧮 Margin Profile
         st.markdown(
             '<div class="section-title">🧮 Margin Profile</div>',
             unsafe_allow_html=True
         )
         col1, col2, col3 = st.columns(3)
         revenue          = income_stmt.loc["total revenue"].iloc[0] if "total revenue" in income_stmt.index else None
-        gross_profit     = income_stmt.loc["gross profit"].iloc[0]    if "gross profit"    in income_stmt.index else None
+        gross_profit     = income_stmt.loc["gross profit"].iloc[0] if "gross profit" in income_stmt.index else None
         operating_income = income_stmt.loc["operating income"].iloc[0] if "operating income" in income_stmt.index else None
-        net_income       = income_stmt.loc["net income"].iloc[0]      if "net income"      in income_stmt.index else None
+        net_income       = income_stmt.loc["net income"].iloc[0] if "net income" in income_stmt.index else None
 
         if revenue:
             gross_margin = gross_profit / revenue if gross_profit else None
             op_margin    = operating_income / revenue if operating_income else None
-            net_margin   = net_income / revenue     if net_income else None
+            net_margin   = net_income / revenue if net_income else None
 
             for col, label, val in zip(
                 [col1, col2, col3],
@@ -1280,28 +1280,76 @@ with st.container():
                         st.metric(label, "N/A")
                         st.progress(0.001)
 
-            # Historical margins
+            # historical margins
             mdf = pd.DataFrame({
                 "Gross Margin": income_stmt.loc["gross profit"] / income_stmt.loc["total revenue"],
                 "Operating Margin": income_stmt.loc["operating income"] / income_stmt.loc["total revenue"],
                 "Net Margin": income_stmt.loc["net income"] / income_stmt.loc["total revenue"],
             }).T.dropna(axis=1, how='all').T * 100
+
             if not mdf.empty:
                 st.line_chart(mdf)
 
-        # — Return on Capital Measures —
+        # 🧾 Return on Capital Measures
         st.markdown(
             '<div class="section-title">🧾 Return on Capital Measures</div>',
             unsafe_allow_html=True
         )
         col1, col2, col3, col4 = st.columns(4)
-        # (calculate roe, roa, roic, roce exactly as before…)
-        # then display metrics + st.progress identical to above
+        # gather balance sheet and income data
+        total_assets = balance_sheet.loc["total assets"].iloc[0] if "total assets" in balance_sheet.index else None
+        equity_keys  = [
+            "total stockholder equity", "stockholders equity",
+            "common stock equity", "total equity gross minority interest"
+        ]
+        total_equity = next((balance_sheet.loc[k].iloc[0] for k in equity_keys if k in balance_sheet.index), None)
+        short_long_debt = balance_sheet.loc["short long term debt"].iloc[0] if "short long term debt" in balance_sheet.index else 0
+        long_term_debt  = balance_sheet.loc["long term debt"].iloc[0]      if "long term debt" in balance_sheet.index else 0
+        ebit = income_stmt.loc["ebit"].iloc[0] if "ebit" in income_stmt.index else operating_income
+        ni   = net_income
 
-        # Historical ROE/ROIC/ROCE
-        # (build historical_df and plot)
-        if not historical_df.empty:
-            st.line_chart(historical_df * 100)
+        ta, te, td, ld, ei, _ni = total_assets or 0, total_equity or 0, short_long_debt or 0, long_term_debt or 0, ebit or 0, ni or 0
+
+        roe  = (_ni/te) if te>0 and ni is not None else None
+        roa  = (_ni/ta) if ta>0 and ni is not None else None
+        roic = (ei/(te+td)) if (te+td)>0 and ebit is not None else None
+        roce = (ei/(te+ld)) if (te+ld)>0 and ebit is not None else None
+
+        for col, label, val in zip(
+            [col1, col2, col3, col4],
+            ["ROE", "ROA", "ROIC", "ROCE"],
+            [roe, roa, roic, roce]
+        ):
+            with col:
+                if val is not None:
+                    pct = val * 100
+                    st.metric(label, f"{pct:.2f}%")
+                    st.progress(min(max(val, 0), 1.0))
+                else:
+                    st.metric(label, "N/A")
+                    st.progress(0.001)
+
+        # historical ROE/ROIC/ROCE
+        years = income_stmt.columns.astype(str)
+        roe_list, roic_list, roce_list = [], [], []
+        for yr in years:
+            try:
+                ni_yr   = income_stmt.loc["net income", yr]
+                te_yr   = next((balance_sheet.loc[k, yr] for k in equity_keys if k in balance_sheet.index), None)
+                ta_yr   = balance_sheet.loc["total assets", yr] if "total assets" in balance_sheet.index else None
+                td_yr   = balance_sheet.loc["short long term debt", yr] if "short long term debt" in balance_sheet.index else 0
+                ld_yr   = balance_sheet.loc["long term debt", yr] if "long term debt" in balance_sheet.index else 0
+                ebit_yr = income_stmt.loc["ebit", yr] if "ebit" in income_stmt.index else income_stmt.loc["operating income", yr]
+
+                roe_list.append((ni_yr/te_yr) if te_yr and ni_yr is not None else None)
+                roic_list.append((ebit_yr/(te_yr+td_yr)) if te_yr and (te_yr+td_yr)>0 else None)
+                roce_list.append((ebit_yr/(te_yr+ld_yr)) if te_yr and (te_yr+ld_yr)>0 else None)
+            except:
+                roe_list.append(None); roic_list.append(None); roce_list.append(None)
+
+        hist_df = pd.DataFrame({"ROE": roe_list, "ROIC": roic_list, "ROCE": roce_list}, index=years).dropna(how="all")
+        if not hist_df.empty:
+            st.line_chart(hist_df * 100)
 
     except Exception as e:
         st.error(f"Error loading profitability section: {e}")
@@ -1312,15 +1360,54 @@ st.markdown(
     '<div class="section-title">🧠 Market News Summary</div>',
     unsafe_allow_html=True
 )
-company_name = get_company_name_from_ticker(ticker)
-articles     = get_news_articles(company_name)
-positive, negative, emerging = categorize_articles(articles)
+
+@st.cache_data(ttl=3600)
+def get_company_name_from_ticker(t):
+    return yf.Ticker(t).info.get("longName", t)
+
+@st.cache_data(ttl=60)
+def get_news_articles(name):
+    today = datetime.today()
+    week_ago = today - timedelta(days=7)
+    params = {
+        "q": name,
+        "from": week_ago.strftime("%Y-%m-%d"),
+        "sortBy": "relevancy",
+        "language": "en",
+        "apiKey": st.secrets["NEWSAPI_KEY"],
+        "pageSize": 10
+    }
+    r = requests.get("https://newsapi.org/v2/everything", params=params)
+    return r.json().get("articles", []) if r.ok else []
+
+def categorize_articles(arts):
+    pos, neg, eme = [], [], []
+    for a in arts:
+        text = (a.get("title","")+" "+a.get("description","")).lower()
+        if any(w in text for w in ["beats","growth","record","surge","upgrade","strong","gain","boost"]): pos.append(a)
+        elif any(w in text for w in ["misses","decline","drop","downgrade","loss","concern","lawsuit"]): neg.append(a)
+        else: eme.append(a)
+    return pos, neg, eme
+
+def generate_summary(arts):
+    if not arts: return "No significant news."
+    snippets = []
+    for art in arts[:3]:
+        t = art.get("title","")
+        d = art.get("description","")
+        snippets.append(t if len(t)>20 else f"{t} — {d}")
+    return " ".join(snippets)
+
+company = get_company_name_from_ticker(ticker)
+arts    = get_news_articles(company)
+pos, neg, eme = categorize_articles(arts)
+
 st.markdown('<div class="section-title">📈 Positive Developments</div>', unsafe_allow_html=True)
-st.write(generate_summary(positive))
+st.write(generate_summary(pos))
 st.markdown('<div class="section-title">⚠️ Risks & Negative Sentiment</div>', unsafe_allow_html=True)
-st.write(generate_summary(negative))
+st.write(generate_summary(neg))
 st.markdown('<div class="section-title">🧩 Emerging Themes</div>', unsafe_allow_html=True)
-st.write(generate_summary(emerging))
+st.write(generate_summary(eme))
 
 
 # — Interactive Financial Visualizations —
@@ -1328,53 +1415,94 @@ st.markdown(
     '<div class="section-title">📈 Interactive Financial Visualizations</div>',
     unsafe_allow_html=True
 )
-income_stmt_q, cashflow_q = get_quarterly_financials(ticker)
 
-# Operating Cash Flow chart (unchanged colors)
-fig_ocf = go.Figure()
-fig_ocf.add_trace(…)
-st.plotly_chart(fig_ocf)
+@st.cache_data
+def get_quarterly_financials(t):
+    stkr = yf.Ticker(t)
+    return stkr.quarterly_financials, stkr.quarterly_cashflow
 
-# Free Cash Flow chart (unchanged colors)
-fig_fcf = go.Figure()
-fig_fcf.add_trace(…)
-st.plotly_chart(fig_fcf)
+inc_q, cf_q = get_quarterly_financials(ticker)
 
-# Net Profit Margin vs Sales (unchanged)
+# Operating Cash Flow
+if 'Total Cash From Operating Activities' in cf_q.index:
+    fig_ocf = go.Figure()
+    fig_ocf.add_trace(go.Scatter(
+        x=cf_q.columns, y=cf_q.loc['Total Cash From Operating Activities'],
+        mode='lines+markers', name='Operating Cash Flow'
+    ))
+    fig_ocf.update_layout(title="Operating Cash Flow (Quarterly)", xaxis_title="Date", yaxis_title="USD")
+    st.plotly_chart(fig_ocf, use_container_width=True)
+
+# Free Cash Flow
+if 'Total Cash From Operating Activities' in cf_q.index and 'Capital Expenditures' in cf_q.index:
+    fcf = cf_q.loc['Total Cash From Operating Activities'] - cf_q.loc['Capital Expenditures']
+    fig_fcf = go.Figure()
+    fig_fcf.add_trace(go.Scatter(
+        x=fcf.index, y=fcf.values, mode='lines+markers', name='Free Cash Flow'
+    ))
+    fig_fcf.update_layout(title="Free Cash Flow (Quarterly)", xaxis_title="Date", yaxis_title="USD")
+    st.plotly_chart(fig_fcf, use_container_width=True)
+
+# Net Profit Margin vs Sales
+if 'Total Revenue' in inc_q.index and 'Net Income' in inc_q.index:
+    rev = inc_q.loc['Total Revenue']
+    nm  = inc_q.loc['Net Income'] / rev * 100
+    fig_nm = make_subplots(specs=[[{"secondary_y": True}]])
+    fig_nm.add_trace(go.Bar(
+        x=rev.index, y=rev.values,
+        name='Revenue', marker_color='lightblue'
+    ), secondary_y=False)
+    fig_nm.add_trace(go.Line(
+        x=nm.index, y=nm.values,
+        name='Net Margin (%)', marker_color='red'
+    ), secondary_y=True)
+    fig_nm.update_layout(title="Net Profit Margin vs Sales", xaxis_title="Date")
+    st.plotly_chart(fig_nm, use_container_width=True)
 
 
-# — Free Cash Flow Analysis (Bar Chart in Red) —
+# — Free Cash Flow Analysis —
 st.markdown(
     '<div class="section-title">💰 Free Cash Flow Analysis</div>',
     unsafe_allow_html=True
 )
-# (assume fcf and revenue/net_income computed above)
-chart_data = pd.DataFrame({
-    "Year": fcf.index,
-    "Free Cash Flow": fcf.values / 1e9
-})
-chart = alt.Chart(chart_data).mark_bar(color="#C8102E").encode(
-    x=alt.X("Year:O", title="Year"),
-    y=alt.Y("Free Cash Flow:Q", title="FCF (B USD)"),
-).properties(width=700, height=400, title="🧾 Free Cash Flow Over Time")
+# assume fcf series from above
+fcf_series = fcf.dropna().reset_index()
+fcf_series.columns = ['Year','FCF']
+chart = alt.Chart(fcf_series).mark_bar(color="#C8102E").encode(
+    x=alt.X('Year:O'),
+    y=alt.Y('FCF:Q', title="FCF (USD)")
+).properties(height=400, width=600)
 st.altair_chart(chart, use_container_width=True)
 
 
-# — Earnings Breakdown Waterfall & Revenue Trend —
+# — Earnings Breakdown Waterfall —
 st.markdown(
     '<div class="section-title">💰 Earnings Breakdown Waterfall</div>',
     unsafe_allow_html=True
 )
 earnings_waterfall_section(ticker)
 
+
+# — Revenue Trend —
 st.markdown(
     '<div class="section-title">📈 Revenue Trend</div>',
     unsafe_allow_html=True
 )
-# (revenue trend code as before)
+try:
+    rev_ts = yf.Ticker(ticker).financials.loc['Total Revenue'].dropna()
+    rev_ts.index = pd.to_datetime(rev_ts.index)
+    rev_ts = rev_ts.sort_index()
+    fig_rev = go.Figure()
+    fig_rev.add_trace(go.Scatter(
+        x=rev_ts.index, y=rev_ts.values/1e9, mode='lines+markers', name='Revenue'
+    ))
+    fig_rev.update_layout(title="Revenue Trend (B USD)", xaxis_title="Year", yaxis_title="Revenue (B)")
+    st.plotly_chart(fig_rev, use_container_width=True)
+except:
+    st.warning("Revenue data not available.")
 
 
-# — Solvency and Liquidity Overview —
+# — Solvency & Liquidity Overview —
 st.markdown(
     '<div class="section-title">🏦 Solvency & Liquidity Overview</div>',
     unsafe_allow_html=True
@@ -1382,53 +1510,73 @@ st.markdown(
 solvency_overview_section(ticker)
 
 
-# — Market Valuation & Profitability / Leverage Ratios —
+# — Market Valuation Multiples —
 st.markdown(
-    '<div class="section-title">📉 Financial Metrics & Key Ratios</div>',
+    '<div class="section-title">📊 Market Valuation Multiples</div>',
     unsafe_allow_html=True
 )
-
-# Market Valuation Multiples (Bar in Red)
-valuation_data = { … }
+valuation_data = {
+    "P/E Ratio": ratios.get("Trailing P/E"),
+    "Price to Book": ratios.get("Price to Book"),
+    "EV/EBITDA": ratios.get("Enterprise to EBITDA")
+}
+valuation_data = {k:v for k,v in valuation_data.items() if v is not None}
 if valuation_data:
-    fig1 = px.bar(
-        x=list(valuation_data.keys()),
-        y=list(valuation_data.values()),
+    fig_val = px.bar(
+        x=list(valuation_data.keys()), y=list(valuation_data.values()),
         text_auto=True,
         color_discrete_sequence=["#C8102E"]
     )
-    st.plotly_chart(fig1, use_container_width=True)
+    fig_val.update_layout(title="Market Valuation Metrics", yaxis_title="Value")
+    st.plotly_chart(fig_val, use_container_width=True)
+else:
+    st.warning("No market valuation data available.")
 
-# Profitability & Leverage Ratios (Bar in Red)
-profitability_data = { … }
-leverage_data       = { … }
+
+# — Profitability & Leverage Ratios —
+st.markdown(
+    '<div class="section-title">📈 Profitability & Leverage Ratios</div>',
+    unsafe_allow_html=True
+)
+profit_data = {
+    "ROE": ratios.get("Return on Equity (ROE)"),
+    "Op Margin": ratios.get("Operating Margins")
+}
+lev_data = {
+    "Debt/Equity": ratios.get("Debt to Equity")
+}
+profit_data = {k:v for k,v in profit_data.items() if v is not None}
+lev_data = {k:v for k,v in lev_data.items() if v is not None}
 col1, col2 = st.columns(2)
 with col1:
-    if profitability_data:
-        fig_profit = px.bar(
-            x=list(profitability_data.keys()),
-            y=list(profitability_data.values()),
+    if profit_data:
+        fig_p = px.bar(
+            x=list(profit_data.keys()), y=list(profit_data.values()),
             text_auto=True,
             color_discrete_sequence=["#C8102E"]
         )
-        st.plotly_chart(fig_profit, use_container_width=True)
+        st.plotly_chart(fig_p, use_container_width=True)
+    else:
+        st.warning("No profitability data available.")
 with col2:
-    if leverage_data:
-        fig_lev = px.bar(
-            x=list(leverage_data.keys()),
-            y=list(leverage_data.values()),
+    if lev_data:
+        fig_l = px.bar(
+            x=list(lev_data.keys()), y=list(lev_data.values()),
             text_auto=True,
             color_discrete_sequence=["#C8102E"]
         )
-        st.plotly_chart(fig_lev, use_container_width=True)
+        st.plotly_chart(fig_l, use_container_width=True)
+    else:
+        st.warning("No leverage data available.")
 
 
-# — Earnings Call Summary —
+# — Latest Earnings Call Summary —
 st.markdown(
     '<div class="section-title">📢 Latest Earnings Call Summary</div>',
     unsafe_allow_html=True
 )
 earnings_call_summary_section(ticker)
+
 
 
 
