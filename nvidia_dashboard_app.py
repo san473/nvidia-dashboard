@@ -2116,77 +2116,84 @@ def wall_street_price_targets(ticker: str):
 # Insert this line at the end of any logical section (e.g., scenario modeling)
 wall_street_price_targets(ticker)
 
-import pandas as pd  # make sure this is at the top
-
 import yfinance as yf
 import streamlit as st
 import plotly.graph_objects as go
 
 def render_price_target_chart(ticker_symbol: str):
-    # 1) Fetch data
+    # Fetch data
     info = yf.Ticker(ticker_symbol).info
-    current = info.get("currentPrice")
-    low     = info.get("targetLowPrice")
-    mean    = info.get("targetMeanPrice")
-    high    = info.get("targetHighPrice")
-
-    if None in (current, low, mean, high):
-        st.warning(f"No price‑target data available for {ticker_symbol.upper()}.")
+    curr = info.get("currentPrice")
+    low  = info.get("targetLowPrice")
+    mean = info.get("targetMeanPrice")
+    high = info.get("targetHighPrice")
+    if None in (curr, low, mean, high):
+        st.warning(f"No price‑target data for {ticker_symbol.upper()}.")
         return
 
-    # 2) Build figure
+    # Build figure
     fig = go.Figure()
 
-    # a) range band as a filled rectangle
-    fig.add_shape(
-        type="rect",
-        x0=low, x1=high,
-        y0=-0.1, y1=0.1,
-        fillcolor="lightblue",
-        line_width=0,
-        opacity=0.5
-    )
-
-    # b) mean target marker
-    fig.add_trace(go.Scatter(
-        x=[mean], y=[0],
-        mode="markers+text",
-        marker=dict(color="green", symbol="diamond", size=16),
-        text=["Mean"],
-        textposition="bottom center",
-        hovertemplate="Mean Target: $%{x:.2f}<extra></extra>"
+    # Mean bar with asymmetric error bars for low/high
+    fig.add_trace(go.Bar(
+        x=[mean],
+        y=[""],
+        error_x=dict(
+            type="data",
+            symmetric=False,
+            array=[high - mean],
+            arrayminus=[mean - low],
+            color="lightblue",
+            thickness=2,
+            width=0
+        ),
+        marker=dict(color="lightblue", line=dict(width=0)),
+        width=0.4,
+        hovertemplate=(
+            f"<b>{ticker_symbol.upper()}</b><br>"
+            "Low: $%{base:.2f}<br>"
+            "Mean: $%{x:.2f}<br>"
+            "High: $%{x+error_x.array:.2f}<extra></extra>"
+        )
     ))
 
-    # c) current price marker
+    # Current price marker
     fig.add_trace(go.Scatter(
-        x=[current], y=[0],
+        x=[curr], y=[""],
         mode="markers+text",
-        marker=dict(color="red", symbol="x", size=16),
+        marker=dict(symbol="x", size=18, color="red", line=dict(width=2, color="white")),
         text=["Current"],
         textposition="top center",
         hovertemplate="Current Price: $%{x:.2f}<extra></extra>"
     ))
 
-    # 3) Layout styling
-    fig.update_yaxes(visible=False, range=[-0.5, 0.5])
-    fig.update_xaxes(
-        title="Price (USD)",
-        range=[min(low, current) * 0.9, max(high, current) * 1.1],
-        showgrid=True,
-        gridcolor="lightgray"
-    )
+    # Layout styling
     fig.update_layout(
-        title=f"{ticker_symbol.upper()} Analyst Price Target Range",
-        plot_bgcolor="white",
+        title=dict(
+            text=f"{ticker_symbol.upper()} Analyst Price Target Range",
+            x=0.5, font=dict(size=18)
+        ),
+        template="plotly_dark",
+        xaxis=dict(
+            title="Price (USD)",
+            showgrid=True, gridcolor="gray80",
+            range=[min(low, curr)*0.9, max(high, curr)*1.1],
+            zeroline=False
+        ),
+        yaxis=dict(visible=False),
+        margin=dict(l=20, r=20, t=50, b=20),
         height=300,
-        margin=dict(l=40, r=40, t=60, b=40),
         showlegend=False
     )
 
-    # 4) Render in Streamlit
     st.plotly_chart(fig, use_container_width=True)
-st.markdown("## 🎯 Analyst Price Target Chart")
-render_price_target_chart(ticker)
+
+# — Usage —
+ticker = st.text_input("Ticker", "AAPL")
+if ticker:
+    st.markdown("## 🎯 Analyst Price Target Chart")
+    render_price_target_chart(ticker)
+
 
 
 
