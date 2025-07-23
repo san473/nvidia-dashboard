@@ -22,6 +22,59 @@ st.set_page_config(page_title="📈 Stock Dashboard", layout="wide")
 
 import streamlit.components.v1 as components
 
+import streamlit as st
+
+# — Custom CSS for hiding Streamlit chrome and branding —
+st.markdown(
+    """
+    <style>
+      /* Hide the default Streamlit header menu and footer */
+      #MainMenu {visibility: hidden;}
+      footer {visibility: hidden;}
+
+      /* Brand header container */
+      .app-header {
+        display: flex;
+        align-items: center;
+        padding: 10px 0;
+      }
+      /* Logo spacing (if you ever revert to HTML img) */
+      .app-header img {
+        height: 50px;
+        margin-right: 15px;
+      }
+      /* Header text styling */
+      .app-header h1 {
+        color: #C8102E;  /* LC Red */
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: bold;
+      }
+      /* Section titles */
+      .section-title {
+        color: #C8102E !important;
+        font-size: 1.75rem !important;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# — Logo + Branded Header —
+# Make sure 'assets/logo.png' exists and is committed
+st.image("assets/logo.png", width=60)
+st.markdown(
+    """
+    <div class="app-header">
+      <h1>Lighthouse Canton Dashboard</h1>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
 def render_ticker_widget():
     ticker_html = """
     <!-- TradingView Widget BEGIN -->
