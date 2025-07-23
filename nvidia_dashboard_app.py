@@ -2117,89 +2117,91 @@ def wall_street_price_targets(ticker: str):
 wall_street_price_targets(ticker)
 
 import yfinance as yf
+import pandas as pd
+import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
+from datetime import timedelta
 
-def render_price_target_chart(ticker_symbol: str):
-    # 1) Fetch data
-    info = yf.Ticker(ticker_symbol).info
-    curr = info.get("currentPrice")
-    low  = info.get("targetLowPrice")
-    mean = info.get("targetMeanPrice")
-    high = info.get("targetHighPrice")
-    
-    # 2) Validate
-    if None in (curr, low, mean, high):
-        st.warning(f"No price‑target data for {ticker_symbol.upper()}.")
+def render_price_with_forecast(ticker_symbol: str):
+    # 1) Load historical data (1 year)
+    tkr = yf.Ticker(ticker_symbol)
+    hist = tkr.history(period="1y")
+    if hist.empty:
+        st.warning(f"No historical data for {ticker_symbol.upper()}.")
         return
 
-    # 3) Build figure
+    # 2) Get current & target prices
+    info = tkr.info
+    current = info.get("currentPrice")
+    low_tgt = info.get("targetLowPrice")
+    mean_tgt= info.get("targetMeanPrice")
+    high_tgt= info.get("targetHighPrice")
+    if None in (current, low_tgt, mean_tgt, high_tgt):
+        st.warning(f"No analyst targets for {ticker_symbol.upper()}.")
+        return
+
+    # 3) Build forecast index (12 monthly steps after last hist date)
+    last_date = hist.index[-1]
+    forecast_dates = pd.date_range(
+        start=last_date + pd.DateOffset(months=1),
+        periods=12,
+        freq='M'
+    )
+
+    # 4) Linearly interpolate from current to each target
+    months = np.arange(1, 13)
+    low_proj  = np.linspace(current, low_tgt, 12)
+    mean_proj = np.linspace(current, mean_tgt, 12)
+    high_proj = np.linspace(current, high_tgt, 12)
+
+    # 5) Plotly figure
     fig = go.Figure()
 
-    # a) Mean bar with asymmetric error bars for low/high
-    fig.add_trace(go.Bar(
-        x=[mean],
-        y=[""],
-        error_x=dict(
-            type="data",
-            symmetric=False,
-            array=[high - mean],
-            arrayminus=[mean - low],
-            color="lightblue",
-            thickness=2,
-            width=0
-        ),
-        marker=dict(color="lightblue", line=dict(width=0)),
-        width=0.4,
-        hovertemplate=(
-            f"<b>{ticker_symbol.upper()}</b><br>"
-            "Low: $%{base:.2f}<br>"
-            "Mean: $%{x:.2f}<br>"
-            "High: $%{x+error_x.array:.2f}<extra></extra>"
-        )
-    ))
-
-    # b) Current price marker
+    # A) Historical price
     fig.add_trace(go.Scatter(
-        x=[curr], y=[""],
-        mode="markers+text",
-        marker=dict(symbol="x", size=18, color="red",
-                    line=dict(width=2, color="white")),
-        text=["Current"],
-        textposition="top center",
-        hovertemplate="Current Price: $%{x:.2f}<extra></extra>"
+        x=hist.index, y=hist['Close'],
+        mode='lines', name='Historical',
+        line=dict(color='white', width=2),
+        hovertemplate='%{x|%b %Y}: $%{y:.2f}<extra></extra>'
     ))
 
-    # 4) Layout styling
+    # B) Forecast lines
+    fig.add_trace(go.Scatter(
+        x=forecast_dates, y=low_proj,
+        mode='lines', name='Low Forecast',
+        line=dict(color='gray', dash='dot', width=2)
+    ))
+    fig.add_trace(go.Scatter(
+        x=forecast_dates, y=mean_proj,
+        mode='lines', name='Mean Forecast',
+        line=dict(color='lightblue', dash='dot', width=2)
+    ))
+    fig.add_trace(go.Scatter(
+        x=forecast_dates, y=high_proj,
+        mode='lines', name='High Forecast',
+        line=dict(color='green', dash='dot', width=2)
+    ))
+
+    # 6) Layout styling
     fig.update_layout(
-        title=dict(
-            text=f"{ticker_symbol.upper()} Analyst Price Target Range",
-            x=0.5,
-            font=dict(size=18)
-        ),
+        title=f"{ticker_symbol.upper()} Price & 12‑Month Forecast",
+        xaxis_title="Date",
+        yaxis_title="Price (USD)",
         template="plotly_dark",
-        xaxis=dict(
-            title="Price (USD)",
-            showgrid=True,
-            gridcolor="lightgray",             # fixed CSS color
-            range=[min(low, curr) * 0.9,
-                   max(high, curr) * 1.1],
-            zeroline=False
-        ),
-        yaxis=dict(visible=False),
-        margin=dict(l=20, r=20, t=50, b=20),
-        height=300,
-        showlegend=False
+        legend=dict(bgcolor='rgba(0,0,0,0.5)'),
+        hovermode="x unified",
+        margin=dict(l=40, r=40, t=60, b=40),
+        height=450
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-
-# —— Usage in your Streamlit app ——
-ticker = st.text_input("Enter Ticker", "AAPL")
+ticker = st.text_input("Ticker to Forecast", "AAPL")
 if ticker:
-    st.markdown("## 🎯 Analyst Price Target Chart")
-    render_price_target_chart(ticker)
+    st.markdown("## 📈 Price History + 12‑Month Analyst Forecast")
+    render_price_with_forecast(ticker)
+
 
 
 
