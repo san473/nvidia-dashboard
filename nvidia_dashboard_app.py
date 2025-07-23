@@ -2118,12 +2118,13 @@ wall_street_price_targets(ticker)
 
 import pandas as pd  # make sure this is at the top
 
-def render_price_target_widget(ticker_symbol: str):
-    import yfinance as yf
-    import streamlit as st
-    from plotly.subplots import make_subplots
-    import plotly.graph_objects as go
+import yfinance as yf
+import streamlit as st
+import pandas as pd
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 
+def render_price_target_widget(ticker_symbol: str):
     ticker = yf.Ticker(ticker_symbol)
     info = ticker.info
     rec_df = ticker.recommendations
@@ -2141,26 +2142,94 @@ def render_price_target_widget(ticker_symbol: str):
         st.warning(f"No analyst price‑target data available for {ticker_symbol.upper()}.")
         return
 
-    # Attempt to build sentiment pie
+    # Build sentiment pie if possible
     sentiment_counts = None
     if isinstance(rec_df, pd.DataFrame) and {"Firm","To Grade"}.issubset(rec_df.columns):
-        latest = rec_df.groupby("Firm").tail(1)["To Grade"].replace({
-            "Strong Buy":"Buy","Buy":"Buy",
-            "Hold":"Hold",
-            "Underperform":"Sell","Sell":"Sell","Strong Sell":"Sell"
-        })
+        latest = (
+            rec_df.groupby("Firm")
+                  .tail(1)["To Grade"]
+                  .replace({
+                    "Strong Buy":"Buy","Buy":"Buy",
+                    "Hold":"Hold",
+                    "Underperform":"Sell","Sell":"Sell","Strong Sell":"Sell"
+                  })
+        )
         sentiment_counts = latest.value_counts().reindex(["Buy","Hold","Sell"], fill_value=0)
 
-    # Build subplot...
-    fig = make_subplots(...)
+    # Create a 1×2 subplot: left=range+markers, right=pie
+    fig = make_subplots(
+        rows=1, cols=2,
+        specs=[[{"type":"xy"}, {"type":"domain"}]],
+        column_widths=[0.7, 0.3],
+        horizontal_spacing=0.1
+    )
 
-    # [ your plotting traces here ]
+    # 1) Range bar (low→high)
+    fig.add_trace(go.Bar(
+        y=["Targets"],
+        x=[target_high - target_low],
+        base=target_low,
+        orientation="h",
+        marker_color="#636EFA",
+        hovertemplate="Low: $%{base:.2f}<br>High: $%{x+base:.2f}<extra></extra>"
+    ), row=1, col=1)
+
+    # 2) Mean-target marker
+    fig.add_trace(go.Scatter(
+        y=["Targets"], x=[target_mean],
+        mode="markers+text",
+        marker=dict(color="green", symbol="diamond", size=14),
+        text=["Mean"],
+        textposition="bottom center",
+        hovertemplate="Mean: $%{x:.2f}<extra></extra>"
+    ), row=1, col=1)
+
+    # 3) Current-price marker
+    fig.add_trace(go.Scatter(
+        y=["Targets"], x=[current_price],
+        mode="markers+text",
+        marker=dict(color="red", symbol="x", size=14),
+        text=["Current"],
+        textposition="top center",
+        hovertemplate="Current: $%{x:.2f}<extra></extra>"
+    ), row=1, col=1)
+
+    # 4) Sentiment pie (if available)
+    if sentiment_counts is not None:
+        fig.add_trace(go.Pie(
+            labels=sentiment_counts.index,
+            values=sentiment_counts.values,
+            hole=0.4,
+            marker_colors=["#00CC96", "#AB63FA", "#EF553B"],
+            textinfo="label+percent",
+            hoverinfo="label+value"
+        ), row=1, col=2)
+
+    # Layout styling
+    fig.update_layout(
+        title={
+            "text": (
+                f"{ticker_symbol.upper()} Analyst Price Targets<br>"
+                f"<sup>{num_analysts} analysts, consensus: {consensus}</sup>"
+            ),
+            "x": 0.5
+        },
+        xaxis=dict(
+            title="Price (USD)",
+            range=[min(target_low, current_price) * 0.9, max(target_high, current_price) * 1.1]
+        ),
+        yaxis=dict(showticklabels=False),
+        template="plotly_white",
+        margin=dict(l=40, r=40, t=80, b=40),
+        showlegend=False,
+        height=400
+    )
 
     st.plotly_chart(fig, use_container_width=True)
 
-# —— Now these lines must be at top‑level (no indent) ——
 st.markdown("## 🎯 Analyst Price Target Forecast")
 render_price_target_widget(ticker)
+
 
 
 
