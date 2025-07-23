@@ -2121,20 +2121,22 @@ import streamlit as st
 import plotly.graph_objects as go
 
 def render_price_target_chart(ticker_symbol: str):
-    # Fetch data
+    # 1) Fetch data
     info = yf.Ticker(ticker_symbol).info
     curr = info.get("currentPrice")
     low  = info.get("targetLowPrice")
     mean = info.get("targetMeanPrice")
     high = info.get("targetHighPrice")
+    
+    # 2) Validate
     if None in (curr, low, mean, high):
         st.warning(f"No price‑target data for {ticker_symbol.upper()}.")
         return
 
-    # Build figure
+    # 3) Build figure
     fig = go.Figure()
 
-    # Mean bar with asymmetric error bars for low/high
+    # a) Mean bar with asymmetric error bars for low/high
     fig.add_trace(go.Bar(
         x=[mean],
         y=[""],
@@ -2157,27 +2159,31 @@ def render_price_target_chart(ticker_symbol: str):
         )
     ))
 
-    # Current price marker
+    # b) Current price marker
     fig.add_trace(go.Scatter(
         x=[curr], y=[""],
         mode="markers+text",
-        marker=dict(symbol="x", size=18, color="red", line=dict(width=2, color="white")),
+        marker=dict(symbol="x", size=18, color="red",
+                    line=dict(width=2, color="white")),
         text=["Current"],
         textposition="top center",
         hovertemplate="Current Price: $%{x:.2f}<extra></extra>"
     ))
 
-    # Layout styling
+    # 4) Layout styling
     fig.update_layout(
         title=dict(
             text=f"{ticker_symbol.upper()} Analyst Price Target Range",
-            x=0.5, font=dict(size=18)
+            x=0.5,
+            font=dict(size=18)
         ),
         template="plotly_dark",
         xaxis=dict(
             title="Price (USD)",
-            showgrid=True, gridcolor="gray80",
-            range=[min(low, curr)*0.9, max(high, curr)*1.1],
+            showgrid=True,
+            gridcolor="lightgray",             # fixed CSS color
+            range=[min(low, curr) * 0.9,
+                   max(high, curr) * 1.1],
             zeroline=False
         ),
         yaxis=dict(visible=False),
@@ -2188,11 +2194,13 @@ def render_price_target_chart(ticker_symbol: str):
 
     st.plotly_chart(fig, use_container_width=True)
 
-# — Usage —
-ticker = st.text_input("Ticker", "AAPL")
+
+# —— Usage in your Streamlit app ——
+ticker = st.text_input("Enter Ticker", "AAPL")
 if ticker:
     st.markdown("## 🎯 Analyst Price Target Chart")
     render_price_target_chart(ticker)
+
 
 
 
