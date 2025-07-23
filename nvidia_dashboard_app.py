@@ -566,14 +566,15 @@ if len(risk_points) < 3:
 for point in risk_points:
     st.markdown(f"- {point}")
 
-# — Retain your existing TradingView financials widget below —
-st.markdown('<div class="section-title">🧾 Financials Overview (TradingView)</div>', unsafe_allow_html=True)
-tradingview_financials_overview(ticker, height=500)
 
 
 
 
 
+import streamlit as st
+import streamlit.components.v1 as components
+
+# — TradingView widget definitions (unchanged) —
 
 def tradingview_financials_overview(ticker, height=500):
     """TradingView Financials Overview Widget"""
@@ -582,14 +583,14 @@ def tradingview_financials_overview(ticker, height=500):
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-financials.js">
       {{
-      "colorTheme": "light",
-      "isTransparent": false,
-      "largeChartUrl": "",
-      "displayMode": "regular",
-      "width": "100%",
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "locale": "en"
+        "colorTheme": "light",
+        "isTransparent": false,
+        "largeChartUrl": "",
+        "displayMode": "regular",
+        "width": "100%",
+        "height": "{height}",
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "locale": "en"
       }}
       </script>
     </div>
@@ -603,14 +604,14 @@ def tradingview_fundamental_data(ticker, height=500):
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-fundamental-data.js">
       {{
-      "colorTheme": "light",
-      "isTransparent": false,
-      "largeChartUrl": "",
-      "displayMode": "regular",
-      "width": "100%",
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "locale": "en"
+        "colorTheme": "light",
+        "isTransparent": false,
+        "largeChartUrl": "",
+        "displayMode": "regular",
+        "width": "100%",
+        "height": "{height}",
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "locale": "en"
       }}
       </script>
     </div>
@@ -624,14 +625,14 @@ def tradingview_earnings_estimates(ticker, height=500):
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-earnings.js">
       {{
-      "colorTheme": "light",
-      "isTransparent": false,
-      "largeChartUrl": "",
-      "displayMode": "regular",
-      "width": "100%",
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "locale": "en"
+        "colorTheme": "light",
+        "isTransparent": false,
+        "largeChartUrl": "",
+        "displayMode": "regular",
+        "width": "100%",
+        "height": "{height}",
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "locale": "en"
       }}
       </script>
     </div>
@@ -645,12 +646,12 @@ def tradingview_dividends(ticker, height=400):
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js">
       {{
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "width": "100%",
-      "locale": "en",
-      "colorTheme": "light",
-      "isTransparent": false,
-      "height": "{height}"
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "width": "100%",
+        "locale": "en",
+        "colorTheme": "light",
+        "isTransparent": false,
+        "height": "{height}"
       }}
       </script>
     </div>
@@ -664,12 +665,12 @@ def tradingview_analyst_estimates(ticker, height=500):
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-analyst-estimates.js">
       {{
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "width": "100%",
-      "height": "{height}",
-      "colorTheme": "light",
-      "isTransparent": false,
-      "locale": "en"
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "width": "100%",
+        "height": "{height}",
+        "colorTheme": "light",
+        "isTransparent": false,
+        "locale": "en"
       }}
       </script>
     </div>
@@ -683,21 +684,52 @@ def tradingview_technical_analysis_widget(ticker, height=500):
       <div class="tradingview-widget-container__widget"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js">
       {{
-      "interval": "1D",
-      "width": "100%",
-      "isTransparent": false,
-      "height": "{height}",
-      "symbol": "NASDAQ:{ticker.upper()}",
-      "showIntervalTabs": true,
-      "displayMode": "regular",
-      "colorTheme": "light",
-      "locale": "en"
+        "interval": "1D",
+        "width": "100%",
+        "isTransparent": false,
+        "height": "{height}",
+        "symbol": "NASDAQ:{ticker.upper()}",
+        "showIntervalTabs": true,
+        "displayMode": "regular",
+        "colorTheme": "light",
+        "locale": "en"
       }}
       </script>
     </div>
     """
     return components.html(html_code, height=height)
 
+
+# — Main dashboard layout —
+
+def equities_dashboard(ticker):
+    # … your previous sections (header, financials widget, DCF, etc.) …
+
+    # 🧾 Financials Overview
+    st.markdown('<div class="section-title">🧾 Financials Overview</div>', unsafe_allow_html=True)
+    tradingview_financials_overview(ticker, height=500)
+
+    # 📊 Fundamental Data
+    st.markdown('<div class="section-title">📊 Fundamental Data</div>', unsafe_allow_html=True)
+    tradingview_fundamental_data(ticker, height=500)
+
+    # 📈 Earnings Estimates
+    st.markdown('<div class="section-title">📈 Earnings Estimates</div>', unsafe_allow_html=True)
+    tradingview_earnings_estimates(ticker, height=500)
+
+    # 💰 Dividends
+    st.markdown('<div class="section-title">💰 Dividends</div>', unsafe_allow_html=True)
+    tradingview_dividends(ticker, height=400)
+
+    # 🎯 Analyst Estimates
+    st.markdown('<div class="section-title">🎯 Analyst Estimates</div>', unsafe_allow_html=True)
+    tradingview_analyst_estimates(ticker, height=500)
+
+    # 🛠 Technical Analysis
+    st.markdown('<div class="section-title">🛠 Technical Analysis</div>', unsafe_allow_html=True)
+    tradingview_technical_analysis_widget(ticker, height=500)
+
+    # … any follow‑on sections …
 
 import streamlit as st
 import streamlit.components.v1 as components
