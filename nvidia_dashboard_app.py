@@ -2116,6 +2116,8 @@ def wall_street_price_targets(ticker: str):
 # Insert this line at the end of any logical section (e.g., scenario modeling)
 wall_street_price_targets(ticker)
 
+import pandas as pd  # make sure this is at the top
+
 def render_price_target_widget(ticker_symbol: str):
     import yfinance as yf
     import streamlit as st
@@ -2141,7 +2143,7 @@ def render_price_target_widget(ticker_symbol: str):
 
     # Attempt to build sentiment pie
     sentiment_counts = None
-    if isinstance(rec_df, (pd.DataFrame,)) and {"Firm","To Grade"}.issubset(rec_df.columns):
+    if isinstance(rec_df, pd.DataFrame) and {"Firm","To Grade"}.issubset(rec_df.columns):
         latest = rec_df.groupby("Firm").tail(1)["To Grade"].replace({
             "Strong Buy":"Buy","Buy":"Buy",
             "Hold":"Hold",
@@ -2149,77 +2151,17 @@ def render_price_target_widget(ticker_symbol: str):
         })
         sentiment_counts = latest.value_counts().reindex(["Buy","Hold","Sell"], fill_value=0)
 
-    # Build subplot
-    fig = make_subplots(rows=1, cols=2,
-                        specs=[[{"type":"xy"},{"type":"domain"}]],
-                        column_widths=[0.7,0.3],
-                        horizontal_spacing=0.1)
+    # Build subplot...
+    fig = make_subplots(...)
 
-    # Range bar
-    fig.add_trace(go.Bar(
-        y=["Targets"],
-        x=[target_high - target_low],
-        base=target_low,
-        orientation="h",
-        marker_color="#636EFA",
-        hovertemplate="Low: $%{base:.2f}<br>High: $%{x+base:.2f}<extra></extra>"
-    ), row=1, col=1)
-
-    # Mean marker
-    fig.add_trace(go.Scatter(
-        y=["Targets"], x=[target_mean],
-        mode="markers+text",
-        marker=dict(color="green", symbol="diamond", size=14),
-        text=["Mean"],
-        textposition="bottom center",
-        hovertemplate="Mean: $%{x:.2f}<extra></extra>"
-    ), row=1, col=1)
-
-    # Current marker
-    fig.add_trace(go.Scatter(
-        y=["Targets"], x=[current_price],
-        mode="markers+text",
-        marker=dict(color="red", symbol="x", size=14),
-        text=["Current"],
-        textposition="top center",
-        hovertemplate="Current: $%{x:.2f}<extra></extra>"
-    ), row=1, col=1)
-
-    # Sentiment pie if available
-    if sentiment_counts is not None:
-        fig.add_trace(go.Pie(
-            labels=sentiment_counts.index,
-            values=sentiment_counts.values,
-            hole=0.4,
-            marker_colors=["#00CC96","#AB63FA","#EF553B"],
-            textinfo="label+percent",
-            hoverinfo="label+value"
-        ), row=1, col=2)
-
-    # Layout
-    fig.update_layout(
-        title={
-            "text": (
-                f"{ticker_symbol.upper()} Analyst Price Targets<br>"
-                f"<sup>{num_analysts} analysts, consensus: {consensus}</sup>"
-            ),
-            "x":0.5
-        },
-        xaxis=dict(title="Price (USD)",
-                   range=[min(target_low, current_price)*0.9,
-                          max(target_high, current_price)*1.1]),
-        yaxis=dict(showticklabels=False),
-        template="plotly_white",
-        margin=dict(l=40,r=40,t=80,b=40),
-        showlegend=False,
-        height=400
-    )
+    # [ your plotting traces here ]
 
     st.plotly_chart(fig, use_container_width=True)
 
-# 🎯 Analyst Price Target Section
-    st.markdown("## 🎯 Analyst Price Target Forecast")
-    render_price_target_widget(ticker)
+# —— Now these lines must be at top‑level (no indent) ——
+st.markdown("## 🎯 Analyst Price Target Forecast")
+render_price_target_widget(ticker)
+
 
 
 import streamlit as st
