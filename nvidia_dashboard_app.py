@@ -15,6 +15,8 @@ from finvizfinance.quote import finvizfinance
 import nltk
 import openai
 from openai import RateLimitError, APIError
+from plotly.subplots import make_subplots
+
 
 
 # Set page config BEFORE anything else
