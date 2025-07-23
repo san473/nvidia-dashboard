@@ -2120,71 +2120,115 @@ import yfinance as yf
 import plotly.graph_objects as go
 
 import yfinance as yf
+import streamlit as st
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-def render_price_target_chart(ticker_symbol):
+def render_price_target_widget(ticker_symbol: str):
     ticker = yf.Ticker(ticker_symbol)
     info = ticker.info
+    rec_df = ticker.recommendations
 
-    try:
-        current_price = info.get("currentPrice")
-        target_mean_price = info.get("targetMeanPrice")
-        target_high_price = info.get("targetHighPrice")
-        target_low_price = info.get("targetLowPrice")
+    # Extract data
+    current_price   = info.get("currentPrice")
+    target_low      = info.get("targetLowPrice")
+    target_mean     = info.get("targetMeanPrice")
+    target_high     = info.get("targetHighPrice")
+    num_analysts    = info.get("numberOfAnalystOpinions", 0)
+    consensus       = info.get("recommendationKey", "N/A")
 
-        if None in (current_price, target_mean_price, target_high_price, target_low_price):
-            raise ValueError("Incomplete price target data.")
+    # Check availability
+    if None in (current_price, target_low, target_mean, target_high):
+        st.warning(f"No analyst price‑target data available for {ticker_symbol.upper()}.")
+        return
 
-        fig = go.Figure()
+    # Build analyst sentiment distribution (Buy/Hold/Sell) if possible
+    sentiment_counts = None
+    if rec_df is not None and not rec_df.empty:
+        latest = rec_df.groupby("Firm").tail(1)["To Grade"]
+        mapped = latest.replace({
+            "Strong Buy": "Buy", "Buy": "Buy",
+            "Hold": "Hold",
+            "Underperform": "Sell", "Sell": "Sell", "Strong Sell": "Sell"
+        })
+        sentiment_counts = mapped.value_counts().reindex(["Buy","Hold","Sell"], fill_value=0)
 
-        fig.add_trace(go.Bar(
-            x=[target_high_price - target_low_price],
-            base=target_low_price,
-            orientation='h',
-            marker=dict(color="lightblue"),
-            name="Price Target Range",
-            hovertemplate=f"Low: ${target_low_price}<br>High: ${target_high_price}<extra></extra>"
-        ))
+    # Create subplot (bar + pie)
+    fig = make_subplots(
+        rows=1, cols=2,
+        specs=[[{"type":"xy"}, {"type":"domain"}]],
+        column_widths=[0.7, 0.3],
+        horizontal_spacing=0.1
+    )
 
-        fig.add_trace(go.Scatter(
-            x=[target_mean_price],
-            y=["Target"],
-            mode='markers+text',
-            marker=dict(color='blue', size=12, symbol='diamond'),
-            text=["Target Mean"],
-            textposition="bottom center",
-            name="Target Mean"
-        ))
+    # 1) Range bar (low→high)
+    fig.add_trace(go.Bar(
+        y=["Price Targets"],
+        x=[target_high - target_low],
+        base=target_low,
+        orientation='h',
+        marker=dict(color="#636EFA"),
+        hovertemplate=f"Low: $%{{base:.2f}}<br>High: $%{{x+base:.2f}}<extra></extra>"
+    ), row=1, col=1)
 
-        fig.add_trace(go.Scatter(
-            x=[current_price],
-            y=["Target"],
-            mode='markers+text',
-            marker=dict(color='red', size=12, symbol='x'),
-            text=["Current Price"],
-            textposition="top center",
-            name="Current Price"
-        ))
+    # 2) Mean‑target marker
+    fig.add_trace(go.Scatter(
+        y=["Price Targets"],
+        x=[target_mean],
+        mode='markers+text',
+        marker=dict(color='green', symbol='diamond', size=14),
+        text=["Mean Target"],
+        textposition="bottom center",
+        hovertemplate=f"Mean Target: ${target_mean:.2f}<extra></extra>"
+    ), row=1, col=1)
 
-        fig.update_layout(
-            title=f"{ticker_symbol.upper()} Analyst Price Target Range",
-            xaxis_title="Price (USD)",
-            yaxis=dict(showticklabels=False),
-            height=300,
-            margin=dict(l=20, r=20, t=40, b=20),
-            template="plotly_white"
-        )
+    # 3) Current‑price marker
+    fig.add_trace(go.Scatter(
+        y=["Price Targets"],
+        x=[current_price],
+        mode='markers+text',
+        marker=dict(color='red', symbol='x', size=14),
+        text=["Current Price"],
+        textposition="top center",
+        hovertemplate=f"Current Price: ${current_price:.2f}<extra></extra>"
+    ), row=1, col=1)
 
-        return fig
+    # 4) Sentiment pie (if data exists)
+    if sentiment_counts is not None:
+        fig.add_trace(go.Pie(
+            labels=sentiment_counts.index,
+            values=sentiment_counts.values,
+            hole=0.4,
+            marker_colors=["#00CC96","#AB63FA","#EF553B"],
+            textinfo="label+percent",
+            hoverinfo="label+value"
+        ), row=1, col=2)
 
-    except Exception as e:
-        import streamlit as st
-        st.warning(f"Could not fetch or render price target chart: {e}")
-        return None
+    # Layout styling
+    fig.update_layout(
+        title={
+            "text": (
+                f"{ticker_symbol.upper()} Analyst Price Targets<br>"
+                f"<sup>{num_analysts} analysts, consensus: {consensus}</sup>"
+            ),
+            "x":0.5
+        },
+        xaxis=dict(title="Price (USD)", range=[min(target_low, current_price)*0.9, max(target_high, current_price)*1.1]),
+        yaxis=dict(showticklabels=False),
+        template="plotly_white",
+        margin=dict(l=40, r=40, t=80, b=40),
+        showlegend=False,
+        height=400
+    )
 
-fig = render_price_target_chart(ticker)
-if fig:
     st.plotly_chart(fig, use_container_width=True)
+
+
+# —— Usage in your Streamlit app ——
+ticker = st.text_input("Enter Ticker", "AAPL")
+if ticker:
+    render_price_target_widget(ticker)
+
 
 
 import streamlit as st
