@@ -485,7 +485,7 @@ current_ratio = financial_data.get("currentRatio", None)
 
 
 
-# Load Lighthouse Canton commentary
+# — Load Lighthouse Canton commentary —
 @st.cache_data
 def load_lighthouse_commentary():
     df = pd.read_excel("CIO Stocks.xlsx")
@@ -494,40 +494,31 @@ def load_lighthouse_commentary():
 
 cio_df      = load_lighthouse_commentary()
 ticker_upper = ticker.upper()
-
-# Match current ticker
-matched = cio_df[cio_df["ticker"].str.upper().str.strip() == ticker_upper]
+matched     = cio_df[cio_df["ticker"].str.upper().str.strip() == ticker_upper]
 
 # 🧭 Lighthouse Canton View
-st.markdown(
-    '<div class="section-title">🧭 Lighthouse Canton View</div>',
-    unsafe_allow_html=True
-)
+st.markdown('<div class="section-title">🧭 Lighthouse Canton View</div>', unsafe_allow_html=True)
 
 if not matched.empty:
     view         = matched["lighthouse canton view"].values[0]
     target_price = matched["target price"].values[0]
 
-    # Get current market price from yfinance
+    # Fetch current price
     try:
-        ticker_data   = yf.Ticker(ticker)
-        current_price = ticker_data.info.get("regularMarketPrice", None)
+        current_price = yf.Ticker(ticker).info.get("regularMarketPrice", None)
     except Exception:
         current_price = None
 
     # Compute upside/downside
+    upside_pct = None
     if pd.notna(target_price) and current_price:
         upside_pct = ((target_price - current_price) / current_price) * 100
         direction  = "Upside" if upside_pct >= 0 else "Downside"
         color      = "green" if upside_pct >= 0 else "red"
-    else:
-        upside_pct = None
 
-    # Display content
     st.markdown(f"**📌 View:** {view}")
     st.markdown(f"**🎯 Target Price:** ${target_price:,.2f}")
-    
-    if current_price:
+    if current_price is not None:
         st.markdown(f"**💵 Current Price:** ${current_price:,.2f}")
         st.markdown(f"**📈 {direction} Potential:** :{color}[{upside_pct:.2f}%]")
     else:
@@ -535,43 +526,52 @@ if not matched.empty:
 else:
     st.info("This stock is not present in the Lighthouse Canton coverage.")
 
-
 # 📈 Investment Thesis & Upside Potential
-st.markdown(
-    '<div class="section-title">📈 Investment Thesis & Upside Potential</div>',
-    unsafe_allow_html=True
-)
+st.markdown('<div class="section-title">📈 Investment Thesis & Upside Potential</div>', unsafe_allow_html=True)
 
 thesis_points = []
 if revenue and revenue > 1e9:
-    thesis_points.append(f" Strong topline performance with trailing revenue of ${revenue/1e9:.2f}B suggests robust demand.")
-# … (other thesis logic) …
+    thesis_points.append(f"Strong topline performance with trailing revenue of ${revenue/1e9:.2f}B suggests robust demand.")
+if eps and eps > 0:
+    thesis_points.append(f"Solid EPS of ${eps:.2f} indicates strong earnings power.")
+if roe and roe > 0.15:
+    thesis_points.append(f"Healthy Return on Equity (ROE) of {roe*100:.1f}% highlights efficient capital allocation.")
+if earnings_growth and earnings_growth > 0:
+    thesis_points.append(f"Positive quarterly earnings growth of {earnings_growth*100:.1f}% supports upside potential.")
+if market_cap and market_cap > 50e9:
+    thesis_points.append(f"Large‑cap stability: {long_name} operates at a market cap above $50B, enhancing institutional confidence.")
+if len(thesis_points) < 3:
+    thesis_points.append("Limited available financial highlights — further analysis recommended.")
 
 for point in thesis_points:
     st.markdown(f"- {point}")
 
-
 # ⚠️ Risks & Concerns
-st.markdown(
-    '<div class="section-title">⚠️ Risks & Concerns</div>',
-    unsafe_allow_html=True
-)
+st.markdown('<div class="section-title">⚠️ Risks & Concerns</div>', unsafe_allow_html=True)
 
 risk_points = []
 if earnings_growth is not None and earnings_growth < 0:
-    risk_points.append(f" Negative earnings growth ({earnings_growth*100:.1f}%) may signal performance headwinds.")
-# … (other risk logic) …
+    risk_points.append(f"Negative earnings growth ({earnings_growth*100:.1f}%) may signal performance headwinds.")
+if profit_margin is not None and profit_margin < 0.05:
+    risk_points.append(f"Thin profit margins ({profit_margin*100:.1f}%) could limit scalability.")
+if roe is not None and roe < 0.05:
+    risk_points.append(f"Weak Return on Equity ({roe*100:.1f}%) may suggest inefficient operations.")
+if debt_to_equity is not None and debt_to_equity > 100:
+    risk_points.append(f"Elevated debt‑to‑equity ratio ({debt_to_equity:.0f}%) increases financial risk.")
+if current_ratio is not None and current_ratio < 1:
+    risk_points.append(f"Current ratio below 1.0 raises concerns over short‑term liquidity.")
+if len(risk_points) < 3:
+    risk_points.append("No major red flags from available metrics — monitor quarterly updates.")
 
 for point in risk_points:
     st.markdown(f"- {point}")
 
-
-# TradingView Financials Overview Widget
-st.markdown(
-    '<div class="section-title">🧾 Financials Overview (TradingView)</div>',
-    unsafe_allow_html=True
-)
+# — Retain your existing TradingView financials widget below —
+st.markdown('<div class="section-title">🧾 Financials Overview (TradingView)</div>', unsafe_allow_html=True)
 tradingview_financials_overview(ticker, height=500)
+
+
+
 
 
 
